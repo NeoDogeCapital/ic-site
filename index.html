@@ -373,6 +373,35 @@ async function proposal(el){
   el.innerHTML = head("Process", "Proposed portfolio", `<span class="muted">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</span>`) +
     sect("KEEP", "held and supported by the grid") + `<div style="margin-top:16px">${sect("ADD","ranked on fundamentals, within sector and correlation limits")}</div>` +
     `<div style="margin-top:16px">${sect("EXIT","grid no longer supports ownership, or a limit forces it out")}</div>`;
+  await paperCard(el);
+}
+
+/* ═══ forward track record (paper) ══════════════════════════════════════════ */
+const PAPER_LABEL = {grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Strong Buy", tech_buy:"Technical Buy only", grade_a:"Grade A only",
+  grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
+  quad_q1:"Q1 names", quad_q2:"Q2 names", quad_q3:"Q3 names", quad_q4:"Q4 names", universe_ew:"Universe EW",
+  proposal:"Proposal", actual_book:"Actual book", spy:"SPY"};
+const PAPER_COL = {grid_ab_buy:C.green, grid_a_buy:"#2fa874", tech_buy:C.accent2, grade_a:"#c9a1ff", grade_cd:"#b66",
+  ab_not_down:"#7fd1c8", grade_ab:"#9ab", ab_tech_weak:"#d98", quad_q1:C.q.Q1, quad_q2:C.q.Q2, quad_q3:C.q.Q3, quad_q4:C.q.Q4,
+  universe_ew:C.violet, proposal:C.accent, actual_book:C.gold, spy:C.muted};
+const PAPER_DEFAULT = ["grid_ab_buy", "proposal", "actual_book", "universe_ew", "spy"];
+async function paperCard(el){
+  const rows = await q("site_paper_nav", r => r.order("nav_date"));
+  if(!rows.length) return;
+  const by = {}; rows.forEach(r => (by[r.strategy] ||= []).push(r));
+  const start = rows[0].nav_date, days = [...new Set(rows.map(r => r.nav_date))];
+  const spyLast = +(by.spy||[]).slice(-1)[0]?.nav || 100;
+  const stats = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
+    const last = +by[s].slice(-1)[0].nav; return [ `<span style="color:${PAPER_COL[s]}">●</span> ${PAPER_LABEL[s]}`, pct(last/100-1), s==="spy" ? "—" : pct(last/spyLast-1) ]; });
+  const box = document.createElement("div"); box.style.marginTop = "16px";
+  box.innerHTML = card("Forward track record", `paper portfolios locked monthly from live analytics · since ${start} · ${days.length} trading day${days.length===1?"":"s"} · no back-fill`,
+    `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${tbl(["Strategy","Return","vs SPY"], stats.sort((a,b)=>parseFloat(b[1])-parseFloat(a[1])))}</div><div class="muted" style="margin-top:8px">Backtest (Jan 2024 → Sep 2026, hindsight universe): A/B + Buy +157% · A + Buy +170% · Technical Buy +154% · Grade A +139% · C/D +133% · A/B not downtrend +116% · Universe +114% · A/B +107% · A/B weak +97% · SPY +65%.</div>`);
+  el.appendChild(box);
+  mk(document.getElementById("paperChart"), {legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
+      selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))}, grid:{left:48,right:16,top:20,bottom:40},
+    xAxis:{type:"category", data:days, axisLabel:{color:C.muted}}, yAxis:{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+    series:Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => ({name:PAPER_LABEL[s], type:"line", showSymbol:days.length<3, lineStyle:{width:s==="grid_ab_buy"||s==="actual_book"?2.4:1.4, color:PAPER_COL[s]}, itemStyle:{color:PAPER_COL[s]},
+      data:days.map(d => { const x = by[s].find(r => r.nav_date===d); return x ? +(+x.nav).toFixed(2) : null; })}))});
 }
 
 const VIEWS = {overview, holdings, performance, universe, grid, risk, proposal, signals, factors, history};
