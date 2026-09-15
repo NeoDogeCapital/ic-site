@@ -186,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function loadPayload(){
   const rows = await q("site_payload");
@@ -219,7 +219,8 @@ function applyQuotes(){
 }
 async function enter(){
   const err = document.getElementById("err");
-  try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t])); }
+  try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t]));
+    LIVE.v2 = Object.fromEntries((await q("site_technicals_v2")).map(t => [t.ticker, t])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -286,6 +287,25 @@ function sparkline(el, pts, color){
 
 /* ═══ router ═════════════════════════════════════════════════════════════ */
 
+/* ═══ timing (technical v2) ═══════════════════════════════════════════════ */
+const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
+                    TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
+const timingChip = (t, pos) => !t ? "—" :
+  `<span style="color:${TIMING_COL[t]||C.text}">${esc(t.replaceAll("_"," "))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
+function rangeBar(v2){
+  if(!v2 || v2.trade_low == null) return "";
+  const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
+  return `<div class="sec"><h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing?.replaceAll("_"," ")||"")}</span></h4>
+    <div style="position:relative;height:26px;margin:10px 0;background:linear-gradient(90deg,rgba(63,207,142,.25),rgba(255,255,255,.05),rgba(240,169,74,.25));border-radius:4px">
+      <div style="position:absolute;left:${p*100}%;top:-4px;width:2px;height:34px;background:${C.text}"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px" class="muted"><span>${usd(lo,2)} low</span><span>${usd(px,2)}</span><span>${usd(hi,2)} high</span></div>
+    ${tbl(["Range","Direction","Low","High"], [["Trade (1 week)", esc(v2.trade_dir), usd(v2.trade_low,2), usd(v2.trade_high,2)],
+      ["Trend (1 month)", esc(v2.trend_dir), usd(v2.trend_low,2), usd(v2.trend_high,2)],
+      ["Tail (6 months)", esc(v2.tail_dir), usd(v2.tail_low,2), usd(v2.tail_high,2)]])}
+    <div class="note">Trend line ${esc(v2.trend)} since ${esc(v2.trend_since||"—")} · RSI ${num(v2.rsi,0)} (${esc(v2.rsi_regime)}) ·
+      ${v2.above_52w_low_avwap ? "above" : "below"} the 52-week-low VWAP · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>`;
+}
+
 /* ═══ GRID (decision matrix, live) ═════════════════════════════════════════ */
 const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.green, STARTER:C.accent, HOLD:C.muted,
   HOLD_WAIT_TREND:C.muted, HOLD_NO_NEW_BUYS:C.amber, REVIEW:C.amber, TRIM_CANDIDATE:C.amber, WATCH:C.dim,
@@ -305,6 +325,7 @@ async function grid(el){
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
+      <td>${timingChip(r.timing, r.range_pos)}</td><td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     document.getElementById("gridN").textContent = rows.length + " names";
@@ -318,7 +339,7 @@ async function grid(el){
       `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><input class="search" id="gq" placeholder="Ticker or sector" value="${esc(gridFilter.q)}">
        <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
        <button class="lock" id="gclear">Clear filters</button></div>
-       <div class="table-wrap"><table class="tbl"><thead><tr><th>Ticker</th><th>Grade</th><th>Technical</th><th>Action</th><th>Quad</th><th>QGS tier</th><th>Composite</th><th>Trend</th><th>Sector</th><th>Why</th></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
+       <div class="table-wrap"><table class="tbl"><thead><tr><th>Ticker</th><th>Grade</th><th>Technical</th><th>Action</th><th>Timing</th><th>Guidance</th><th>Quad</th><th>QGS tier</th><th>Composite</th><th>Trend</th><th>Sector</th><th>Why</th></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
   document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; draw(); };
@@ -630,7 +651,7 @@ function holdings(el){
 }
 function drawHoldings(){
   const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
+                ["align","Alignment"],["trend","Trend"],["_timing","Timing"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
   const q = hQuery.toLowerCase();
   let rows = D.holdings.filter(h => !q || h.tk.toLowerCase().includes(q) || (h.name||"").toLowerCase().includes(q));
   rows.sort((a,b) => { const k=hSort.k, x=a[k], y=b[k]; if(x==null) return 1; if(y==null) return -1;
@@ -649,10 +670,11 @@ function drawHoldings(){
       <td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor?' <span class="chip bad" title="P2 or P3 below 6.0">floor</span>':''}</td>
       <td>${alignBar(h.align)}</td>
       <td>${trendChip(h.trend)}</td>
+      <td style="font-size:12px">${timingChip((LIVE.v2[h.tk]||{}).timing, (LIVE.v2[h.tk]||{}).range_pos)}</td>
       <td class="mono muted" style="font-size:12px">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
       <td class="mono muted" style="font-size:12px">${h.next_er||"—"}</td>
       <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + "</tbody>";
-  t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark") return;
+  t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
     hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
   t.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; });
   t.querySelectorAll("[data-spark]").forEach(el => { const h = D.holdings.find(x=>x.tk===el.dataset.spark);
@@ -684,7 +706,7 @@ function openHolding(tk){
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
       <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
-    ${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${rangeBar(LIVE.v2[h.tk])}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
