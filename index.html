@@ -63,7 +63,8 @@ main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
 .grid{display:grid;gap:16px}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g-2-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
-@media(max-width:980px){.g2,.g3,.g-2-1{grid-template-columns:1fr}}
+.g-1-2{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+@media(max-width:980px){.g2,.g3,.g-2-1,.g-1-2{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:0}
 .card h3{margin:0;font-size:13.5px;font-weight:600;color:var(--text)}
 .card .sub{color:var(--dim);font-size:12px;margin-top:2px}
@@ -162,10 +163,12 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#holdings" data-v="holdings">Holdings</a>
       <a href="#performance" data-v="performance">Performance</a>
+      <a href="#analytics" data-v="analytics">Analytics</a>
       <a href="#universe" data-v="universe">Universe</a>
       <a href="#grid" data-v="grid">Grid</a>
       <a href="#risk" data-v="risk">Risk</a>
       <a href="#proposal" data-v="proposal">Proposal</a>
+      <a href="#theses" data-v="theses">Theses</a>
       <a href="#signals" data-v="signals">Signals</a>
       <a href="#factors" data-v="factors">Factors</a>
       <a href="#history" data-v="history">History</a>
@@ -183,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
+let D = null, LIVE = {theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function loadPayload(){
   const rows = await q("site_payload");
@@ -216,7 +219,7 @@ function applyQuotes(){
 }
 async function enter(){
   const err = document.getElementById("err");
-  try{ await loadPayload(); await loadQuotes(); }
+  try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -376,6 +379,115 @@ async function proposal(el){
   await paperCard(el);
 }
 
+
+/* ═══ ANALYTICS (movers · benchmarks · income · vol regimes · geography · fundamentals · news) ═══ */
+function regress(y, x){
+  const n = Math.min(y.length, x.length); if(n < 30) return null;
+  const my = y.reduce((a,b)=>a+b,0)/n, mx = x.reduce((a,b)=>a+b,0)/n;
+  let sxy=0, sxx=0; for(let i=0;i<n;i++){ sxy += (x[i]-mx)*(y[i]-my); sxx += (x[i]-mx)**2; }
+  const beta = sxy/sxx, alpha = my - beta*mx;
+  const ex = y.map((v,i) => v - x[i]), me = ex.reduce((a,b)=>a+b,0)/n;
+  const te = Math.sqrt(ex.reduce((a,b)=>a+(b-me)**2,0)/(n-1)) * Math.sqrt(252);
+  const res = y.map((v,i) => v - alpha - beta*x[i]), sr = Math.sqrt(res.reduce((a,b)=>a+b*b,0)/(n-2));
+  return {beta, alpha_ann: alpha*252, t_alpha: alpha/(sr/Math.sqrt(n)), te, ir: te ? me*252/te : null,
+          cum: y.reduce((a,v)=>a*(1+v),1)-1, bench_cum: x.reduce((a,v)=>a*(1+v),1)-1};
+}
+async function analytics(el){
+  el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">loading…</span>`);
+  if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
+  const HA = LIVE.hanal, B = HA.book || {}, P = D.perf;
+  if(!LIVE.benchPx){
+    const rows = await q("site_price_history", r => r.in("ticker", ["QQQ","IWM"]).gte("price_date", P.dates[0]).order("price_date"));
+    LIVE.benchPx = {}; rows.forEach(r => (LIVE.benchPx[r.ticker] ||= {})[r.price_date] = +r.adj_close);
+  }
+  const retOn = (px) => { const out = []; let prev = null; P.dates.forEach(d => { const v = px[d]; out.push(prev && v ? v/prev-1 : null); if(v) prev = v; }); return out; };
+  const pairs = (b) => { const y=[], x=[]; P.daily_p.forEach((v,i) => { if(v!=null && b[i]!=null){ y.push(v); x.push(b[i]); } }); return {y, x}; };
+  const benches = {SPY: P.daily_b, QQQ: retOn(LIVE.benchPx.QQQ||{}), IWM: retOn(LIVE.benchPx.IWM||{})};
+  const stats = Object.fromEntries(Object.entries(benches).map(([k,b]) => { const {y,x} = pairs(b); return [k, regress(y,x)]; }));
+
+  const H = D.holdings.slice(), movers = H.filter(h => h.day!=null).sort((a,b) => b.day-a.day);
+  const mv = h => [`<b>${esc(h.tk)}</b>`, `<span class="${cls(h.day)}">${pct(h.day,2)}</span>`, usd(h.value - h.value/(1+h.day))];
+  const inc = Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.income||{})})).filter(r => r.fwd_rate > 0).sort((a,b)=>b.annual_income-a.annual_income);
+  const vols = Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.vol||{})})).filter(r => r.regime);
+  const RC = {LOW:C.green, NORMAL:C.muted, ELEVATED:C.amber, EXTREME:C.red};
+  const news = H.flatMap(h => ((h.research||{}).news||[]).map(n => ({...n, tk:h.tk}))).sort((a,b) => (b.date||"").localeCompare(a.date||"")).slice(0,60);
+
+  el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">prices live · income & volatility as of ${HA.as_of||"—"}</span>`) +
+  `<div class="grid g2">
+    ${card("Today's movers", `book ${(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)>=0)?"up":"down"} ${usd(Math.abs(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)))} today`,
+      `<div class="grid g2">${tbl(["Top","Day","$"], movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], movers.slice(-5).reverse().map(mv))}</div>`)}
+    ${card("Skill vs benchmark", "daily returns since inception · alpha = return not explained by beta",
+      tbl(["Benchmark","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"], Object.entries(stats).filter(([,s])=>s).map(([k,s]) =>
+        [k, pct(s.cum), pct(s.bench_cum), num(s.beta), `<span class="${cls(s.alpha_ann)}">${pct(s.alpha_ann)}</span>`, num(s.t_alpha), pct(s.te,1,false), num(s.ir)])) +
+      `<div class="chart" id="anScatter"></div><div class="note">|t| ≥ 2 is the usual bar for alpha distinguishable from luck.</div>`)}
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    ${card("Volatility regimes", `book: <b style="color:${RC[(B.vol||{}).regime]||C.muted}">${(B.vol||{}).regime||"—"}</b> · conditional vol ${pct((B.vol||{}).cond_vol,1,false)} vs long-run ${pct((B.vol||{}).long_run_vol,1,false)} · GARCH(1,1)`,
+      `<div class="chart" id="anVol"></div>` + tbl(["Holding","Regime","Cond. vol","Long-run","20d realized","Pctile"], vols.sort((a,b)=>b.vol_percentile-a.vol_percentile).map(v =>
+        [`<b>${v.tk}</b>`, `<span style="color:${RC[v.regime]}">${v.regime}</span>`, pct(v.cond_vol,0,false), pct(v.long_run_vol,0,false), pct(v.realized_20d,0,false), pct(v.vol_percentile,0,false)])))}
+    ${card("Income", `${usd((B.income||{}).annual_income)}/yr · yield ${pct((B.income||{}).yield,2,false)} · yield on cost ${pct((B.income||{}).yield_on_cost,2,false)} · ${(B.income||{}).payers||0}/${(B.income||{}).names||0} pay`,
+      tbl(["Holding","Annual $","Rate","Yield","YoC","Ex-date","Last paid"], inc.map(r => [`<b>${r.tk}</b>`, usd(r.annual_income), usd(r.fwd_rate,2), pct(r.yield,2,false), pct(r.yield_on_cost,2,false), esc(r.ex_date||"—"), r.last_payment ? `${r.last_payment.date} · ${usd(r.last_payment.amount,2)}` : "—"])))}
+  </div>
+  <div class="grid g-1-2" style="margin-top:16px">
+    ${card("Geography", "by headquarters country", `<div class="chart" id="anGeo"></div>`)}
+    ${card("Valuation & profitability", "trailing, from the latest screen", `<div class="table-wrap">` + tbl(["Holding","ROIC","Gross mgn","FCF mgn","FCF/EV","ND/EBITDA","Fwd rev","Fwd EPS","Beta","Mkt cap"],
+      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pct(h.roic,0,false), pct(h.gm,0,false), pct(h.fcfm,0,false), pct(h.fcfev,1,false), num(h.nde,1), pct(h.fwd_rev,0), pct(h.fwd_eps,0), num(h.beta), h.mcap ? "$"+(h.mcap/1000).toFixed(0)+"B" : "—"])) + `</div>`)}
+  </div>
+  <div style="margin-top:16px">${card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
+    tbl(["Date","Holding","Headline","Why it matters"], news.map(n => [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`)}</div>`;
+
+  const sp = pairs(benches.SPY);
+  mk(document.getElementById("anScatter"), {tooltip:{trigger:"item", formatter:p => `SPY ${(p.value[0]*100).toFixed(2)}% · book ${(p.value[1]*100).toFixed(2)}%`},
+    grid:{left:48,right:16,top:16,bottom:30}, xAxis:{type:"value", name:"SPY day", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
+    series:[{type:"scatter", symbolSize:4, itemStyle:{color:C.accent, opacity:.55}, data:sp.x.map((v,i)=>[v, sp.y[i]])},
+      ...(stats.SPY ? [{type:"line", showSymbol:false, lineStyle:{color:C.gold,width:2}, data:[-0.05,0.05].map(v => [v, stats.SPY.alpha_ann/252 + stats.SPY.beta*v])},
+                       {type:"line", showSymbol:false, lineStyle:{color:C.dim,type:"dashed"}, data:[[-0.05,-0.05],[0.05,0.05]]}] : [])]});
+  const bh = (B.vol||{}).history || [];
+  mk(document.getElementById("anVol"), {grid:{left:48,right:16,top:16,bottom:30}, xAxis:{type:"category", data:bh.map(x=>x[0]), axisLabel:{color:C.muted}},
+    yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
+    series:[{type:"line", showSymbol:false, areaStyle:{opacity:.12}, lineStyle:{color:C.accent}, data:bh.map(x=>x[1])}]});
+  const geo = Object.entries(B.geography||{});
+  mk(document.getElementById("anGeo"), {tooltip:{trigger:"item", formatter:p => `${p.name}: ${(p.value*100).toFixed(1)}%`},
+    series:[{type:"pie", radius:["45%","72%"], label:{color:C.muted, formatter:p => `${p.name} ${(p.value*100).toFixed(0)}%`}, data:geo.map(([k,v]) => ({name:k, value:v}))}]});
+}
+/* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
+function thesisBlock(tk, full=false){
+  const t = LIVE.theses[tk]; if(!t) return "";
+  const badge = t.status === "LOCKED" ? `<span class="chip">LOCKED v${t.version}</span>` : `<span class="chip bad">DRAFT v${t.version} · not yet reviewed</span>`;
+  const li = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
+  return `<div class="sec"><h4>Thesis ${badge}</h4>
+    ${t.theme ? `<div class="caps" style="margin:4px 0 8px">${esc(t.theme)}</div>` : ""}
+    ${full && t.business ? `<p class="muted">${esc(t.business)}</p>` : ""}
+    <h4 style="margin-top:10px">Catalyst — why we own it</h4><p>${esc(t.catalyst?.summary)}</p><ul class="list">${li(t.catalyst?.drivers)}</ul>
+    <h4 style="margin-top:10px">Edge — why this company</h4><p>${esc(t.edge?.summary)}</p>
+    <ul class="list">${(t.edge?.vs_peers||[]).map(v => `<li><b>vs ${esc(v.peer)}:</b> ${esc(v.advantage)}</li>`).join("")}</ul>
+    <h4 style="margin-top:10px">Risks — what would break it</h4>
+    ${tbl(["Risk","Type","Watch","Trigger"], (t.risks||[]).map(r => [esc(r.risk), esc(r.category), esc(r.watch), esc(r.trigger)]))}
+    <h4 style="margin-top:10px">Sell if</h4><ul class="list">${li(t.invalidation)}</ul>
+    ${(t.upcoming||[]).length ? `<h4 style="margin-top:10px">Upcoming</h4><ul class="list">${(t.upcoming||[]).map(u => `<li>${esc(u.date)} — ${esc(u.event)}</li>`).join("")}</ul>` : ""}
+    ${full ? `<h4 style="margin-top:10px">Model view</h4><p class="muted">${esc(t.model_view)}</p>
+      <h4 style="margin-top:10px">Evidence</h4><ul class="list">${(t.evidence||[]).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.source)}</span> — ${esc(e.fact)}</li>`).join("")}</ul>
+      ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions before locking</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}` : ""}
+  </div>`;
+}
+let thesisSel = null;
+async function theses(el){
+  LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t]));
+  const T = Object.values(LIVE.theses), held = new Set(D.holdings.map(h => h.tk));
+  const locked = T.filter(t => t.status === "LOCKED").length;
+  thesisSel = thesisSel && LIVE.theses[thesisSel] ? thesisSel : (T[0]||{}).ticker;
+  el.innerHTML = head("Research", "Theses", `<span class="muted">${locked} locked · ${T.length-locked} drafts awaiting review · Catalyst · Edge · Risk</span>`) +
+    `<div class="grid g-1-2">` +
+    card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
+      T.sort((a,b) => (held.has(b.ticker)-held.has(a.ticker)) || a.ticker.localeCompare(b.ticker)).map(t => `<tr data-tk="${t.ticker}" style="cursor:pointer${t.ticker===thesisSel?';background:rgba(106,166,248,.08)':''}">
+        <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted">${esc(t.theme||"")}</td>
+        <td>${t.status==="LOCKED"?'<span class="chip">locked</span>':'<span class="chip bad">draft</span>'}</td></tr>`).join("")
+    }</tbody></table></div>`) +
+    card(thesisSel||"—", "", thesisBlock(thesisSel, true) || "<p class='muted'>No thesis yet.</p>") + `</div>`;
+  el.querySelectorAll("tr[data-tk]").forEach(tr => tr.onclick = () => { thesisSel = tr.dataset.tk; theses(el); });
+}
+
 /* ═══ forward track record (paper) ══════════════════════════════════════════ */
 const PAPER_LABEL = {grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Strong Buy", tech_buy:"Technical Buy only", grade_a:"Grade A only",
   grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
@@ -404,7 +516,7 @@ async function paperCard(el){
       data:days.map(d => { const x = by[s].find(r => r.nav_date===d); return x ? +(+x.nav).toFixed(2) : null; })}))});
 }
 
-const VIEWS = {overview, holdings, performance, universe, grid, risk, proposal, signals, factors, history};
+const VIEWS = {overview, holdings, performance, analytics, universe, grid, risk, proposal, theses, signals, factors, history};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
@@ -572,7 +684,7 @@ function openHolding(tk){
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
       <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
-    ${r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : ""}
+    ${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
