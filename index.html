@@ -433,12 +433,62 @@ function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
   const rsi=[]; let up=0, dn=0;
   for(let i=0;i<n;i++){ const d = i? C_[i]-C_[i-1] : 0; up = i? up + ((d>0?d:0)-up)/14 : 0; dn = i? dn + ((d<0?-d:0)-dn)/14 : 0;
     rsi.push(i<14 || dn===0 ? null : 100 - 100/(1+up/dn)); }
-  return {line, bull, trade, trend, avwap, rsi};
+  // TD Sequential: setup 9 (close vs close[4]) and countdown 13 (close vs low/high[2])
+  const tdB=[], tdS=[], buy9=[], sell9=[], buy13=[], sell13=[];
+  let bc=-1, sc=-1;
+  for(let i=0;i<n;i++){
+    const b = i>=4 && C_[i] < C_[i-4] ? (tdB[i-1]||0)+1 : 0;
+    const sl = i>=4 && C_[i] > C_[i-4] ? (tdS[i-1]||0)+1 : 0;
+    tdB.push(b); tdS.push(sl); buy9.push(b===9); sell9.push(sl===9);
+    if(b===9){ bc=0; sc=-1; } if(sl===9){ sc=0; bc=-1; }
+    let b13=false, s13=false;
+    if(i>=2){
+      if(bc>=0 && C_[i] <= L[i-2]){ bc++; if(bc===13){ b13=true; bc=-1; } }
+      if(sc>=0 && C_[i] >= H[i-2]){ sc++; if(sc===13){ s13=true; sc=-1; } }
+    }
+    buy13.push(b13); sell13.push(s13);
+  }
+  // LTF markers: T / B at 20-bar extremes with RSI confirmation, R on an RSI re-cross above its signal
+  const sig9 = ema(rsi.map(v => v==null?50:v), 9);
+  const thin = (arr) => arr.map((v,i) => v && !arr.slice(Math.max(0,i-5),i).some(Boolean));
+  const rng = (i) => (H[i]-L[i]) || 1e-9;
+  const top = [], bot = [], rev = [];
+  for(let i=0;i<n;i++){
+    const w = Math.max(0, i-19);
+    const hiMax = Math.max(...H.slice(w, i+1)), loMin = Math.min(...L.slice(w, i+1));
+    const p = (C_[i]-L[i]) / rng(i), r = rsi[i];
+    top.push(r!=null && H[i] >= hiMax && r >= 60 && p < 0.5);
+    bot.push(r!=null && L[i] <= loMin && r <= 45 && p > 0.4);
+    const prevLow = i>=3 ? Math.min(rsi[i-1]??50, rsi[i-2]??50, rsi[i-3]??50) : 50;
+    rev.push(i>0 && r!=null && r > sig9[i] && (rsi[i-1]??50) <= sig9[i-1] && prevLow < 45 && C_[i] > H[i-1]);
+  }
+  return {line, bull, trade, trend, avwap, rsi, td:{b:tdB, s:tdS, buy9, sell9, buy13, sell13},
+          marks:{T:thin(top), B:thin(bot), R:thin(rev)}};
+}
+const MARK = {
+  T:      {label:"T", color:"#ffb74d", above:true,  name:"Top"},
+  B:      {label:"B", color:"#64b5f6", above:false, name:"Bottom"},
+  R:      {label:"R", color:"#81c784", above:false, name:"Reversal"},
+  sell9:  {label:"9", color:"#ef5350", above:true,  name:"TD sell 9"},
+  buy9:   {label:"9", color:"#26a69a", above:false, name:"TD buy 9"},
+  sell13: {label:"13", color:"#ef5350", above:true, name:"TD sell 13"},
+  buy13:  {label:"13", color:"#26a69a", above:false, name:"TD buy 13"},
+};
+function markerSeries(S, bars){
+  const pick = k => (S.marks[k] || S.td[k] || []);
+  return Object.entries(MARK).map(([k, cfg]) => ({
+    name: cfg.name, type: "scatter", symbolSize: 1, silent: true,
+    data: pick(k).map((on, i) => on ? [i, cfg.above ? bars[i].h * 1.015 : bars[i].l * 0.985] : null).filter(Boolean),
+    label: {show: true, formatter: cfg.label, color: cfg.color, fontWeight: "bold", fontSize: 11,
+            position: cfg.above ? "top" : "bottom"},
+    itemStyle: {color: "transparent"},
+  }));
 }
 async function techChart(el, tk, bars){
   const S = techSeries(bars), dates = bars.map(b=>b.d), close = bars.map(b=>b.c);
   const seg = keep => S.line.map((v,i) => S.bull[i]===keep ? v : null);
-  mk(el, {legend:{bottom:0, textStyle:{color:C.muted}, data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP"]},
+  mk(el, {legend:{bottom:0, type:"scroll", textStyle:{color:C.muted},
+      data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP", ...Object.values(MARK).map(m=>m.name)]},
     grid:[{left:52,right:16,top:14,height:"62%"},{left:52,right:16,top:"76%",height:"18%"}],
     axisPointer:{link:[{xAxisIndex:"all"}]},
     tooltip:{trigger:"axis"},
@@ -457,6 +507,7 @@ async function techChart(el, tk, bars){
       {name:"Trend line ▲", type:"line", data:seg(true), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.green}},
       {name:"Trend line ▼", type:"line", data:seg(false), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.red}},
       {name:"52w-low VWAP", type:"line", data:S.avwap, showSymbol:false, lineStyle:{width:1.2, color:C.violet}},
+      ...markerSeries(S, bars),
       {name:"RSI", type:"line", xAxisIndex:1, yAxisIndex:1, data:S.rsi, showSymbol:false, lineStyle:{width:1.2, color:C.gold},
        markLine:{silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dotted"}, data:[{yAxis:40},{yAxis:60}]}},
     ]});
