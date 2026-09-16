@@ -455,10 +455,11 @@ function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
   const top = [], bot = [], rev = [];
   for(let i=0;i<n;i++){
     const w = Math.max(0, i-19);
-    const hiMax = Math.max(...H.slice(w, i+1)), loMin = Math.min(...L.slice(w, i+1));
+    const wb = Math.max(0, i-9);
+    const hiMax = Math.max(...H.slice(w, i+1)), loMin = Math.min(...L.slice(wb, i+1));
     const p = (C_[i]-L[i]) / rng(i), r = rsi[i];
     top.push(r!=null && H[i] >= hiMax && r >= 60 && p < 0.5);
-    bot.push(r!=null && L[i] <= loMin && r <= 45 && p > 0.4);
+    bot.push(r!=null && L[i] <= loMin && r <= 50 && p > 0.5);
     const prevLow = i>=3 ? Math.min(rsi[i-1]??50, rsi[i-2]??50, rsi[i-3]??50) : 50;
     rev.push(i>0 && r!=null && r > sig9[i] && (rsi[i-1]??50) <= sig9[i-1] && prevLow < 45 && C_[i] > H[i-1]);
   }
@@ -484,11 +485,19 @@ function markerSeries(S, bars){
     itemStyle: {color: "transparent"},
   }));
 }
+function earningsAvwap(bars, anchor){
+  if(!anchor) return [];
+  const i0 = bars.findIndex(b => b.d >= anchor);
+  if(i0 < 0) return [];
+  let pv = 0, vv = 0;
+  return bars.map((b, i) => { if(i < i0) return null;
+    pv += (b.h + b.l + b.c) / 3 * (b.v || 0); vv += (b.v || 0); return vv > 0 ? pv / vv : null; });
+}
 async function techChart(el, tk, bars){
   const S = techSeries(bars), dates = bars.map(b=>b.d), close = bars.map(b=>b.c);
   const seg = keep => S.line.map((v,i) => S.bull[i]===keep ? v : null);
   mk(el, {legend:{bottom:0, type:"scroll", textStyle:{color:C.muted},
-      data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP", ...Object.values(MARK).map(m=>m.name)]},
+      data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP","Earnings VWAP", ...Object.values(MARK).map(m=>m.name)]},
     grid:[{left:52,right:16,top:14,height:"62%"},{left:52,right:16,top:"76%",height:"18%"}],
     axisPointer:{link:[{xAxisIndex:"all"}]},
     tooltip:{trigger:"axis"},
@@ -507,6 +516,8 @@ async function techChart(el, tk, bars){
       {name:"Trend line ▲", type:"line", data:seg(true), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.green}},
       {name:"Trend line ▼", type:"line", data:seg(false), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.red}},
       {name:"52w-low VWAP", type:"line", data:S.avwap, showSymbol:false, lineStyle:{width:1.2, color:C.violet}},
+      {name:"Earnings VWAP", type:"line", data:earningsAvwap(bars, LIVE.v2[tk]?.earnings_anchor), showSymbol:false,
+       lineStyle:{width:1.4, color:C.gold, type:"dashed"}},
       ...markerSeries(S, bars),
       {name:"RSI", type:"line", xAxisIndex:1, yAxisIndex:1, data:S.rsi, showSymbol:false, lineStyle:{width:1.2, color:C.gold},
        markLine:{silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dotted"}, data:[{yAxis:40},{yAxis:60}]}},
@@ -561,7 +572,10 @@ function rangeBar(v2){
       ["Trend (1 month)", esc(v2.trend_dir), usd(v2.trend_low,2), usd(v2.trend_high,2)],
       ["Tail (6 months)", esc(v2.tail_dir), usd(v2.tail_low,2), usd(v2.tail_high,2)]])}
     <div class="note">Trend line ${esc(v2.trend)} since ${esc(v2.trend_since||"—")} · RSI ${num(v2.rsi,0)} (${esc(v2.rsi_regime)}) ·
-      ${v2.above_52w_low_avwap ? "above" : "below"} the 52-week-low VWAP · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>`;
+      ${v2.above_52w_low_avwap ? "above" : "below"} the 52-week-low VWAP ·
+      ${v2.above_earnings_avwap == null ? "no earnings anchor" :
+        (v2.above_earnings_avwap ? "above" : "below") + " the VWAP since earnings " + esc(v2.earnings_anchor) +
+        " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>`;
 }
 
 /* ═══ GRID (decision matrix, live) ═════════════════════════════════════════ */
