@@ -530,6 +530,14 @@ async function loadBars(tk, days=420){
   const out = rows.map(r => ({d:r.price_date, c:+r.adj_close, h:+(r.adj_high ?? r.adj_close), l:+(r.adj_low ?? r.adj_close), v:+(r.volume||0)}));
   (LIVE.bars ||= {})[tk] = out; return out;
 }
+const techCard = (tk) => `<div class="card" style="padding:12px;margin-top:12px">
+  <div class="card-h"><div><h3>Technical setup</h3><div class="sub">trend line · risk-range bands · 52-week-low and earnings VWAP · T / B / R and TD markers</div></div></div>
+  <div class="chart" id="drTech-${esc(tk)}" style="height:340px"></div></div>`;
+async function drawTechCard(tk){
+  const el = document.getElementById(`drTech-${tk}`); if(!el) return;
+  const bars = await loadBars(tk);
+  if(bars.length) techChart(el, tk, bars);
+}
 async function openName(tk){
   const v2 = LIVE.v2[tk] || {}, m = (LIVE.matrix||[]).find(r => r.ticker===tk) || {};
   const held = D.holdings.some(h => h.tk===tk);
@@ -980,7 +988,7 @@ function openHolding(tk){
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
       <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
-    ${rangeBar(LIVE.v2[h.tk])}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
@@ -1002,6 +1010,7 @@ function openHolding(tk){
     <div class="sec"><h4>Position</h4><p class="muted mono" style="font-size:12.5px">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)}</p></div>`;
   document.getElementById("drawer").classList.add("on"); document.getElementById("scrim").classList.add("on");
   document.getElementById("drawer").scrollTop = 0;
+  drawTechCard(tk);
   setTimeout(() => {
     const px = h.px || []; const d = px.map(p=>p[0]), c = px.map(p=>p[1]);
     const e35 = ema(c,35), s200 = sma(c,200), s = sd(c,200);
