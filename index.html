@@ -148,7 +148,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-09-16 00:57 · 777f055</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-09-16 00:58 · 1c5f160</div>
   </div>
 </section>
 
@@ -171,7 +171,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#signals" data-v="signals">Signals</a>
       <a href="#history" data-v="history">History</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-09-16 00:57 · 777f055</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-09-16 00:58 · 1c5f160</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -560,7 +560,8 @@ async function openName(tk){
     ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
       .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "")}`;
   document.getElementById("scrim").classList.add("on");
-  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("drawer").scrollTop = 0;
   const bars = await loadBars(tk);
   if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
 }
