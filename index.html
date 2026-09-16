@@ -287,6 +287,104 @@ function sparkline(el, pts, color){
 
 /* ═══ router ═════════════════════════════════════════════════════════════ */
 
+
+/* ═══ technical chart (v2 overlays computed in the browser from daily bars) ═══ */
+function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
+  const n = bars.length, C_ = bars.map(b=>b.c), H=bars.map(b=>b.h), L=bars.map(b=>b.l), V=bars.map(b=>b.v||0);
+  const ema = (arr, span) => { const k=2/(span+1); const o=[]; arr.forEach((v,i)=> o.push(i? o[i-1]+k*(v-o[i-1]) : v)); return o; };
+  const tr = C_.map((c,i) => i ? Math.max(H[i]-L[i], Math.abs(H[i]-C_[i-1]), Math.abs(L[i]-C_[i-1])) : H[i]-L[i]);
+  const atr = tr.map((_,i) => i<13 ? null : tr.slice(i-13,i+1).reduce((a,b)=>a+b,0)/14);
+  // track line: EMA26, flips after 2 closes beyond ±1.5 ATR
+  const line = ema(C_, 26); const bull=[]; let st=true, cnt=0;
+  for(let i=0;i<n;i++){
+    if(atr[i]!=null){ const want = C_[i] > line[i]+1.5*atr[i] ? true : C_[i] < line[i]-1.5*atr[i] ? false : st;
+      cnt = want!==st ? cnt+1 : 0; if(cnt>=2){ st=want; cnt=0; } }
+    bull.push(st);
+  }
+  // EWMA σ (λ≈0.94) then smoothed, and the calibrated bands
+  const lr = C_.map((c,i)=> i? Math.log(c/C_[i-1]) : 0);
+  let m=0, v2=0; const sig=[];
+  lr.forEach((r,i)=>{ m = 0.06*r + 0.94*m; v2 = 0.06*(r-m)*(r-m) + 0.94*v2; sig.push(Math.sqrt(v2)); });
+  const sigS = ema(sig, 10);
+  const vwma = (win) => C_.map((_,i) => { if(i<win-1) return null; let pv=0, vv=0;
+    for(let j=i-win+1;j<=i;j++){ pv += C_[j]*V[j]; vv += V[j]; }
+    return vv>0 ? pv/vv : C_.slice(i-win+1,i+1).reduce((a,b)=>a+b,0)/win; });
+  const band = (win, hz, wgt, k, ms) => { const vw=vwma(win), e=ema(C_, ms), lo=[], hi=[], mid=[];
+    for(let i=0;i<n;i++){ if(vw[i]==null || i<win){ lo.push(null); hi.push(null); mid.push(null); continue; }
+      const mi = wgt*vw[i] + (1-wgt)*e[i], b = k*sigS[i]*Math.sqrt(hz);
+      mid.push(mi); lo.push(mi*Math.exp(-b)); hi.push(mi*Math.exp(b)); }
+    return {lo, hi, mid}; };
+  const trade = band(15, 5, 0.25, 1.2, 10), trend = band(63, 21, 0, 1.0, 5);
+  // AVWAP from the rolling 252-day low
+  const avwap = C_.map((_,i) => { if(i<60) return null; const s0=Math.max(0,i-251);
+    let lo=Infinity, li=s0; for(let j=s0;j<=i;j++) if(L[j]<lo){ lo=L[j]; li=j; }
+    let pv=0, vv=0; for(let j=li;j<=i;j++){ pv += (H[j]+L[j]+C_[j])/3*V[j]; vv += V[j]; }
+    return vv>0 ? pv/vv : null; });
+  // RSI(14)
+  const rsi=[]; let up=0, dn=0;
+  for(let i=0;i<n;i++){ const d = i? C_[i]-C_[i-1] : 0; up = i? up + ((d>0?d:0)-up)/14 : 0; dn = i? dn + ((d<0?-d:0)-dn)/14 : 0;
+    rsi.push(i<14 || dn===0 ? null : 100 - 100/(1+up/dn)); }
+  return {line, bull, trade, trend, avwap, rsi};
+}
+async function techChart(el, tk, bars){
+  const S = techSeries(bars), dates = bars.map(b=>b.d), close = bars.map(b=>b.c);
+  const seg = keep => S.line.map((v,i) => S.bull[i]===keep ? v : null);
+  mk(el, {legend:{bottom:0, textStyle:{color:C.muted}, data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP"]},
+    grid:[{left:52,right:16,top:14,height:"62%"},{left:52,right:16,top:"76%",height:"18%"}],
+    axisPointer:{link:[{xAxisIndex:"all"}]},
+    tooltip:{trigger:"axis"},
+    xAxis:[{type:"category", data:dates, axisLabel:{color:C.muted}},
+           {type:"category", gridIndex:1, data:dates, axisLabel:{show:false}}],
+    yAxis:[{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+           {type:"value", gridIndex:1, min:20, max:80, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}}],
+    series:[
+      {name:"Trend range", type:"line", data:S.trend.lo, lineStyle:{opacity:0}, stack:"tr", symbol:"none", silent:true},
+      {name:"Trend range", type:"line", data:S.trend.hi.map((v,i)=> v==null?null:v-S.trend.lo[i]), lineStyle:{opacity:0},
+       areaStyle:{color:"#ffcc80", opacity:.10}, stack:"tr", symbol:"none", silent:true},
+      {name:"Trade range", type:"line", data:S.trade.lo, lineStyle:{opacity:0}, stack:"td", symbol:"none", silent:true},
+      {name:"Trade range", type:"line", data:S.trade.hi.map((v,i)=> v==null?null:v-S.trade.lo[i]), lineStyle:{opacity:0},
+       areaStyle:{color:C.accent, opacity:.14}, stack:"td", symbol:"none", silent:true},
+      {name:"Price", type:"line", data:close, showSymbol:false, lineStyle:{width:1.6, color:C.text}},
+      {name:"Trend line ▲", type:"line", data:seg(true), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.green}},
+      {name:"Trend line ▼", type:"line", data:seg(false), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.red}},
+      {name:"52w-low VWAP", type:"line", data:S.avwap, showSymbol:false, lineStyle:{width:1.2, color:C.violet}},
+      {name:"RSI", type:"line", xAxisIndex:1, yAxisIndex:1, data:S.rsi, showSymbol:false, lineStyle:{width:1.2, color:C.gold},
+       markLine:{silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dotted"}, data:[{yAxis:40},{yAxis:60}]}},
+    ]});
+}
+async function loadBars(tk, days=420){
+  if(LIVE.bars?.[tk]) return LIVE.bars[tk];
+  const from = new Date(Date.now() - days*864e5).toISOString().slice(0,10);
+  const rows = await q("site_price_history", r => r.eq("ticker", tk).gte("price_date", from).order("price_date"));
+  const out = rows.map(r => ({d:r.price_date, c:+r.adj_close, h:+(r.adj_high ?? r.adj_close), l:+(r.adj_low ?? r.adj_close), v:+(r.volume||0)}));
+  (LIVE.bars ||= {})[tk] = out; return out;
+}
+async function openName(tk){
+  const v2 = LIVE.v2[tk] || {}, m = (LIVE.matrix||[]).find(r => r.ticker===tk) || {};
+  const held = D.holdings.some(h => h.tk===tk);
+  document.getElementById("drIn").innerHTML = `
+    <div class="dr-top"><div><div class="caps">${esc(m.sector||"")}</div><h2>${esc(tk)}</h2>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        ${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${qchip(m.quadrant)}${trendChip(v2.trend)}
+        ${held?'<span class="chip">held</span>':""}</div></div>
+      <button class="x" onclick="closeDrawer()">✕</button></div>
+    <div class="mini">
+      <div><span class="caps">Price</span><b>${usd(v2.close,2)}</b></div>
+      <div><span class="caps">Timing</span><b style="font-size:13px">${timingChip(v2.timing, v2.range_pos)}</b></div>
+      <div><span class="caps">Guidance</span><b style="font-size:13px">${esc(m.guidance||"—")}</b></div>
+      <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
+    </div>
+    <div class="card" style="padding:12px"><div class="chart" id="nmChart" style="height:360px"></div></div>
+    ${rangeBar(v2)}${thesisBlock(tk, true)}
+    ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
+      [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
+    ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
+      .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "")}`;
+  document.getElementById("scrim").classList.add("on");
+  document.getElementById("drawer").classList.add("open");
+  const bars = await loadBars(tk);
+  if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
+}
 /* ═══ timing (technical v2) ═══════════════════════════════════════════════ */
 const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
@@ -321,7 +419,7 @@ async function grid(el){
     const rows = M.filter(r => (!f.held || r.held) && (!f.act || r.action===f.act) &&
       (!f.q || (r.ticker + " " + (r.sector||"")).toLowerCase().includes(f.q.toLowerCase())))
       .sort((a,b) => (a.grade>b.grade?1:a.grade<b.grade?-1:0) || (b.composite||0)-(a.composite||0));
-    document.getElementById("gridRows").innerHTML = rows.slice(0,400).map(r => `<tr>
+    document.getElementById("gridRows").innerHTML = rows.slice(0,400).map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
@@ -329,6 +427,7 @@ async function grid(el){
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     document.getElementById("gridN").textContent = rows.length + " names";
+    document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</span>`) +
     card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${t.replace("_"," ")}</th>`).join("")}</tr></thead><tbody>${
@@ -339,6 +438,7 @@ async function grid(el){
       `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><input class="search" id="gq" placeholder="Ticker or sector" value="${esc(gridFilter.q)}">
        <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
        <button class="lock" id="gclear">Clear filters</button></div>
+       <div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
        <div class="table-wrap"><table class="tbl"><thead><tr><th>Ticker</th><th>Grade</th><th>Technical</th><th>Action</th><th>Timing</th><th>Guidance</th><th>Quad</th><th>QGS tier</th><th>Composite</th><th>Trend</th><th>Sector</th><th>Why</th></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
