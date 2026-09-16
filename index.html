@@ -166,11 +166,9 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#analytics" data-v="analytics">Analytics</a>
       <a href="#universe" data-v="universe">Universe</a>
       <a href="#grid" data-v="grid">Grid</a>
-      <a href="#risk" data-v="risk">Risk</a>
       <a href="#proposal" data-v="proposal">Proposal</a>
       <a href="#theses" data-v="theses">Theses</a>
       <a href="#signals" data-v="signals">Signals</a>
-      <a href="#factors" data-v="factors">Factors</a>
       <a href="#history" data-v="history">History</a>
     </nav>
     <button class="lock" id="lock" title="Sign out">Sign out</button>
@@ -288,6 +286,117 @@ function sparkline(el, pts, color){
 /* ═══ router ═════════════════════════════════════════════════════════════ */
 
 
+
+
+/* ═══ SIGNALS: universe-wide technical analysis (v2) ══════════════════════ */
+let sigFilter = {q:"", trend:"", timing:"", held:false};
+async function signalsV2(el){
+  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">loading…</span>`);
+  if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await q("site_technicals_v2")).map(t => [t.ticker, t]));
+  if(!LIVE.events) LIVE.events = await q("site_technical_events", r => r.order("event_date", {ascending:false}).limit(600));
+  if(!LIVE.matrix) LIVE.matrix = await q("site_decision_matrix");
+  const M = Object.fromEntries(LIVE.matrix.map(r => [r.ticker, r]));
+  const V = Object.values(LIVE.v2), held = new Set(D.holdings.map(h => h.tk));
+  const count = (k, v) => V.filter(x => x[k] === v).length;
+  const T_COUNT = {BULLISH: count("trend","BULLISH"), BEARISH: count("trend","BEARISH")};
+  const draw = () => {
+    const f = sigFilter;
+    const rows = V.filter(v => (!f.trend || v.trend === f.trend) && (!f.timing || v.timing === f.timing)
+        && (!f.held || held.has(v.ticker))
+        && (!f.q || (v.ticker + " " + (M[v.ticker]?.sector || "")).toLowerCase().includes(f.q.toLowerCase())))
+      .sort((a,b) => (a.range_pos ?? 9) - (b.range_pos ?? 9));
+    document.getElementById("sigRows").innerHTML = rows.map(v => {
+      const m = M[v.ticker] || {};
+      return `<tr data-open="${v.ticker}" style="cursor:pointer">
+        <td><b>${held.has(v.ticker) ? "★ " : ""}${esc(v.ticker)}</b></td>
+        <td>${usd(v.close,2)}</td>
+        <td>${trendChip(v.trend)}<div class="muted" style="font-size:10px">${esc(v.trend_since||"")}</div></td>
+        <td>${timingChip(v.timing, v.range_pos)}</td>
+        <td class="mono" style="font-size:11px">${usd(v.trade_low,2)} – ${usd(v.trade_high,2)}</td>
+        <td class="mono" style="font-size:11px">${usd(v.trend_low,2)} – ${usd(v.trend_high,2)}</td>
+        <td>${num(v.rsi,0)} <span class="muted" style="font-size:10px">${esc(v.rsi_regime||"")}</span></td>
+        <td>${num(v.rvol,1)}×</td>
+        <td>${v.above_52w_low_avwap ? '<span style="color:'+C.green+'">above</span>' : '<span class="muted">below</span>'}</td>
+        <td class="muted" style="font-size:11px">${v.td_buy_count||0} / ${v.td_sell_count||0}</td>
+        <td>${esc(m.tech_rating ? m.tech_rating.replace("_"," ") : "—")}</td></tr>`;
+    }).join("");
+    document.getElementById("sigN").textContent = rows.length + " names";
+  };
+  const ev = LIVE.events.slice(0, 120);
+  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${V.length} names · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
+  `<div class="kpis">
+    ${kpi("Trend line bullish", T_COUNT.BULLISH, `${T_COUNT.BEARISH} bearish`, T_COUNT.BULLISH>T_COUNT.BEARISH?"pos":"neg")}
+    ${kpi("Buy zone", count("timing","BUY_ZONE"), "at the low end of range", "pos")}
+    ${kpi("Accumulate OK", count("timing","ACCUMULATE_OK"), "below mid-range")}
+    ${kpi("Trim zone", count("timing","TRIM_ZONE"), "at the high end", "neg")}
+    ${kpi("Wait / extended", count("timing","WAIT_FOR_LOW_END") + count("timing","AVOID_EXTENDED"), "do not chase", "neg")}
+    ${kpi("Above 52w-low VWAP", V.filter(v=>v.above_52w_low_avwap).length, "buyers since the low in profit")}
+  </div>
+  <div style="margin-top:16px">` + card("Universe technicals", `<span id="sigN"></span>`,
+    `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <input class="search" id="sq" placeholder="Ticker or sector" value="${esc(sigFilter.q)}">
+      <select class="input" id="strend" style="width:auto"><option value="">Any trend</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>
+      <select class="input" id="stiming" style="width:auto">${["","BUY_ZONE","ACCUMULATE_OK","NEUTRAL","WAIT_FOR_LOW_END","TRIM_ZONE","AVOID_EXTENDED"]
+        .map(v => `<option value="${v}">${v ? v.replaceAll("_"," ") : "Any timing"}</option>`).join("")}</select>
+      <label class="check"><input type="checkbox" id="sheld" ${sigFilter.held?"checked":""}> Holdings only</label></div>
+     <div class="table-wrap" style="max-height:640px;overflow:auto"><table class="tbl"><thead><tr><th>Ticker</th><th>Price</th><th>Trend line</th><th>Timing</th>
+       <th>Trade range (1w)</th><th>Trend range (1m)</th><th>RSI</th><th>Rel vol</th><th>52w-low VWAP</th><th>TD b/s</th><th>Rating</th></tr></thead>
+       <tbody id="sigRows"></tbody></table></div>`) + `</div>
+  <div class="grid g2" style="margin-top:16px">
+    ${card("Signal events", "last 90 days · universe-wide", `<div class="table-wrap" style="max-height:420px;overflow:auto">` +
+      tbl(["Date","Ticker","Event","Dir"], ev.map(e => [esc(e.event_date), `<b>${esc(e.ticker)}</b>${e.is_holding?" ★":""}`,
+        esc(e.event.replaceAll("_"," ")), e.direction==="bull"?`<span style="color:${C.green}">bull</span>`:`<span style="color:${C.red}">bear</span>`])) + `</div>`)}
+    ${card("Model signal changes", "trend / extension / reversal / quad flips", `<div class="table-wrap" style="max-height:420px;overflow:auto">` +
+      tbl(["Date","Ticker","Field","Change"], (D.signals||[]).slice(0,120).map(s => [esc(s.d), `<b>${esc(s.tk)}</b>${s.held?" ★":""}`,
+        esc(s.field), `${esc(s.old)} → ${esc(s.new)}`])) + `</div>`)}
+  </div>`;
+  draw();
+  document.getElementById("sq").oninput = e => { sigFilter.q = e.target.value; draw(); };
+  document.getElementById("strend").value = sigFilter.trend;
+  document.getElementById("stiming").value = sigFilter.timing;
+  document.getElementById("strend").onchange = e => { sigFilter.trend = e.target.value; draw(); };
+  document.getElementById("stiming").onchange = e => { sigFilter.timing = e.target.value; draw(); };
+  document.getElementById("sheld").onchange = e => { sigFilter.held = e.target.checked; draw(); };
+  el.addEventListener("click", ev2 => { const tr = ev2.target.closest("tr[data-open]"); if(tr) openName(tr.dataset.open); });
+}
+/* ═══ one performance tab: returns · risk · factors ═══════════════════════ */
+const sectionHead = (title, right="") => `<div class="pagehead" style="margin-top:26px;border-top:1px solid ${C.line};padding-top:18px">
+  <div><h2 style="font-size:20px">${title}</h2></div><div>${right}</div></div>`;
+function slugCard(){
+  const P = D.perf, m = P.metrics, T = P.trades_all || {};
+  const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+  const prof = (arr, label) => {
+    const up = arr.filter(v => v > 0), dn = arr.filter(v => v < 0);
+    const au = avg(up), ad = avg(dn);
+    return [label, `${up.length}/${arr.length} (${pct(up.length/arr.length,0,false)})`, pct(au,2), pct(ad,2),
+            ad ? num(Math.abs(au/ad)) + "×" : "—"];
+  };
+  const daily = (P.daily_p || []).filter(v => v != null);
+  const monthly = (P.monthly || []).map(x => x.p).filter(v => v != null);
+  const rows = [prof(daily, "Daily"), prof(monthly, "Monthly")];
+  if(T.n) rows.push(["Positions (closed + open)", `${Math.round(T.n*(T.ba||0))}/${T.n} (${pct(T.ba,0,false)})`,
+                     pct(T.avg_win,1), pct(T.avg_loss,1), T.slug ? num(T.slug) + "×" : "—"]);
+  const mSlug = (() => { const up = monthly.filter(v=>v>0), dn = monthly.filter(v=>v<0);
+    return dn.length && up.length ? Math.abs(avg(up)/avg(dn)) : null; })();
+  return `<div class="kpis" style="margin-top:16px">
+      ${kpi("Slugging — monthly", mSlug ? num(mSlug) + "×" : "—", "avg up month ÷ avg down month", mSlug>1?"pos":"neg")}
+      ${kpi("Slugging — positions", T.slug ? num(T.slug) + "×" : "—", `avg win ${pct(T.avg_win,1)} vs ${pct(T.avg_loss,1)}`, T.slug>1?"pos":"neg")}
+      ${kpi("Batting average", pct(m.monthly_win,0,false), "share of up months")}
+      ${kpi("Win / loss ratio", T.wl ? num(T.wl) + "×" : "—", `${T.n||0} allocations`)}
+      ${kpi("Up / down capture", `${num(m.up_capture)} / ${num(m.down_capture)}`, `ratio ${num(m.updown)}`)}
+      ${kpi("Expectancy", pct(T.expectancy,1), "per allocation", T.expectancy>0?"pos":"neg")}
+    </div>` +
+    `<div style="margin-top:16px">` + card("Win / loss profile", "slugging = average gain in up periods ÷ average loss in down periods",
+      tbl(["Period","Up periods","Avg up","Avg down","Slugging"], rows)) + `</div>`;
+}
+async function performanceAll(el){
+  performance(el);
+  const slug = document.createElement("div"); slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard(); el.appendChild(slug);
+  const riskBox = document.createElement("div"); el.appendChild(riskBox);
+  try{ await risk(riskBox); }catch(e){ riskBox.innerHTML = sectionHead("Risk") + `<div class="note">Risk data unavailable: ${esc(e.message||e)}</div>`; }
+  const facBox = document.createElement("div"); el.appendChild(facBox);
+  try{ factors(facBox); }catch(e){ facBox.innerHTML = sectionHead("Factors") + `<div class="note">Factor data unavailable: ${esc(e.message||e)}</div>`; }
+}
 /* ═══ technical chart (v2 overlays computed in the browser from daily bars) ═══ */
 function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
   const n = bars.length, C_ = bars.map(b=>b.c), H=bars.map(b=>b.h), L=bars.map(b=>b.l), V=bars.map(b=>b.v||0);
@@ -450,14 +559,14 @@ async function grid(el){
 /* ═══ RISK (live) ═══════════════════════════════════════════════════════════ */
 let riskBook = "current";
 async function risk(el){
-  el.innerHTML = head("Portfolio", "Risk", `<span class="muted">loading…</span>`);
+  el.innerHTML = sectionHead("Risk", `<span class="muted">loading…</span>`);
   if(!LIVE.risk) LIVE.risk = Object.fromEntries((await q("site_risk")).map(r => [r.book, r]));
   const R = LIVE.risk[riskBook]?.payload;
   const toggle = `<div class="seg">${["current","proposal"].map(b => `<button class="lock ${b===riskBook?"on":""}" data-b="${b}">${b==="current"?"Current book":"Proposal"}</button>`).join(" ")}</div>`;
-  if(!R){ el.innerHTML = head("Portfolio", "Risk", toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
+  if(!R){ el.innerHTML = sectionHead("Risk", toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
   const m = R.metrics||{}, mc = (R.monte_carlo||{}).drawdown_1y||{}, co = R.concentration||{}, rc = R.risk_contrib||{};
   const passTag = ok => `<span style="color:${ok?C.green:C.red}">${ok?"PASS":"FAIL"}</span>`;
-  el.innerHTML = head("Portfolio", "Risk", `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
+  el.innerHTML = sectionHead("Risk", `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
   `<div class="kpis">
     ${kpi("Beta vs SPY", num(m.beta_spy), "1-year daily")}
     ${kpi("Volatility", pct(m.ann_vol,1,false), `ex-ante ${pct(rc.exante_vol,1,false)}`)}
@@ -637,7 +746,7 @@ async function paperCard(el){
       data:days.map(d => { const x = by[s].find(r => r.nav_date===d); return x ? +(+x.nav).toFixed(2) : null; })}))});
 }
 
-const VIEWS = {overview, holdings, performance, analytics, universe, grid, risk, proposal, theses, signals, factors, history};
+const VIEWS = {overview, holdings, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, risk: performanceAll, factors: performanceAll};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
@@ -864,7 +973,7 @@ function openHolding(tk){
 /* ═══ PERFORMANCE ════════════════════════════════════════════════════════ */
 function performance(el){
   const m = D.perf.metrics, P = D.perf, T = P.trades_all || {};
-  el.innerHTML = head("Analytics engine", "Performance & risk", `<span class="muted">${m.n||P.dates.length} trading days · rf ${pct(P.rf_mean,1,false)}</span>`) +
+  el.innerHTML = head("Portfolio", "Performance analytics", `<span class="muted">${m.n||P.dates.length} trading days · rf ${pct(P.rf_mean,1,false)}</span>`) +
   `<div class="kpis">
     ${kpi("Total return", pct(m.total_return), `SPY ${pct(m.spy_total)}`, cls(m.total_return))}
     ${kpi("CAGR", pct(m.cagr), `SPY ${pct(m.spy_cagr)}`, cls(m.cagr))}
@@ -1048,7 +1157,7 @@ function signals(el){
 /* ═══ FACTORS ════════════════════════════════════════════════════════════ */
 function factors(el){
   const F = D.factor_snapshot || {}, FS = D.factor_scores, H = D.holdings;
-  el.innerHTML = head("Portfolio construction", "Factors & concentration", `<span class="muted">${F.snapshot_date?"snapshot "+F.snapshot_date:""}</span>`) +
+  el.innerHTML = sectionHead("Factors & concentration", `<span class="muted">${F.snapshot_date?"snapshot "+F.snapshot_date:""}</span>`) +
   `<div class="kpis">
     ${kpi("IT sector", pct((F.it_sector_pct||0)/100,1,false), "cap 28%", (F.it_sector_pct||0)>28?"neg":"")}
     ${kpi("Effective N", num(F.effective_n,1), `${H.length} positions`)}
