@@ -172,8 +172,9 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#theses" data-v="theses">Theses</a>
       <a href="#signals" data-v="signals">Signals</a>
       <a href="#history" data-v="history">History</a>
+      <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-09-16 01:03 · 25d35f8</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-09-16 01:15 · b77b0d6</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -286,6 +287,125 @@ function sparkline(el, pts, color){
 }
 
 /* ═══ router ═════════════════════════════════════════════════════════════ */
+
+/* ═══ ABOUT — the process, start to finish, in plain language ═════════════ */
+function about(el){
+  const step = (n, title, body) => `<div class="card" style="margin-top:14px"><div class="card-h"><div>
+      <h3><span style="color:var(--brand);font-variant-numeric:tabular-nums">${n}</span> &nbsp;${title}</h3></div></div>
+      <div style="padding:2px 2px 4px;line-height:1.65">${body}</div></div>`;
+  el.innerHTML = head("Integrity Compounders", "How the model works", `<span class="muted">V12.1</span>`) +
+  `<div class="card"><div style="line-height:1.7">
+     <b>What we are trying to own:</b> businesses that compound — they earn high returns on the capital they
+     employ, convert profit into cash, and reinvest it at attractive rates, with management that allocates
+     capital honestly. We want to own them while the numbers are improving rather than deteriorating, and to
+     buy them at sensible points rather than after they have run.
+     <br><br><b>How the process is organised:</b> a quality screen defines the universe; every name in it goes
+     through the same quantitative process; the analytics produce a grade and a timing read; the portfolio is
+     built from those outputs; each position carries a written thesis with the conditions that would make us sell.
+   </div></div>` +
+  step(1, "The universe — a quality screen, not the whole market", `
+    We never start from every listed company. The starting list comes from a Fiscal screen that only admits
+    businesses already showing compounder characteristics:
+    <ul class="list">
+      <li>US-listed, market cap above roughly $2B, share price above $10 — investable and liquid</li>
+      <li>Return on invested capital and operating margin positive and healthy</li>
+      <li>Revenue and earnings grown over three years <i>and</i> expected to keep growing</li>
+      <li>Leverage contained, capital spending not consuming the business</li>
+      <li>Buybacks positive, valuation not extreme</li>
+    </ul>
+    The screen currently admits about 350 names out of thousands, and is refreshed weekly. Every entry and exit
+    is logged. A name is never dropped automatically: screen absence is surfaced for review, and holdings are exempt.`) +
+  step(2, "The quadrant — accelerating or decelerating?", `
+    For every name we compare what the business is expected to do against what it has done:
+    <ul class="list">
+      <li><b>Revenue momentum</b> = expected revenue growth − recent revenue growth</li>
+      <li><b>Earnings momentum</b> = expected earnings growth − recent earnings growth</li>
+    </ul>
+    <b>Q1</b> both accelerating, the ideal · <b>Q2</b> revenue accelerating while earnings compress ·
+    <b>Q3</b> both decelerating, which needs an explicit override to own ·
+    <b>Q4</b> earnings rising while revenue falls — usually cost-cutting, and the bucket we most want to avoid.
+    A quadrant change must persist two consecutive months before we act on it.`) +
+  step(3, "Quality and honesty checks", `
+    <ul class="list">
+      <li><b>Quality Growth Score</b> — expected growth, cash-flow yield on enterprise value, return on capital
+          and cash margin combined into one ranked number (rare elite → low quality).</li>
+      <li><b>Growth efficiency</b> — how much growth survives dilution from share issuance and stock compensation.</li>
+      <li><b>Six quality indicators</b> — capital efficiency, pricing power, operating efficiency, cash conversion,
+          growth durability, balance sheet. They describe a company; they never remove it.</li>
+      <li><b>Earnings-quality flag</b> — if earnings are accelerating while gross profit is not, the improvement
+          is flagged as potentially engineered and gets extra scrutiny.</li>
+    </ul>`) +
+  step(4, "Human scoring — the three pillars", `
+    Every candidate is scored 1–10 on three pillars, with evidence:
+    <ul class="list">
+      <li><b>Business quality (40%)</b> — moat durability, economics, reinvestment quality</li>
+      <li><b>Management &amp; capital allocation (35%)</b> — direction of returns on capital, M&amp;A and buyback
+          discipline, dilution, candour. <b>Hard floor 6.0.</b></li>
+      <li><b>Financial strength (25%)</b> — balance sheet, earnings and cash quality, self-funding. <b>Floor 6.0.</b></li>
+    </ul>
+    A composite below 6.5 is not eligible. Valuation deliberately sits outside the pillars, in the quality score.`) +
+  step(5, "The grade — one letter per company", `
+    <ul class="list">
+      <li><b>A</b> — accelerating, high quality, scores clear, no flags</li>
+      <li><b>B</b> — ownable, something short of A</li>
+      <li><b>C</b> — unscored, composite under 6.5, one floor breach, or earnings flagged</li>
+      <li><b>D</b> — thesis broken, or both floors breached</li>
+    </ul>`) +
+  step(6, "Technicals — timing, never thesis", `
+    Technicals decide <i>when</i>, never <i>what</i>:
+    <ul class="list">
+      <li><b>Trend rating</b> (Strong Buy → Strong Sell) from the 200-day trend. Its job is risk: names in an
+          uptrend have had a materially lower chance of a large drawdown. We don't initiate into a downtrend.</li>
+      <li><b>Timing</b> from where price sits in its expected range, whether buyers since the 52-week low and
+          since the last earnings report are in profit, and recent bottom or reversal signals. It reads
+          Buy zone → Trim zone and paces entries and exits.</li>
+    </ul>
+    Each piece was backtested before use; what failed — a second trend line, RSI regimes, exhaustion counts
+    alone — was left out.`) +
+  step(7, "The decision grid", `
+    Grade × trend rating gives the action (accumulate, starter, hold, review, trim, reduce, exit) and timing
+    paces it. "Accumulate · BUY NOW" is a qualified name at the low end of its range; "Accumulate · WAIT for
+    range low" is the same company, extended. The grid is a default, not a cage — discretionary overrides are
+    allowed and documented.`) +
+  step(8, "Building the portfolio", `
+    <ul class="list">
+      <li><b>Equal weight</b>, about 1/N — no oversized bets on conviction alone</li>
+      <li><b>Sector cap 28%</b> of names</li>
+      <li><b>Correlation clusters</b> — names that move together are capped at four per cluster</li>
+      <li><b>Turnover control</b> — a supported holding isn't sold merely for being outranked</li>
+      <li><b>Risk gates</b> — a proposed book must pass simulated drawdown limits (1-year median ≤ 12%,
+          worst case ≤ 20%) and is stress-tested against past crises and factor shocks</li>
+    </ul>`) +
+  step(9, "The thesis — and what would make us sell", `
+    Nothing is owned without a written thesis in three parts:
+    <ul class="list">
+      <li><b>Catalyst</b> — why we own it: what the company does, and the theme we want exposure to</li>
+      <li><b>Edge</b> — why this company rather than named competitors</li>
+      <li><b>Risk</b> — what could invalidate the thesis: business, industry, competitive, regulatory,
+          balance-sheet or management risk, each with a metric to watch and a trigger. Never "the price fell";
+          that is not a risk to a business.</li>
+    </ul>
+    Theses are drafted from primary data, reviewed, then locked. Reviews are quarterly, plus whenever a trigger fires.`) +
+  step(10, "Monitoring, and how a position ends", `
+    Prices refresh through the day. After each close the whole chain reruns: signals, technicals, grid, proposal,
+    risk, income and volatility. A position ends when the thesis breaks, a pillar floor is breached, the grade
+    falls to D, a risk trigger fires, or a portfolio limit forces it out. A falling price alone is not an exit —
+    it is a reason to re-check the thesis.`) +
+  step(11, "What we have proven — and what we haven't", `
+    <ul class="list">
+      <li><b>Where we stand:</b> the live book has beaten SPY, but its 1.7 beta explains the gap; measured alpha
+          is not yet distinguishable from zero.</li>
+      <li><b>What the tests support:</b> trend state helps avoid large drawdowns, and buying qualified names at
+          the low end of their range beat buying them extended. Quality grades plus technical confirmation beat
+          the screened universe by roughly 7–8%/yr since January 2024 — a test that still carries survivorship
+          bias and is not statistically conclusive.</li>
+      <li><b>What we do about it:</b> since September 2026 every variant — the grid's picks, the proposal, the
+          quads, and the real book — is tracked forward monthly against SPY, unedited. That record, not a
+          backtest, is what will show whether the process adds value.</li>
+    </ul>`) +
+  `<div class="note" style="margin-top:18px">Integrity Wealth Partners · LPL Financial affiliate · internal research tool.
+     Nothing here is a recommendation or an offer.</div>`;
+}
 
 
 
@@ -822,7 +942,7 @@ async function paperCard(el){
       data:days.map(d => { const x = by[s].find(r => r.nav_date===d); return x ? +(+x.nav).toFixed(2) : null; })}))});
 }
 
-const VIEWS = {overview, holdings, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, risk: performanceAll, factors: performanceAll};
+const VIEWS = {overview, holdings, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, about, risk: performanceAll, factors: performanceAll};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
