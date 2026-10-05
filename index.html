@@ -150,7 +150,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · LPL Financial affiliate · internal use only</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-05 17:45 · 9967d85</div>
   </div>
 </section>
 
@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:34 · bb9941d</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:45 · 9967d85</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -205,7 +205,7 @@ async function loadPayload(){
   D = rows[0].payload; LIVE.builtAt = rows[0].built_at;
 }
 async function loadQuotes(){
-  const rows = await q("site_quotes");
+  const rows = await qAll("site_quotes");
   LIVE.quotes = Object.fromEntries(rows.map(r => [r.ticker, r]));
   LIVE.jobs = await q("site_job_runs");
   applyQuotes();
@@ -230,8 +230,8 @@ function applyQuotes(){
 }
 async function enter(){
   const err = document.getElementById("err");
-  try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t]));
-    LIVE.v2 = Object.fromEntries((await q("site_technicals_v2")).map(t => [t.ticker, t])); }
+  try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
+    LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -413,7 +413,7 @@ function about(el){
           quads, and the real book — is tracked forward monthly against SPY, unedited. That record, not a
           backtest, is what will show whether the process adds value.</li>
     </ul>`) +
-  `<div class="note" style="margin-top:18px">Integrity Wealth Partners · LPL Financial affiliate · internal research tool.
+  `<div class="note" style="margin-top:18px">Integrity Wealth Partners · internal research tool.
      Nothing here is a recommendation or an offer.</div>`;
 }
 
@@ -445,9 +445,9 @@ function sigKey(v, k, M){
 }
 async function signalsV2(el){
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">loading…</span>`);
-  if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await q("site_technicals_v2")).map(t => [t.ticker, t]));
-  if(!LIVE.events) LIVE.events = await q("site_technical_events", r => r.order("event_date", {ascending:false}).limit(600));
-  if(!LIVE.matrix) LIVE.matrix = await q("site_decision_matrix");
+  if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
+  if(!LIVE.events) LIVE.events = await qAll("site_technical_events", r => r.order("event_date", {ascending:false}));
+  if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
   const M = Object.fromEntries(LIVE.matrix.map(r => [r.ticker, r]));
   const V = Object.values(LIVE.v2), held = new Set(D.holdings.map(h => h.tk));
   const count = (k, v) => V.filter(x => x[k] === v).length;
@@ -698,7 +698,7 @@ async function techChart(el, tk, bars){
 async function loadBars(tk, days=420){
   if(LIVE.bars?.[tk]) return LIVE.bars[tk];
   const from = new Date(Date.now() - days*864e5).toISOString().slice(0,10);
-  const rows = await q("site_price_history", r => r.eq("ticker", tk).gte("price_date", from).order("price_date"));
+  const rows = await qAll("site_price_history", r => r.eq("ticker", tk).gte("price_date", from).order("price_date"));
   const out = rows.map(r => ({d:r.price_date, c:+r.adj_close, h:+(r.adj_high ?? r.adj_close), l:+(r.adj_low ?? r.adj_close), v:+(r.volume||0)}));
   (LIVE.bars ||= {})[tk] = out; return out;
 }
@@ -788,7 +788,7 @@ function gridKey(r, k){
 }
 async function grid(el){
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">loading…</span>`);
-  if(!LIVE.matrix) LIVE.matrix = await q("site_decision_matrix");
+  if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
   const M = LIVE.matrix, grades = ["A","B","C","D"], techs = ["STRONG_BUY","BUY","NEUTRAL","SELL","STRONG_SELL"];
   const cell = (g,t) => M.filter(r => r.grade===g && r.tech_rating===t);
   const draw = () => {
@@ -884,7 +884,7 @@ function tbl(h, rows){ return `<div class="table-wrap"><table class="tbl"><thead
 /* ═══ PROPOSAL (live) ═══════════════════════════════════════════════════════ */
 async function proposal(el){
   el.innerHTML = head("Process", "Proposed portfolio", `<span class="muted">loading…</span>`);
-  if(!LIVE.proposal) LIVE.proposal = await q("site_proposal");
+  if(!LIVE.proposal) LIVE.proposal = await qAll("site_proposal");
   const P = LIVE.proposal, by = s => P.filter(r => r.status===s);
   const sect = (s, sub) => card(`${s} (${by(s).length})`, sub, tbl(["Ticker","Grade","Action","Technical","Composite","Sector","Reason"],
     by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc((r.action||"").replaceAll("_"," ")), esc((r.tech_rating||"—").replace("_"," ")), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
@@ -912,7 +912,7 @@ async function analytics(el){
   if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
   const HA = LIVE.hanal, B = HA.book || {}, P = D.perf;
   if(!LIVE.benchPx){
-    const rows = await q("site_price_history", r => r.in("ticker", ["QQQ","IWM"]).gte("price_date", P.dates[0]).order("price_date"));
+    const rows = await qAll("site_price_history", r => r.in("ticker", ["QQQ","IWM"]).gte("price_date", P.dates[0]).order("price_date"));
     LIVE.benchPx = {}; rows.forEach(r => (LIVE.benchPx[r.ticker] ||= {})[r.price_date] = +r.adj_close);
   }
   const retOn = (px) => { const out = []; let prev = null; P.dates.forEach(d => { const v = px[d]; out.push(prev && v ? v/prev-1 : null); if(v) prev = v; }); return out; };
@@ -988,7 +988,7 @@ function thesisBlock(tk, full=false){
 }
 let thesisSel = null;
 async function theses(el){
-  LIVE.theses = Object.fromEntries((await q("site_theses")).map(t => [t.ticker, t]));
+  LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
   const T = Object.values(LIVE.theses), held = new Set(D.holdings.map(h => h.tk));
   const locked = T.filter(t => t.status === "LOCKED").length;
   thesisSel = thesisSel && LIVE.theses[thesisSel] ? thesisSel : (T[0]||{}).ticker;
