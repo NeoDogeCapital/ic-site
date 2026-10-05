@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:30 · e6e9f42</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:34 · bb9941d</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -189,6 +189,16 @@ const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKe
   {auth:{persistSession:true, autoRefreshToken:true}});
 let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
+async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
+  const out = [];
+  for(let from = 0; ; from += page){
+    let r = SB.from(view).select("*"); if(build) r = build(r);
+    const {data, error} = await r.range(from, from + page - 1);
+    if(error) throw error;
+    out.push(...data);
+    if(data.length < page) return out;
+  }
+}
 async function loadPayload(){
   const rows = await q("site_payload");
   if(!rows.length) throw new Error("no-access");
@@ -1006,50 +1016,78 @@ const PAPER_COL = {grid_ab_buy:C.green, grid_a_buy:"#2fa874", tech_buy:C.accent2
 const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];
 const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
 const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
+let paperRange = "all";                      // YTD / 1Y / All
 async function paperCard(el){
-  const rows = await q("site_paper_nav", r => r.order("nav_date"));
+  const rows = await qAll("site_paper_nav", r => r.order("nav_date"));
   if(!rows.length) return;
-  const by = {}; rows.forEach(r => (by[r.strategy] ||= []).push(r));
-  const start = rows[0].nav_date, days = [...new Set(rows.map(r => r.nav_date))];
-  // Each series starts when its inputs exist: Jan 2 for the proxy-gradable rules, Jun 25 for anything
-  // needing a quad (quads, the long/short) or the real book. Compare each against SPY over ITS window.
-  const spyAt = d => { const r = (by.spy||[]).filter(x => x.nav_date <= d).slice(-1)[0]; return r ? +r.nav : null; };
-  // Sharpe from each series' own daily returns, annualised, over the risk-free rate the analytics use.
-  const rf = (D.perf && D.perf.rf_mean) || 0;
-  const sharpe = rows_ => {
-    const r = rows_.map(x => x.daily_return).filter(v => v != null).map(Number);
-    if(r.length < 20) return null;
-    const m = r.reduce((a,b)=>a+b,0) / r.length;
-    const sd = Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0) / (r.length-1));
-    return sd > 0 ? (m*252 - rf) / (sd*Math.sqrt(252)) : null;
+  const all = {}; rows.forEach(r => (all[r.strategy] ||= []).push(r));
+  const lastDate = rows.reduce((a, r) => r.nav_date > a ? r.nav_date : a, "");
+  const cutoff = () => {
+    if(paperRange === "ytd") return lastDate.slice(0,4) + "-01-01";
+    if(paperRange === "1y"){ const d = new Date(lastDate); d.setFullYear(d.getFullYear()-1); return d.toISOString().slice(0,10); }
+    return "0000-01-01";
   };
-  const stats = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
-    const first = by[s][0], last = by[s].slice(-1)[0];
-    const ret = +last.nav / +first.nav - 1;
-    const s0 = spyAt(first.nav_date), s1 = spyAt(last.nav_date);
-    const bench = s0 && s1 ? s1 / s0 - 1 : null;
-    const sh = sharpe(by[s]);
-    return [`<span style="color:${PAPER_COL[s]}">●</span> ${PAPER_LABEL[s]}`,
-            `<span class="muted" style="font-size:11px">${first.nav_date}</span>`,
-            pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
-            sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
-  });
-  const box = document.createElement("div"); box.style.marginTop = "16px";
-  const liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
-  box.innerHTML = card("Track record", `since ${start} · ${days.length} trading days · three regimes:
-    <b>proxy</b> to ${PAPER_REAL_FROM} (grade rebuilt from filings — no quads, so quad and long/short series start later),
-    <b>reconstructed</b> from stored model snapshots to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since`,
-    `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div><div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long): one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily returns over the risk-free rate; it appears once a series has 20 trading days (younger ones show their day count instead), and a short history makes it unreliable regardless. Backtest (Jan 2024 → Sep 2026, hindsight universe): A/B + Buy +157% · A + Buy +170% · Technical Buy +154% · Grade A +139% · C/D +133% · A/B not downtrend +116% · Universe +114% · A/B +107% · A/B weak +97% · SPY +65%.</div>`);
-  el.appendChild(box);
-  mk(document.getElementById("paperChart"), {legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
-      selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))}, grid:{left:48,right:16,top:20,bottom:40},
-    xAxis:{type:"category", data:days, axisLabel:{color:C.muted}}, yAxis:{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
-    series:Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => ({name:PAPER_LABEL[s], type:"line", showSymbol:days.length<3, lineStyle:{width:s==="grid_ab_buy"||s==="actual_book"?2.4:1.4, color:PAPER_COL[s]}, itemStyle:{color:PAPER_COL[s]},
-      data:days.map(d => { const x = by[s].find(r => r.nav_date===d); return x ? +(+x.nav).toFixed(2) : null; }),
-      markLine: s === "spy" ? {silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dashed"},
-        label:{color:C.muted, fontSize:10, formatter:"live from here"},
-        data:[{xAxis: days.find(d => d >= PAPER_REAL_FROM), label:{formatter:"model data"}},
-              {xAxis: days.find(d => d >= PAPER_LIVE_FROM), label:{formatter:"live"}}]} : undefined}))});
+  const box = document.createElement("div"); box.style.marginTop = "16px"; el.appendChild(box);
+
+  const draw = () => {
+    const from = cutoff();
+    const by = {};
+    Object.entries(all).forEach(([s, ser]) => { const w = ser.filter(r => r.nav_date >= from); if(w.length) by[s] = w; });
+    const days = [...new Set(Object.values(by).flat().map(r => r.nav_date))].sort();
+    const start_ = days[0], liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
+    const spyAt = d => { const r = (by.spy||[]).filter(x => x.nav_date <= d).slice(-1)[0]; return r ? +r.nav : null; };
+    const rf = (D.perf && D.perf.rf_mean) || 0;
+    const sharpe = ser => {
+      const r = ser.map(x => x.daily_return).filter(v => v != null).map(Number);
+      if(r.length < 20) return null;
+      const m = r.reduce((a,b)=>a+b,0) / r.length;
+      const sd = Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0) / (r.length-1));
+      return sd > 0 ? (m*252 - rf) / (sd*Math.sqrt(252)) : null;
+    };
+    const stats = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
+      const first = by[s][0], last = by[s].slice(-1)[0];
+      const ret = +last.nav / +first.nav - 1;
+      const s0 = spyAt(first.nav_date), s1 = spyAt(last.nav_date);
+      const bench = s0 && s1 ? s1 / s0 - 1 : null;
+      const sh = sharpe(by[s]);
+      return [`<span style="color:${PAPER_COL[s]}">&#9679;</span> ${PAPER_LABEL[s]}`,
+              `<span class="muted" style="font-size:11px">${first.nav_date}</span>`,
+              pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
+              sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
+    });
+    const btn = (k, label) => `<button class="lock" data-range="${k}"${paperRange===k?' style="border-color:var(--brand);color:var(--text)"':""}>${label}</button>`;
+    box.innerHTML = card("Track record",
+      `${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; since ${start_} · ${days.length} trading days ·
+       <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since ·
+       each series rebased to 100 at its first day in view`,
+      `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
+        tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
+       <div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
+       one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
+       returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
+       unreliable regardless.</div>`);
+    const series = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
+      const base = +by[s][0].nav;
+      return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3, connectNulls:false,
+        lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s]}, itemStyle:{color:PAPER_COL[s]},
+        data:days.map(d => { const x = by[s].find(r => r.nav_date === d); return x ? +(+x.nav / base * 100).toFixed(2) : null; })};
+    });
+    const marks = [[PAPER_REAL_FROM,"model data"],[PAPER_LIVE_FROM,"live"]]
+      .map(([d,l]) => { const at = days.find(x => x >= d); return at && at !== days[0] ? {xAxis:at, label:{formatter:l}} : null; })
+      .filter(Boolean);
+    if(series.length && marks.length)
+      series[series.length-1].markLine = {silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dashed"},
+        label:{color:C.muted, fontSize:10}, data:marks};
+    mk(document.getElementById("paperChart"), {
+      legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
+        selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))},
+      grid:{left:48,right:16,top:20,bottom:40}, tooltip:{trigger:"axis"},
+      xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
+      yAxis:{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+      series});
+    box.querySelectorAll("button[data-range]").forEach(b => b.onclick = () => { paperRange = b.dataset.range; draw(); });
+  };
+  draw();
 }
 
 const VIEWS = {overview, holdings, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, about, risk: performanceAll, factors: performanceAll};
