@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:23 · 4bc0b8a</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:30 · e6e9f42</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1032,14 +1032,14 @@ async function paperCard(el){
     return [`<span style="color:${PAPER_COL[s]}">●</span> ${PAPER_LABEL[s]}`,
             `<span class="muted" style="font-size:11px">${first.nav_date}</span>`,
             pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
-            sh == null ? "—" : num(sh, 2)];
+            sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
   });
   const box = document.createElement("div"); box.style.marginTop = "16px";
   const liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
   box.innerHTML = card("Track record", `since ${start} · ${days.length} trading days · three regimes:
     <b>proxy</b> to ${PAPER_REAL_FROM} (grade rebuilt from filings — no quads, so quad and long/short series start later),
     <b>reconstructed</b> from stored model snapshots to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since`,
-    `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div><div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long): one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily returns over the risk-free rate, so short histories carry little weight. Backtest (Jan 2024 → Sep 2026, hindsight universe): A/B + Buy +157% · A + Buy +170% · Technical Buy +154% · Grade A +139% · C/D +133% · A/B not downtrend +116% · Universe +114% · A/B +107% · A/B weak +97% · SPY +65%.</div>`);
+    `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div><div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long): one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily returns over the risk-free rate; it appears once a series has 20 trading days (younger ones show their day count instead), and a short history makes it unreliable regardless. Backtest (Jan 2024 → Sep 2026, hindsight universe): A/B + Buy +157% · A + Buy +170% · Technical Buy +154% · Grade A +139% · C/D +133% · A/B not downtrend +116% · Universe +114% · A/B +107% · A/B weak +97% · SPY +65%.</div>`);
   el.appendChild(box);
   mk(document.getElementById("paperChart"), {legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
       selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))}, grid:{left:48,right:16,top:20,bottom:40},
