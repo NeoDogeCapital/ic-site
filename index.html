@@ -101,6 +101,17 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .fbtn.on{color:var(--text);border-color:rgba(106,166,248,.45);background:rgba(106,166,248,.12)}
 .search{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;outline:none;width:180px}
 .list{display:flex;flex-direction:column}
+/* plain-English thesis layer: the readable version, with the full record behind a toggle */
+.kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kv{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.02)}
+.kv span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.kv b{font-size:13.5px}
+.thesis-full{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.thesis-full>summary{cursor:pointer;font:500 12px var(--mono);color:var(--muted);list-style:none}
+.thesis-full>summary::marker,.thesis-full>summary::-webkit-details-marker{display:none}
+.thesis-full>summary::before{content:"▸ ";color:var(--dim)}
+.thesis-full[open]>summary::before{content:"▾ "}
+.thesis-full>summary:hover{color:var(--fg)}
 .li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
 .li:last-child{border-bottom:0}
 .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px}
@@ -150,7 +161,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-05 17:45 · 9967d85</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-05 19:27 · e4b77e2</div>
   </div>
 </section>
 
@@ -174,7 +185,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 17:45 · 9967d85</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 19:27 · e4b77e2</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -967,13 +978,29 @@ async function analytics(el){
     series:[{type:"pie", radius:["45%","72%"], label:{color:C.muted, formatter:p => `${p.name} ${(p.value*100).toFixed(0)}%`}, data:geo.map(([k,v]) => ({name:k, value:v}))}]});
 }
 /* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
+function plainBlock(t, badge){
+  const P = t.plain; if(!P) return "";
+  const num = (P.numbers||[]).map(n => `<div class="kv"><span class="muted">${esc(n.label)}</span><b>${esc(n.value)}</b></div>`).join("");
+  const li  = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
+  return `<div class="sec"><h4>Thesis ${badge}</h4>
+    <p style="font-size:15px;line-height:1.5">${esc(P.snapshot)}</p>
+    <h4 style="margin-top:12px">Why we own it</h4><p>${esc(P.why_we_own)}</p>
+    <h4 style="margin-top:12px">Why this one</h4><p>${esc(P.edge)}</p>
+    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}
+    <h4 style="margin-top:12px">What we're watching</h4><ul class="list">${li(P.watch)}</ul>
+    <h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>
+  </div>`;
+}
 function thesisBlock(tk, full=false){
   const t = LIVE.theses[tk]; if(!t) return "";
   const badge = t.status === "LOCKED" ? `<span class="chip">LOCKED v${t.version}</span>` : `<span class="chip bad">DRAFT v${t.version} · not yet reviewed</span>`;
+  const plain = plainBlock(t, badge);
+  // The plain version is what people read; the full Catalyst · Edge · Risk record is the process
+  // document (every risk carries a watch metric and a trigger) and sits behind a toggle.
   const li = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
-  return `<div class="sec"><h4>Thesis ${badge}</h4>
+  const detail = `<div class="sec">
     ${t.theme ? `<div class="caps" style="margin:4px 0 8px">${esc(t.theme)}</div>` : ""}
-    ${full && t.business ? `<p class="muted">${esc(t.business)}</p>` : ""}
+    ${t.business ? `<p class="muted">${esc(t.business)}</p>` : ""}
     <h4 style="margin-top:10px">Catalyst — why we own it</h4><p>${esc(t.catalyst?.summary)}</p><ul class="list">${li(t.catalyst?.drivers)}</ul>
     <h4 style="margin-top:10px">Edge — why this company</h4><p>${esc(t.edge?.summary)}</p>
     <ul class="list">${(t.edge?.vs_peers||[]).map(v => `<li><b>vs ${esc(v.peer)}:</b> ${esc(v.advantage)}</li>`).join("")}</ul>
@@ -981,10 +1008,12 @@ function thesisBlock(tk, full=false){
     ${tbl(["Risk","Type","Watch","Trigger"], (t.risks||[]).map(r => [esc(r.risk), esc(r.category), esc(r.watch), esc(r.trigger)]))}
     <h4 style="margin-top:10px">Sell if</h4><ul class="list">${li(t.invalidation)}</ul>
     ${(t.upcoming||[]).length ? `<h4 style="margin-top:10px">Upcoming</h4><ul class="list">${(t.upcoming||[]).map(u => `<li>${esc(u.date)} — ${esc(u.event)}</li>`).join("")}</ul>` : ""}
-    ${full ? `<h4 style="margin-top:10px">Model view</h4><p class="muted">${esc(t.model_view)}</p>
-      <h4 style="margin-top:10px">Evidence</h4><ul class="list">${(t.evidence||[]).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.source)}</span> — ${esc(e.fact)}</li>`).join("")}</ul>
-      ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions before locking</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}` : ""}
+    <h4 style="margin-top:10px">Model view</h4><p class="muted">${esc(t.model_view)}</p>
+    <h4 style="margin-top:10px">Evidence</h4><ul class="list">${(t.evidence||[]).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.source)}</span> — ${esc(e.fact)}</li>`).join("")}</ul>
+    ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}
   </div>`;
+  if(!plain) return detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${badge}</h4>`);
+  return plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
 }
 let thesisSel = null;
 async function theses(el){
