@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 14:30 · 1ac6c03</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 16:19 · e551628</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -412,6 +412,27 @@ function about(el){
 
 /* ═══ SIGNALS: universe-wide technical analysis (v2) ══════════════════════ */
 let sigFilter = {q:"", trend:"", timing:"", held:false};
+let sigSort = {k:"range_pos", d:1};
+const TREND_ORD = {BULLISH:0, BEARISH:1};
+const REGIME_ORD = {BULL:0, NEUTRAL:1, BEAR:2};
+const SIG_COLS = [
+  ["ticker","Ticker","txt"], ["close","Price","num"], ["trend","Trend line","ord"], ["range_pos","Timing","ord"],
+  ["trade_mid","Trade range (1w)","num"], ["trend_mid","Trend range (1m)","num"], ["rsi","RSI","num"],
+  ["rvol","Rel vol","num"], ["above_52w_low_avwap","52w-low VWAP","ord"], ["td","TD b/s","num"],
+  ["tech_rating","Rating","ord"],
+];
+function sigKey(v, k, M){
+  const n = x => x == null ? null : +x;
+  if(k === "trend") return TREND_ORD[v.trend] ?? 9;
+  if(k === "range_pos") return [TIMING_ORD[v.timing] ?? 9, n(v.range_pos) ?? 9];   // timing bucket, then depth in range
+  if(k === "above_52w_low_avwap") return v.above_52w_low_avwap ? 0 : 1;
+  if(k === "tech_rating") return TECH_ORD[(M[v.ticker]||{}).tech_rating] ?? 9;
+  if(k === "trade_mid") return v.trade_low == null ? null : (+v.trade_low + +v.trade_high) / 2;
+  if(k === "trend_mid") return v.trend_low == null ? null : (+v.trend_low + +v.trend_high) / 2;
+  if(k === "td") return (v.td_buy_count || 0) - (v.td_sell_count || 0);
+  if(k === "ticker") return v.ticker.toLowerCase();
+  return n(v[k]);
+}
 async function signalsV2(el){
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">loading…</span>`);
   if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await q("site_technicals_v2")).map(t => [t.ticker, t]));
@@ -426,7 +447,18 @@ async function signalsV2(el){
     const rows = V.filter(v => (!f.trend || v.trend === f.trend) && (!f.timing || v.timing === f.timing)
         && (!f.held || held.has(v.ticker))
         && (!f.q || (v.ticker + " " + (M[v.ticker]?.sector || "")).toLowerCase().includes(f.q.toLowerCase())))
-      .sort((a,b) => (a.range_pos ?? 9) - (b.range_pos ?? 9));
+      .sort((a,b) => {
+        let x = sigKey(a, sigSort.k, M), y = sigKey(b, sigSort.k, M);
+        if(Array.isArray(x)){                                   // timing: bucket first, then position
+          const c0 = x[0] - y[0] || x[1] - y[1];
+          return c0 * sigSort.d;
+        }
+        if(x == null && y == null) return 0;
+        if(x == null) return 1;                                 // blanks always sink
+        if(y == null) return -1;
+        const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+        return (c || a.ticker.localeCompare(b.ticker)) * sigSort.d;
+      });
     document.getElementById("sigRows").innerHTML = rows.map(v => {
       const m = M[v.ticker] || {};
       return `<tr data-open="${v.ticker}" style="cursor:pointer">
@@ -443,6 +475,15 @@ async function signalsV2(el){
         <td>${esc(m.tech_rating ? m.tech_rating.replace("_"," ") : "—")}</td></tr>`;
     }).join("");
     document.getElementById("sigN").textContent = rows.length + " names";
+    document.getElementById("sigHead").innerHTML = SIG_COLS.map(([k,label]) =>
+      `<th data-sort="${k}" style="cursor:pointer;white-space:nowrap" title="Sort by ${label}">${label}${
+        sigSort.k === k ? (sigSort.d > 0 ? " ↑" : " ↓") : ""}</th>`).join("");
+    document.querySelectorAll("#sigHead th[data-sort]").forEach(th => th.onclick = () => {
+      const k = th.dataset.sort;
+      const num_ = (SIG_COLS.find(c => c[0] === k) || [])[2] === "num";
+      sigSort = {k, d: sigSort.k === k ? -sigSort.d : (num_ ? -1 : 1)};
+      draw();
+    });
   };
   const ev = LIVE.events.slice(0, 120);
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${V.length} names · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
@@ -461,8 +502,7 @@ async function signalsV2(el){
       <select class="input" id="stiming" style="width:auto">${["","BUY_ZONE","ACCUMULATE_OK","NEUTRAL","WAIT_FOR_LOW_END","TRIM_ZONE","AVOID_EXTENDED"]
         .map(v => `<option value="${v}">${v ? v.replaceAll("_"," ") : "Any timing"}</option>`).join("")}</select>
       <label class="check"><input type="checkbox" id="sheld" ${sigFilter.held?"checked":""}> Holdings only</label></div>
-     <div class="table-wrap" style="max-height:640px;overflow:auto"><table class="tbl"><thead><tr><th>Ticker</th><th>Price</th><th>Trend line</th><th>Timing</th>
-       <th>Trade range (1w)</th><th>Trend range (1m)</th><th>RSI</th><th>Rel vol</th><th>52w-low VWAP</th><th>TD b/s</th><th>Rating</th></tr></thead>
+     <div class="table-wrap" style="max-height:640px;overflow:auto"><table class="tbl"><thead><tr id="sigHead"></tr></thead>
        <tbody id="sigRows"></tbody></table></div>`) + `</div>
   <div class="grid g2" style="margin-top:16px">
     ${card("Signal events", "last 90 days · universe-wide", `<div class="table-wrap" style="max-height:420px;overflow:auto">` +
