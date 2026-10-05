@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 16:24 · 0b845af</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 16:25 · 18c7e56</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1367,6 +1367,12 @@ function universe(el){
   <div class="grid g2" style="margin-top:16px">
     ${card("Top alignment scores", "universe leaders not held", `<div class="list" id="uTop"></div>`)}
     ${card("Quad by sector", "count of names", `<div class="chart tall" id="uSec"></div>`)}
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    ${card("Quad by industry", `largest industries · <select class="input" id="uIndN" style="width:auto;display:inline-block;padding:2px 6px">
+      <option value="14">top 14</option><option value="25">top 25</option><option value="99">all</option></select>
+      <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="uIndQ1"> sort by Q1 share</label>`,
+      `<div class="chart" id="uInd" style="height:520px"></div>`)}
   </div>`;
   document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f; clearCharts(); universe(el); });
   const keep = u => uFilter==="all" || (uFilter==="held"&&u.held) || (uFilter==="watch"&&u.watch) || (uFilter==="accum"&&u.bucket==="ACCUMULATE");
@@ -1400,6 +1406,31 @@ function universe(el){
     series:["Q1","Q2","Q3","Q4"].map(q=>({name:q,type:"bar",stack:"s",barWidth:"62%",itemStyle:{color:C.q[q]},
       data:secs.map(s=>U.filter(u=>(u.sector||"Other")===s&&u.quad===q).length)}))
   });
+  const drawInd = () => {
+    const nWanted = +(document.getElementById("uIndN")?.value || 14);
+    const byQ1 = document.getElementById("uIndQ1")?.checked;
+    const names = [...new Set(U.map(u=>u.industry||"Unclassified"))];
+    const cnt = i => U.filter(u=>(u.industry||"Unclassified")===i).length;
+    const q1share = i => { const n = cnt(i); return n ? U.filter(u=>(u.industry||"Unclassified")===i&&u.quad==="Q1").length/n : 0; };
+    let inds = names.filter(i => cnt(i) >= 2).sort((a,b)=>cnt(b)-cnt(a)).slice(0, nWanted);
+    inds = inds.sort((a,b)=> byQ1 ? q1share(a)-q1share(b) : cnt(a)-cnt(b));
+    const el2 = document.getElementById("uInd");
+    if(el2) el2.style.height = Math.max(260, inds.length*26 + 60) + "px";
+    mk(el2, {
+      grid:{left:210,right:14,top:24,bottom:20}, legend:{top:0,right:0,textStyle:{color:C.muted},itemWidth:10,itemHeight:8},
+      xAxis:axY({type:"value"}),
+      yAxis:axX({type:"category",data:inds,axisLabel:{color:C.muted,fontSize:10,width:200,overflow:"truncate"}}),
+      tooltip:{trigger:"axis", formatter:p => { const i = p[0].axisValue;
+        return `<b>${esc(i)}</b><br>` + p.map(x=>`${x.marker}${x.seriesName} ${x.value}`).join("<br>")
+             + `<br><span style="opacity:.7">${cnt(i)} names · Q1 ${(q1share(i)*100).toFixed(0)}%</span>`; }},
+      series:["Q1","Q2","Q3","Q4"].map(q=>({name:q,type:"bar",stack:"s",barWidth:"62%",itemStyle:{color:C.q[q]},
+        data:inds.map(i=>U.filter(u=>(u.industry||"Unclassified")===i&&u.quad===q).length)}))
+    });
+  };
+  drawInd();
+  const nSel = document.getElementById("uIndN"), q1c = document.getElementById("uIndQ1");
+  if(nSel) nSel.onchange = drawInd;
+  if(q1c) q1c.onchange = drawInd;
 }
 
 /* ═══ SIGNALS ════════════════════════════════════════════════════════════ */
