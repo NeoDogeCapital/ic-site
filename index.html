@@ -174,7 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-09-16 01:15 · b77b0d6</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 14:30 · 1ac6c03</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -714,6 +714,28 @@ const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.gree
   HOLD_WAIT_TREND:C.muted, HOLD_NO_NEW_BUYS:C.amber, REVIEW:C.amber, TRIM_CANDIDATE:C.amber, WATCH:C.dim,
   REDUCE:C.red, EXIT_REVIEW:C.red, AVOID:C.red, EXIT:C.red};
 let gridFilter = {q:"", held:false, act:""};
+let gridSort = {k:"grade", d:1};
+// Rank orders so a sort reads the way the model reads: best first on a descending click.
+const GRADE_ORD = {A:0, B:1, C:2, D:3};
+const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
+const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
+const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
+  HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+const GRID_COLS = [
+  ["ticker","Ticker","txt"], ["grade","Grade","ord"], ["tech_rating","Technical","ord"], ["action","Action","ord"],
+  ["timing","Timing","ord"], ["guidance","Guidance","txt"], ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
+  ["composite","Composite","num"], ["trend","Trend","txt"], ["sector","Sector","txt"], ["grade_reason","Why","txt"],
+];
+const QGS_ORD = {RARE_ELITE:0, EXCEPTIONAL:1, GOOD_COMPOUNDER:2, AVERAGE:3, LOW_QUALITY:4};
+function gridKey(r, k){
+  if(k === "grade") return GRADE_ORD[r.grade] ?? 9;
+  if(k === "tech_rating") return TECH_ORD[r.tech_rating] ?? 9;
+  if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
+  if(k === "action") return ACTION_ORD[r.action] ?? 99;
+  if(k === "qgs_tier") return QGS_ORD[r.qgs_tier] ?? 9;
+  if(k === "composite" || k === "range_pos") return r[k] == null ? null : +r[k];
+  return (r[k] ?? "").toString().toLowerCase();
+}
 async function grid(el){
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">loading…</span>`);
   if(!LIVE.matrix) LIVE.matrix = await q("site_decision_matrix");
@@ -723,7 +745,14 @@ async function grid(el){
     const f = gridFilter;
     const rows = M.filter(r => (!f.held || r.held) && (!f.act || r.action===f.act) &&
       (!f.q || (r.ticker + " " + (r.sector||"")).toLowerCase().includes(f.q.toLowerCase())))
-      .sort((a,b) => (a.grade>b.grade?1:a.grade<b.grade?-1:0) || (b.composite||0)-(a.composite||0));
+      .sort((a,b) => {
+        const x = gridKey(a, gridSort.k), y = gridKey(b, gridSort.k);
+        if(x == null && y == null) return 0;
+        if(x == null) return 1;                      // blanks always sink
+        if(y == null) return -1;
+        const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+        return (c || (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9)) * gridSort.d;
+      });
     document.getElementById("gridRows").innerHTML = rows.slice(0,400).map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
@@ -732,6 +761,16 @@ async function grid(el){
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     document.getElementById("gridN").textContent = rows.length + " names";
+    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) =>
+      `<th data-sort="${k}" style="cursor:pointer;white-space:nowrap" title="Sort by ${label}">${label}${
+        gridSort.k === k ? (gridSort.d > 0 ? " ↑" : " ↓") : ""}</th>`).join("");
+    document.querySelectorAll("#gridHead th[data-sort]").forEach(th => th.onclick = () => {
+      const k = th.dataset.sort;
+      // same column flips; a new column opens best-first — highest for numbers, best rank/A-Z otherwise
+      const num_ = (GRID_COLS.find(c => c[0] === k) || [])[2] === "num";
+      gridSort = {k, d: gridSort.k === k ? -gridSort.d : (num_ ? -1 : 1)};
+      draw();
+    });
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</span>`) +
@@ -744,7 +783,7 @@ async function grid(el){
        <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
        <button class="lock" id="gclear">Clear filters</button></div>
        <div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
-       <div class="table-wrap"><table class="tbl"><thead><tr><th>Ticker</th><th>Grade</th><th>Technical</th><th>Action</th><th>Timing</th><th>Guidance</th><th>Quad</th><th>QGS tier</th><th>Composite</th><th>Trend</th><th>Sector</th><th>Why</th></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
+       <div class="table-wrap"><table class="tbl"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
   document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; draw(); };
