@@ -101,6 +101,31 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .fbtn.on{color:var(--text);border-color:rgba(106,166,248,.45);background:rgba(106,166,248,.12)}
 .search{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;outline:none;width:180px}
 .list{display:flex;flex-direction:column}
+/* period segmented control (Overview) */
+.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.03);margin-left:12px}
+.seg button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 11.5px var(--mono);letter-spacing:.06em;
+  padding:4px 10px;border-radius:6px}
+.seg button:hover:not([disabled]):not(.on){color:var(--text)}
+.seg button.on{background:var(--brand);color:#fff}
+.seg button[disabled]{opacity:.32;cursor:default}
+/* daily note on the Holdings tab */
+.brief{border-color:rgba(175,100,82,.28);background:linear-gradient(180deg,rgba(175,100,82,.07),rgba(255,255,255,.012))}
+.brief h3{margin:3px 0 0;font-size:19px;line-height:1.25;font-weight:650}
+.brief h4{margin:0 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.bnav{display:flex;align-items:center;gap:8px;flex:none}
+.bbtn{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted);border-radius:6px;cursor:pointer;
+  font:600 12px var(--mono);padding:3px 8px}
+.bbtn:hover:not([disabled]){color:var(--text);border-color:var(--brand)}
+.bbtn[disabled]{opacity:.3;cursor:default}
+.blede{margin:11px 0 0;font-size:14.5px;line-height:1.6;color:var(--text)}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px 26px;margin-top:18px}
+.blist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;font-size:13.5px;line-height:1.5}
+.blist>li{padding-left:11px;border-left:2px solid var(--line)}
+.blist .muted{font-size:12.5px;margin-top:2px}
+.bahead{margin-top:18px;padding-top:13px;border-top:1px solid var(--line)}
+.bahead p{margin:5px 0 0;font-size:13.5px;line-height:1.6}
+@media(max-width:700px){.bgrid{grid-template-columns:1fr}.brief h3{font-size:17px}}
 /* plain-English thesis layer: the readable version, with the full record behind a toggle */
 .kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .kv{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.02)}
@@ -161,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-05 19:27 · e4b77e2</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 14:33 · 87e4d31</div>
   </div>
 </section>
 
@@ -185,7 +210,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-05 19:27 · e4b77e2</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 14:33 · 87e4d31</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -198,7 +223,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[]}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -242,7 +267,8 @@ function applyQuotes(){
 async function enter(){
   const err = document.getElementById("err");
   try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
-    LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t])); }
+    LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
+    LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false})); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -1137,20 +1163,57 @@ const head = (kicker, title, right="") => `<div class="pagehead"><div><div class
 const card = (title, sub, body, extraCls="") => `<div class="card ${extraCls}"><div class="card-h"><div><h3>${title}</h3>${sub?`<div class="sub">${sub}</div>`:""}</div></div>${body}</div>`;
 
 /* ═══ OVERVIEW ═══════════════════════════════════════════════════════════ */
+
+/* ═══ PERIOD RETURNS (day / MTD / QTD / YTD / since inception) ════════════ */
+const PERIODS = [["mtd","MTD"],["qtd","QTD"],["ytd","YTD"],["all","Since inception"]];
+let ovPeriod = "ytd";
+function periodStart(key, lastDate){
+  const d = new Date(lastDate + "T00:00:00Z"), y = d.getUTCFullYear();
+  if(key === "mtd") return `${y}-${String(d.getUTCMonth()+1).padStart(2,"0")}-01`;
+  if(key === "qtd") return `${y}-${String(Math.floor(d.getUTCMonth()/3)*3+1).padStart(2,"0")}-01`;
+  if(key === "ytd") return `${y}-01-01`;
+  return null;
+}
+// Compounds the daily series from the window start. Returns null when the window has no data yet.
+function periodStats(key){
+  const P = D.perf, dates = P.dates, dp = P.daily_p, db = P.daily_b;
+  if(!dates || !dates.length) return null;
+  const start = periodStart(key, dates[dates.length-1]);
+  let i = start ? dates.findIndex(d => d >= start) : 0;
+  if(i < 0) return null;
+  let p = 1, b = 1, up = 0, n = 0;
+  const cp = [0], cb = [0], dd = [];
+  let peak = 1;
+  for(let j = i; j < dates.length; j++){
+    p *= 1 + (dp[j]||0); b *= 1 + (db[j]||0);
+    cp.push(p-1); cb.push(b-1);
+    peak = Math.max(peak, p); dd.push(p/peak - 1);
+    if((dp[j]||0) > (db[j]||0)) up++;
+    n++;
+  }
+  if(!n) return null;
+  return {key, from: dates[i], to: dates[dates.length-1], days: n,
+          port: p-1, spy: b-1, excess: (p-1)-(b-1), beat_days: n ? up/n : null,
+          max_dd: Math.min(...dd, 0), x: [dates[i], ...dates.slice(i)], cum_p: cp, cum_b: cb};
+}
 function overview(el){
   const m = D.perf.metrics, H = D.holdings;
   const last = arr => arr.filter(v=>v!=null).slice(-1)[0];
-  el.innerHTML = head("Portfolio", "Overview", `<span class="muted">${H.length} holdings · book ${usd(D.book_value)}</span>`) +
+  const S = periodStats(ovPeriod) || periodStats("all");
+  const pl = PERIODS.find(([k]) => k === S.key)[1];
+  const toggle = `<span class="seg" id="ovSeg">${PERIODS.map(([k,l]) =>
+      `<button data-p="${k}" class="${k===S.key?"on":""}" ${periodStats(k)?"":"disabled"}>${l}</button>`).join("")}</span>`;
+  el.innerHTML = head("Portfolio", "Overview", `<span class="muted">${H.length} holdings · book ${usd(D.book_value)}</span>${toggle}`) +
   `<div class="kpis">
-    ${kpi("Total return", pct(m.total_return), `SPY ${pct(m.spy_total)}`, cls(m.total_return))}
-    ${kpi("Excess vs SPY", pct(m.excess), "since inception", cls(m.excess))}
-    ${kpi("Sharpe", num(m.sharpe), `Sortino ${num(m.sortino)}`)}
-    ${kpi("Alpha (ann.)", pct(m.alpha), `beta ${num(m.beta)}`, cls(m.alpha))}
-    ${kpi("Max drawdown", pct(m.max_dd), `${m.dd_start||""} → ${m.dd_end||""}`, "neg")}
-    ${kpi("Batting avg", pct(D.perf.trades_all.ba,0,false), `${D.perf.trades_all.n||0} allocations`)}
+    ${kpi(`${pl} return`, pct(S.port), `SPY ${pct(S.spy)}`, cls(S.port))}
+    ${kpi(`${pl} vs SPY`, pct(S.excess), `${S.from} → ${S.to}`, cls(S.excess))}
+    ${kpi("Days ahead of SPY", pct(S.beat_days,0,false), `of ${S.days} trading days`)}
+    ${kpi(`${pl} worst drawdown`, pct(S.max_dd), "peak to trough in window", "neg")}
+    ${kpi("Sharpe", num(m.sharpe), `since inception · Sortino ${num(m.sortino)}`)}
+    ${kpi("Alpha (ann.)", pct(m.alpha), `since inception · beta ${num(m.beta)}`, cls(m.alpha))}
   </div>
   <div class="grid g-2-1">
-    ${card("Growth of the portfolio vs SPY", `since ${D.inception}`, `<div class="chart tall" id="ovCum"></div>`)}
+    ${card("Growth of the portfolio vs SPY", S.key==="all" ? `since ${D.inception}` : `${pl} · ${S.from} → ${S.to}`, `<div class="chart tall" id="ovCum"></div>`)}
     ${card("Quad mix", "holdings by stock-level quad", `<div class="chart tall" id="ovQuad"></div>`)}
   </div>
   <div class="grid g2" style="margin-top:16px">
@@ -1162,16 +1225,19 @@ function overview(el){
     ${card("Needs attention", "weak model signals or thesis flags", `<div class="list" id="ovFlags"></div>`)}
   </div>`;
 
-  const P = D.perf; const x0 = [D.inception, ...P.dates];
+  const x0 = S.key === "all" ? [D.inception, ...D.perf.dates] : S.x;
   mk(document.getElementById("ovCum"), {
     legend:{top:0,right:0,textStyle:{color:C.muted},icon:"roundRect",itemWidth:12,itemHeight:3},
     xAxis:axX({type:"category",data:x0,boundaryGap:false,axisLabel:{color:C.dim,fontSize:11,formatter:v=>v.slice(2,7)}}),
     yAxis:axY({type:"value",axisLabel:Object.assign({color:C.dim,fontSize:11},pctAxis())}),
     tooltip:{trigger:"axis",valueFormatter:v=>pct(v)},
-    series:[{name:"Integrity Compounders",type:"line",symbol:"none",data:[0,...P.cum_p],lineStyle:{width:2.2,color:C.accent},
+    series:[{name:"Integrity Compounders",type:"line",symbol:"none",data:S.cum_p,lineStyle:{width:2.2,color:C.accent},
              areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:"rgba(106,166,248,.28)"},{offset:1,color:"rgba(106,166,248,0)"}])}},
-            {name:"SPY",type:"line",symbol:"none",data:[0,...P.cum_b],lineStyle:{width:1.4,color:C.muted,type:"dashed"}}]
+            {name:"SPY",type:"line",symbol:"none",data:S.cum_b,lineStyle:{width:1.4,color:C.muted,type:"dashed"}}]
   });
+  const seg = document.getElementById("ovSeg");
+  if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if(b.disabled) return; ovPeriod = b.dataset.p; clearCharts(); overview(el); });
   const qc = {}; H.forEach(h => { const q = h.quad||"N/A"; qc[q] = (qc[q]||0) + (h.weight||0); });
   mk(document.getElementById("ovQuad"), {
     tooltip:{trigger:"item",valueFormatter:v=>pct(v,1,false)},
@@ -1226,9 +1292,11 @@ const kpi = (label, v, note, c="") => `<div class="kpi"><div class="caps">${labe
 let hSort = {k:"weight", d:-1}, hQuery = "";
 function holdings(el){
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
-    `<div class="card" style="padding:6px 6px 2px"><div class="scroll"><table class="t" id="ht"></table></div></div>
+    briefCard() +
+    `<div class="card" style="padding:6px 6px 2px;margin-top:16px"><div class="scroll"><table class="t" id="ht"></table></div></div>
      <div class="note" style="margin-top:10px">Click any row for the full thesis: news, guidance, catalysts, risks, and the trend chart. Composite below 6.5 and pillar-floor breaches are shown in red.</div>`;
   document.getElementById("hq").oninput = e => { hQuery = e.target.value; drawHoldings(); };
+  wireBrief();
   drawHoldings();
 }
 function drawHoldings(){
@@ -1263,6 +1331,47 @@ function drawHoldings(){
     const pts = (h.px||[]).map(p=>p[1]); if(pts.length>2) sparkline(el, pts, pts[pts.length-1]>=pts[0]?C.green:C.red); });
 }
 
+
+/* ═══ DAILY BRIEF (Holdings tab) ══════════════════════════════════════════ */
+let briefIdx = 0;
+function briefCard(){
+  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+  if(!B.length) return "";
+  briefIdx = Math.min(briefIdx, B.length - 1);
+  const row = B[briefIdx], b = row.payload || {};
+  const li = a => (a||[]).map(x=>`<li>${x}</li>`).join("");
+  const nav = `<span class="bnav">
+      <button class="bbtn" data-bd="1" ${briefIdx>=B.length-1?"disabled":""} title="Earlier">←</button>
+      <span class="mono muted" style="font-size:12px">${row.as_of}</span>
+      <button class="bbtn" data-bd="-1" ${briefIdx<=0?"disabled":""} title="Later">→</button></span>`;
+  const movers = (b.movers||[]).map(m =>
+    `<li><a href="#holdings/${m.ticker}" class="tk" style="text-decoration:none">${m.ticker}</a> — ${esc(m.note)}</li>`).join("");
+  const risks = (b.risks_this_week||[]).map(r =>
+    `<li><b>${esc(r.risk)}</b><div class="muted">${esc(r.note)}</div></li>`).join("");
+  const cats = (b.catalysts||[]).map(c =>
+    `<li><span class="mono amber" style="font-size:12px">${esc(c.when)}</span> <b>${esc(c.what)}</b><div class="muted">${esc(c.note)}</div></li>`).join("");
+  const news = (b.news||[]).map(n =>
+    `<li><a href="#holdings/${n.ticker}" class="tk" style="text-decoration:none">${n.ticker}</a>
+      <a href="${esc(n.link)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.headline)}</a>
+      <div class="muted">${esc(n.so_what)}</div></li>`).join("");
+  return `<div class="card brief">
+    <div class="bhead"><div><div class="caps">Daily note</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
+    <p class="blede">${esc(b.performance||"")}</p>
+    <div class="bgrid">
+      ${movers ? `<div><h4>Movers</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${risks ? `<div><h4>Risks to watch this week</h4><ul class="blist">${risks}</ul></div>` : ""}
+      ${cats ? `<div><h4>Catalysts ahead</h4><ul class="blist">${cats}</ul></div>` : ""}
+      ${news ? `<div><h4>New on our names</h4><ul class="blist">${news}</ul></div>` : ""}
+    </div>
+    ${b.week_ahead ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.week_ahead)}</p></div>` : ""}
+    <div class="note" style="margin-top:12px">Written each evening from that day's computed model output — returns, risk engine,
+      decision grid, earnings calendar and the day's headlines. Commentary on what the model is showing, not advice or a forecast.</div>
+  </div>`;
+}
+function wireBrief(){
+  document.querySelectorAll(".bbtn").forEach(btn => btn.onclick = () => {
+    briefIdx += Number(btn.dataset.bd); clearCharts(); holdings(document.getElementById("view")); });
+}
 /* ═══ HOLDING DRAWER ═════════════════════════════════════════════════════ */
 function closeDrawer(silent){ document.getElementById("drawer").classList.remove("on"); document.getElementById("scrim").classList.remove("on");
   if(!silent && location.hash.includes("/")) history.replaceState(null,"",location.hash.split("/")[0]); }
