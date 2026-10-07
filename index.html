@@ -186,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 19:22 · 6cec419</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 20:02 · 2bc0cbc</div>
   </div>
 </section>
 
@@ -210,7 +210,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 19:22 · 6cec419</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 20:02 · 2bc0cbc</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -809,6 +809,27 @@ const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
 const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
   HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+function vdurBlock(tk){
+  const v = (typeof LIVE !== "undefined" && LIVE.vdur) ? LIVE.vdur[tk] : null;
+  if(!v || v.implied_fcf_cagr == null) return "";
+  const g = +v.implied_fcf_cagr, gap = v.value_gap == null ? null : +v.value_gap;
+  const a = v.assumptions || {};
+  // The claim is "here is what the price is assuming" — so it sits with the thesis, where the
+  // question is whether we believe it. Deliberately no floor-share ranking (horizon artifact).
+  return `<div class="sec"><h4>What the price is assuming</h4>
+    <div class="kvs">
+      <div class="kv"><span class="muted">Required FCF growth</span><b style="color:${g>=1?C.red:g>=.5?C.amber:C.text}">${pct(g,0)} a year</b></div>
+      ${gap!=null?`<div class="kv"><span class="muted">vs consensus revenue</span><b class="${gap>0?"neg":"pos"}">${gap>=0?"+":""}${(gap*100).toFixed(0)} pts</b></div>`:""}
+      <div class="kv"><span class="muted">Value in the next ${a.horizon_years||5} years</span><b>${pct(+v.bond_floor_share,0,false)}</b></div>
+      <div class="kv"><span class="muted">If long rates rise 1%</span><b class="neg">${pct(+v.shock_100bp,1)}</b></div>
+    </div>
+    <p class="muted" style="margin-top:9px;font-size:12.5px">To justify today's price, free cash flow has to compound at
+      <b>${pct(g,0)}</b> a year for ${a.horizon_years||5} years${gap!=null?`, which is <b>${Math.abs(gap*100).toFixed(0)} points ${gap>0?"more than":"less than"}</b> the revenue growth analysts forecast`:""}.
+      ${pct(1-(+v.bond_floor_share),0,false)} of the value sits beyond that window, so it rests on assumptions rather than
+      cash flows anyone can see yet. Discounted at the 10-year Treasury plus ${pct(+v.erp,2,false)}.
+      The gap compares an FCF requirement with a revenue forecast, so read it directionally.</p>
+  </div>`;
+}
 /* ═══ VALUATION DURATION (Kao bond floor vs growth option) ════════════════ */
 // implied_fcf_cagr is the FCF growth the current price requires over the horizon — "what you'd have
 // to believe". value_gap is that minus the consensus forward REVENUE CAGR, so it is directional
@@ -1359,10 +1380,13 @@ function holdings(el){
 }
 function drawHoldings(){
   const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["_timing","Timing"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
+                ["align","Alignment"],["trend","Trend"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
   const q = hQuery.toLowerCase();
   let rows = D.holdings.filter(h => !q || h.tk.toLowerCase().includes(q) || (h.name||"").toLowerCase().includes(q));
-  rows.sort((a,b) => { const k=hSort.k, x=a[k], y=b[k]; if(x==null) return 1; if(y==null) return -1;
+  const hval = (r,k) => k === "implied_cagr"
+    ? (((typeof LIVE !== "undefined" && LIVE.vdur ? LIVE.vdur[r.tk] : null)||{}).implied_fcf_cagr ?? null)
+    : r[k];
+  rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
   const t = document.getElementById("ht");
   t.innerHTML = `<thead><tr>${cols.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}">${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
@@ -1379,6 +1403,7 @@ function drawHoldings(){
       <td>${alignBar(h.align)}</td>
       <td>${trendChip(h.trend)}</td>
       <td style="font-size:12px">${timingChip((LIVE.v2[h.tk]||{}).timing, (LIVE.v2[h.tk]||{}).range_pos)}</td>
+      <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
       <td class="mono muted" style="font-size:12px">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
       <td class="mono muted" style="font-size:12px">${h.next_er||"—"}</td>
       <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + "</tbody>";
@@ -1455,7 +1480,7 @@ function openHolding(tk){
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
       <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
-    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
