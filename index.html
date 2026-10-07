@@ -186,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 14:33 · 87e4d31</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 19:22 · 6cec419</div>
   </div>
 </section>
 
@@ -210,7 +210,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 14:33 · 87e4d31</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 19:22 · 6cec419</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -223,7 +223,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[]}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -268,7 +268,8 @@ async function enter(){
   const err = document.getElementById("err");
   try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
     LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
-    LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false})); }
+    LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false}));
+    LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -808,10 +809,28 @@ const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
 const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
   HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+/* ═══ VALUATION DURATION (Kao bond floor vs growth option) ════════════════ */
+// implied_fcf_cagr is the FCF growth the current price requires over the horizon — "what you'd have
+// to believe". value_gap is that minus the consensus forward REVENUE CAGR, so it is directional
+// rather than precise (an FCF requirement measured against a revenue forecast). The bond-floor share
+// is deliberately NOT shown per name: it is a horizon artifact, near-identical across companies
+// (~18% of value at a 3-year horizon, ~47% at 15), and ranking names on it would mislead.
+const VDUR_WARN = 1.00;   // a price requiring 100%+ annual FCF growth gets coloured
+function impliedCell(tk){
+  const v = (typeof LIVE !== "undefined" && LIVE.vdur) ? LIVE.vdur[tk] : null;
+  if(!v || v.implied_fcf_cagr == null) return '<span class="muted">—</span>';
+  const g = +v.implied_fcf_cagr, gap = v.value_gap == null ? null : +v.value_gap;
+  const col = g >= VDUR_WARN ? C.red : g >= 0.50 ? C.amber : C.text;
+  const tip = `price requires ${(g*100).toFixed(0)}% FCF growth a year`
+    + (gap != null ? ` · ${gap >= 0 ? "+" : ""}${(gap*100).toFixed(0)} pts vs consensus revenue growth` : "")
+    + (v.shock_100bp != null ? ` · ${(+v.shock_100bp*100).toFixed(1)}% value at +100bp` : "");
+  return `<span class="mono" style="color:${col}" title="${esc(tip)}">${(g*100).toFixed(0)}%</span>`;
+}
 const GRID_COLS = [
   ["ticker","Ticker","txt"], ["grade","Grade","ord"], ["tech_rating","Technical","ord"], ["action","Action","ord"],
   ["timing","Timing","ord"], ["guidance","Guidance","txt"], ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
-  ["composite","Composite","num"], ["trend","Trend","txt"], ["sector","Sector","txt"], ["grade_reason","Why","txt"],
+  ["composite","Composite","num"], ["implied_cagr","Implied growth","num"], ["trend","Trend","txt"],
+  ["sector","Sector","txt"], ["grade_reason","Why","txt"],
 ];
 const QGS_ORD = {RARE_ELITE:0, EXCEPTIONAL:1, GOOD_COMPOUNDER:2, AVERAGE:3, LOW_QUALITY:4};
 function gridKey(r, k){
@@ -821,6 +840,9 @@ function gridKey(r, k){
   if(k === "action") return ACTION_ORD[r.action] ?? 99;
   if(k === "qgs_tier") return QGS_ORD[r.qgs_tier] ?? 9;
   if(k === "composite" || k === "range_pos") return r[k] == null ? null : +r[k];
+  // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
+  if(k === "implied_cagr"){
+    const v = (LIVE.vdur[r.ticker]||{}).implied_fcf_cagr; return v == null ? null : +v; }
   return (r[k] ?? "").toString().toLowerCase();
 }
 async function grid(el){
@@ -846,6 +868,7 @@ async function grid(el){
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
       <td>${timingChip(r.timing, r.range_pos)}</td><td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
+      <td>${impliedCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     document.getElementById("gridN").textContent = rows.length + " names";
     document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) =>
@@ -944,6 +967,40 @@ function regress(y, x){
   return {beta, alpha_ann: alpha*252, t_alpha: alpha/(sr/Math.sqrt(n)), te, ir: te ? me*252/te : null,
           cum: y.reduce((a,v)=>a*(1+v),1)-1, bench_cum: x.reduce((a,v)=>a*(1+v),1)-1};
 }
+/* book-level valuation duration: how much of what we own is terminal value */
+function vdurCard(){
+  const V = (typeof LIVE !== "undefined" && LIVE.vdur) || {};
+  const rows = D.holdings.map(h => ({h, v: V[h.tk]})).filter(x => x.v && x.v.implied_fcf_cagr != null);
+  if(!rows.length) return "";
+  // Weight by position value, not equally: the question is what share of OUR money sits in terminal
+  // value. Names without a computable floor (negative trailing FCF, no EV) are excluded and counted.
+  const wsum = rows.reduce((a,x) => a + (x.h.value||0), 0);
+  const floorW = rows.reduce((a,x) => a + (x.h.value||0) * (+x.v.bond_floor_share), 0) / wsum;
+  const covered = wsum / D.holdings.reduce((a,h) => a + (h.value||0), 0);
+  const demanding = rows.slice().sort((a,b) => +b.v.implied_fcf_cagr - +a.v.implied_fcf_cagr).slice(0,8);
+  const shockW = rows.reduce((a,x) => a + (x.h.value||0) * (+x.v.shock_100bp || 0), 0) / wsum;
+  const a0 = rows[0].v;
+  return card("Valuation duration",
+    `${rows.length} of ${D.holdings.length} holdings · ${pct(covered,0,false)} of book value`,
+    `<div class="kvs">
+      <div class="kv"><span class="muted">Value in the visible horizon</span><b>${pct(floorW,1,false)}</b></div>
+      <div class="kv"><span class="muted">Value that is terminal</span><b>${pct(1-floorW,1,false)}</b></div>
+      <div class="kv"><span class="muted">Book value at +100bp</span><b class="neg">${pct(shockW,1)}</b></div>
+      <div class="kv"><span class="muted">Discount rate used</span><b>${pct(+a0.discount_rate,2,false)}</b></div>
+     </div>
+     <h4 style="margin:14px 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">Most demanding prices</h4>
+     ${tbl(["Holding","Implied FCF growth","vs consensus","At +100bp"], demanding.map(x => [
+        `<b>${esc(x.h.tk)}</b>`,
+        `<span style="color:${+x.v.implied_fcf_cagr >= 1 ? C.red : +x.v.implied_fcf_cagr >= .5 ? C.amber : C.text}">${pct(+x.v.implied_fcf_cagr,0)}</span>`,
+        x.v.value_gap == null ? "—" : `<span class="${+x.v.value_gap > 0 ? "neg" : "pos"}">${(+x.v.value_gap >= 0 ? "+" : "")}${(+x.v.value_gap*100).toFixed(0)} pts</span>`,
+        pct(+x.v.shock_100bp,1)]))}
+     <div class="note" style="margin-top:10px">Bond floor vs growth option (Kao). The floor is the present value of
+      free cash flow inside a ${a0.assumptions ? a0.assumptions.horizon_years : 5}-year horizon, discounted at the
+      10-year Treasury plus a ${pct(+a0.erp,2,false)} equity risk premium; everything beyond it is terminal value.
+      <b>Implied FCF growth is what today's price requires</b> — compare it to the consensus revenue forecast, not to
+      zero. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so it
+      is shown for the book as context and deliberately not ranked per name.</div>`);
+}
 async function analytics(el){
   el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">loading…</span>`);
   if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
@@ -982,6 +1039,7 @@ async function analytics(el){
   </div>
   <div class="grid g-1-2" style="margin-top:16px">
     ${card("Geography", "by headquarters country", `<div class="chart" id="anGeo"></div>`)}
+    ${vdurCard()}
     ${card("Valuation & profitability", "trailing, from the latest screen", `<div class="table-wrap">` + tbl(["Holding","ROIC","Gross mgn","FCF mgn","FCF/EV","ND/EBITDA","Fwd rev","Fwd EPS","Beta","Mkt cap"],
       H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pct(h.roic,0,false), pct(h.gm,0,false), pct(h.fcfm,0,false), pct(h.fcfev,1,false), num(h.nde,1), pct(h.fwd_rev,0), pct(h.fwd_eps,0), num(h.beta), h.mcap ? "$"+(h.mcap/1000).toFixed(0)+"B" : "—"])) + `</div>`)}
   </div>
