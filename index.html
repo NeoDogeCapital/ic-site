@@ -101,6 +101,16 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .fbtn.on{color:var(--text);border-color:rgba(106,166,248,.45);background:rgba(106,166,248,.12)}
 .search{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;outline:none;width:180px}
 .list{display:flex;flex-direction:column}
+/* filter rows on the Grid and Holdings tabs */
+.filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.fsel{display:flex;align-items:center;gap:6px;font:500 11px var(--mono);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--dim)}
+.fsel select{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);
+  border-radius:7px;padding:5px 8px;font:500 12px var(--sans,inherit);text-transform:none;letter-spacing:0;
+  max-width:190px}
+.fsel select:hover{border-color:var(--brand)}
+.fsel select:focus{outline:none;border-color:var(--brand)}
+@media(max-width:700px){.fsel{width:100%}.fsel select{flex:1;max-width:none}}
 /* period segmented control (Overview) */
 .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.03);margin-left:12px}
 .seg button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 11.5px var(--mono);letter-spacing:.06em;
@@ -186,7 +196,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 13:59 · d8c2157</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 18:05 · 36fa8ee</div>
   </div>
 </section>
 
@@ -210,7 +220,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 13:59 · d8c2157</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 18:05 · 36fa8ee</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -802,7 +812,19 @@ function rangeBar(v2){
 const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.green, STARTER:C.accent, HOLD:C.muted,
   HOLD_WAIT_TREND:C.muted, HOLD_NO_NEW_BUYS:C.amber, REVIEW:C.amber, TRIM_CANDIDATE:C.amber, WATCH:C.dim,
   REDUCE:C.red, EXIT_REVIEW:C.red, AVOID:C.red, EXIT:C.red};
-let gridFilter = {q:"", held:false, act:""};
+let gridFilter = {q:"", held:false, act:"", grade:"", quad:"", sector:"", tech:"", timing:"", qgs:""};
+// Build each dropdown's options from the data actually present, ordered by the model's own ranking
+// where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
+function filterOpts(rows, key, order){
+  const seen = [...new Set(rows.map(r => r[key]).filter(Boolean))];
+  return order ? seen.sort((a,b) => (order[a] ?? 99) - (order[b] ?? 99)) : seen.sort();
+}
+function selectEl(id, label, value, opts){
+  return `<label class="fsel"><span>${label}</span><select id="${id}">
+    <option value="">All</option>${opts.map(o =>
+      `<option value="${esc(o)}"${o===value?" selected":""}>${esc(String(o).replaceAll("_"," "))}</option>`).join("")}
+  </select></label>`;
+}
 let gridSort = {k:"grade", d:1};
 // Rank orders so a sort reads the way the model reads: best first on a descending click.
 const GRADE_ORD = {A:0, B:1, C:2, D:3};
@@ -894,7 +916,14 @@ async function grid(el){
   const draw = () => {
     const f = gridFilter;
     const rows = M.filter(r => (!f.held || r.held) && (!f.act || r.action===f.act) &&
-      (!f.q || (r.ticker + " " + (r.sector||"")).toLowerCase().includes(f.q.toLowerCase())))
+      (!f.grade  || r.grade === f.grade) &&
+      (!f.quad   || r.quadrant === f.quad) &&
+      (!f.sector || r.sector === f.sector) &&
+      (!f.tech   || r.tech_rating === f.tech) &&
+      (!f.timing || r.timing === f.timing) &&
+      (!f.qgs    || r.qgs_tier === f.qgs) &&
+      (!f.q || (r.ticker + " " + (r.sector||"") + " " + (r.grade_reason||""))
+                 .toLowerCase().includes(f.q.toLowerCase())))
       .sort((a,b) => {
         const x = gridKey(a, gridSort.k), y = gridKey(b, gridSort.k);
         if(x == null && y == null) return 0;
@@ -930,14 +959,28 @@ async function grid(el){
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
     }</tbody></table></div>`) +
     `<div style="margin-top:16px">` + card("Names", `<span id="gridN"></span>`,
-      `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><input class="search" id="gq" placeholder="Ticker or sector" value="${esc(gridFilter.q)}">
+      `<div class="filters">
+       <input class="search" id="gq" placeholder="Ticker, sector or reason" value="${esc(gridFilter.q)}">
+       ${selectEl("fGrade","Grade",gridFilter.grade,filterOpts(M,"grade",GRADE_ORD))}
+       ${selectEl("fQuad","Quad",gridFilter.quad,filterOpts(M,"quadrant"))}
+       ${selectEl("fTech","Technical",gridFilter.tech,filterOpts(M,"tech_rating",TECH_ORD))}
+       ${selectEl("fTiming","Timing",gridFilter.timing,filterOpts(M,"timing",TIMING_ORD))}
+       ${selectEl("fQgs","QGS tier",gridFilter.qgs,filterOpts(M,"qgs_tier",QGS_ORD))}
+       ${selectEl("fAct","Action",gridFilter.act,filterOpts(M,"action",ACTION_ORD))}
+       ${selectEl("fSector","Sector",gridFilter.sector,filterOpts(M,"sector"))}
        <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
-       <button class="lock" id="gclear">Clear filters</button></div>
+       <button class="lock" id="gclear">Clear</button></div>
        <div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
        <div class="table-wrap"><table class="tbl"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
   document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; draw(); };
+  // a select change re-renders the whole view so the dropdowns keep their own selected state
+  [["fGrade","grade"],["fQuad","quad"],["fTech","tech"],["fTiming","timing"],
+   ["fQgs","qgs"],["fAct","act"],["fSector","sector"]].forEach(([id,key]) => {
+    const el2 = document.getElementById(id);
+    if(el2) el2.onchange = e => { gridFilter[key] = e.target.value; grid(el); };
+  });
   document.getElementById("gclear").onclick = () => { gridFilter = {q:"", held:false, act:""}; grid(el); };
   draw();
 }
@@ -1389,20 +1432,55 @@ const kpi = (label, v, note, c="") => `<div class="kpi"><div class="caps">${labe
 
 /* ═══ HOLDINGS ═══════════════════════════════════════════════════════════ */
 let hSort = {k:"weight", d:-1}, hQuery = "";
+let hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
 function holdings(el){
+  const HD = D.holdings;
+  const sel = (id, label, value, opts) => `<label class="fsel"><span>${label}</span><select id="${id}">
+      <option value="">All</option>${opts.map(o => `<option value="${esc(o)}"${o===value?" selected":""}>${esc(String(o).replaceAll("_"," "))}</option>`).join("")}
+    </select></label>`;
+  const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
     briefCard() +
+    `<div class="filters" style="margin-top:16px">
+      ${sel("hQuad","Quad",hFilter.quad,uniq("quad"))}
+      ${sel("hTrend","Trend",hFilter.trend,uniq("trend"))}
+      ${sel("hSector","Sector",hFilter.sector,uniq("sector"))}
+      ${sel("hThesis","Thesis",hFilter.thesis,uniq("thesis_status"))}
+      <label class="check"><input type="checkbox" id="hFlag" ${hFilter.flagged?"checked":""}> Flagged only</label>
+      <button class="lock" id="hClear">Clear</button>
+     </div>` +
     `<div class="card" style="padding:6px 6px 2px;margin-top:16px"><div class="scroll"><table class="t" id="ht"></table></div></div>
      <div class="note" style="margin-top:10px">Click any row for the full thesis: news, guidance, catalysts, risks, and the trend chart. Composite below 6.5 and pillar-floor breaches are shown in red.</div>`;
   document.getElementById("hq").oninput = e => { hQuery = e.target.value; drawHoldings(); };
+  [["hQuad","quad"],["hTrend","trend"],["hSector","sector"],["hThesis","thesis"]].forEach(([id,key]) => {
+    const s2 = document.getElementById(id);
+    if(s2) s2.onchange = e => { hFilter[key] = e.target.value; clearCharts(); holdings(el); };
+  });
+  const fl = document.getElementById("hFlag");
+  if(fl) fl.onchange = e => { hFilter.flagged = e.target.checked; clearCharts(); holdings(el); };
+  const hc = document.getElementById("hClear");
+  if(hc) hc.onclick = () => { hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
+    hQuery = ""; clearCharts(); holdings(el); };
   wireBrief();
   drawHoldings();
 }
 function drawHoldings(){
   const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
                 ["align","Alignment"],["trend","Trend"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
-  const q = hQuery.toLowerCase();
-  let rows = D.holdings.filter(h => !q || h.tk.toLowerCase().includes(q) || (h.name||"").toLowerCase().includes(q));
+  const q = hQuery.toLowerCase(), f = hFilter;
+  // "Flagged" means the model has something to say against the name: composite under the 6.5
+  // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
+  // earnings, or a thesis in review or broken. Same test the Overview's "Needs attention" list uses.
+  const flagged = h => (h.comp != null && h.comp < 6.5) || (h.p2 != null && h.p2 < 6) ||
+    (h.p3 != null && h.p3 < 6) || h.bucket === "DISTRIBUTE" || h.trend === "DOWNTREND" ||
+    h.eq === "EPS_ENGINEERED" || h.thesis_status === "BROKEN" || h.thesis_status === "REVIEW";
+  let rows = D.holdings.filter(h =>
+    (!q || h.tk.toLowerCase().includes(q) || (h.name||"").toLowerCase().includes(q)) &&
+    (!f.quad   || h.quad === f.quad) &&
+    (!f.trend  || h.trend === f.trend) &&
+    (!f.sector || h.sector === f.sector) &&
+    (!f.thesis || h.thesis_status === f.thesis) &&
+    (!f.flagged || flagged(h)));
   const hval = (r,k) => k === "implied_cagr"
     ? (((typeof LIVE !== "undefined" && LIVE.vdur ? LIVE.vdur[r.tk] : null)||{}).implied_fcf_cagr ?? null)
     : r[k];
