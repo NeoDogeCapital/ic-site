@@ -186,7 +186,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-07 20:02 · 2bc0cbc</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 13:59 · d8c2157</div>
   </div>
 </section>
 
@@ -210,7 +210,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-07 20:02 · 2bc0cbc</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 13:59 · d8c2157</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -223,7 +223,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -269,7 +269,8 @@ async function enter(){
   try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
     LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
     LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false}));
-    LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v])); }
+    LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
+    LIVE.cards = Object.fromEntries((await qAll("site_company_card")).map(v => [v.ticker, v])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
@@ -764,7 +765,7 @@ async function openName(tk){
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="nmChart" style="height:360px"></div></div>
-    ${rangeBar(v2)}${thesisBlock(tk, true)}
+    ${rangeBar(v2)}${vdurBlock(tk)}${thesisBlock(tk, true) || cardBlock(tk)}
     ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
       [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
     ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
@@ -809,6 +810,25 @@ const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
 const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
   HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+function cardBlock(tk){
+  const c = (typeof LIVE !== "undefined" && LIVE.cards) ? LIVE.cards[tk] : null;
+  if(!c || !c.card) return "";
+  const k = c.card, meta = [c.sub_industry, c.ceo ? "CEO " + c.ceo : null,
+    c.founding_year ? "founded " + c.founding_year : null, c.hq_country].filter(Boolean).join(" · ");
+  const peers = (c.peers||[]).slice(0,6).map(p => typeof p === "string" ? p : (p.ticker||p.companyKey||""))
+    .filter(Boolean);
+  return `<div class="sec"><h4>${esc(c.company_name || tk)}</h4>
+    ${meta ? `<div class="caps" style="margin:2px 0 9px">${esc(meta)}</div>` : ""}
+    <p>${esc(k.business||"")}</p>
+    ${k.story ? `<h4 style="margin-top:12px">The story</h4><p>${esc(k.story)}</p>` : ""}
+    ${k.model_read ? `<h4 style="margin-top:12px">What the model says</h4><p>${esc(k.model_read)}</p>` : ""}
+    ${k.watch ? `<h4 style="margin-top:12px">What would change it</h4><p>${esc(k.watch)}</p>` : ""}
+    ${peers.length ? `<div class="caps" style="margin-top:11px">Peers · ${peers.map(esc).join(" · ")}</div>` : ""}
+    <div class="note" style="margin-top:10px">Written from the company's filings and segment data plus
+      tonight's model output. Regenerated when the model's read on the name changes — ${esc(c.as_of||"")}.
+      This is a summary, not a thesis: only held names carry a locked thesis with invalidation triggers.</div>
+  </div>`;
+}
 function vdurBlock(tk){
   const v = (typeof LIVE !== "undefined" && LIVE.vdur) ? LIVE.vdur[tk] : null;
   if(!v || v.implied_fcf_cagr == null) return "";
@@ -1480,7 +1500,7 @@ function openHolding(tk){
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
       <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
-    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
