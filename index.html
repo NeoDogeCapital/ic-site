@@ -110,6 +110,15 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
   max-width:190px}
 .fsel select:hover{border-color:var(--brand)}
 .fsel select:focus{outline:none;border-color:var(--brand)}
+.fnum{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);border-radius:7px;
+  padding:5px 7px;font:500 12px var(--mono);width:74px;text-transform:none;letter-spacing:0}
+.fnum.wide{width:124px}
+.fnum:focus{outline:none;border-color:var(--brand)}
+.colfilters{padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);
+  margin-bottom:12px;gap:11px 14px}
+.colfilters[hidden]{display:none}
+th.sorted{color:var(--text)}
+sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 @media(max-width:700px){.fsel{width:100%}.fsel select{flex:1;max-width:none}}
 /* period segmented control (Overview) */
 .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.03);margin-left:12px}
@@ -196,7 +205,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 18:05 · 36fa8ee</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 18:13 · fd4453c</div>
   </div>
 </section>
 
@@ -220,7 +229,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 18:05 · 36fa8ee</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 18:13 · fd4453c</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -812,20 +821,66 @@ function rangeBar(v2){
 const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.green, STARTER:C.accent, HOLD:C.muted,
   HOLD_WAIT_TREND:C.muted, HOLD_NO_NEW_BUYS:C.amber, REVIEW:C.amber, TRIM_CANDIDATE:C.amber, WATCH:C.dim,
   REDUCE:C.red, EXIT_REVIEW:C.red, AVOID:C.red, EXIT:C.red};
-let gridFilter = {q:"", held:false, act:"", grade:"", quad:"", sector:"", tech:"", timing:"", qgs:""};
+// One filter per grid column. `q` is the free-text box, `held` the holdings toggle; everything else
+// is keyed by column id. Categorical columns get a dropdown, numeric columns a min/max pair, and
+// high-cardinality text (ticker, guidance, the grade reason) a contains-box — a dropdown of 453
+// tickers would be useless.
+let gridFilter = {q:"", held:false};
+let gridFilterOpen = false;
+const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
+function colControl(key, type, rows){
+  if(type === "num") return "num";
+  if(FREE_TEXT_COLS.has(key)) return "text";
+  return new Set(rows.map(r => r[key]).filter(Boolean)).size <= 30 ? "select" : "text";
+}
+function matchesFilters(r, rows){
+  const f = gridFilter;
+  if(f.held && !r.held) return false;
+  if(f.q && !(r.ticker + " " + (r.sector||"") + " " + (r.grade_reason||"") + " " + (r.guidance||""))
+      .toLowerCase().includes(f.q.toLowerCase())) return false;
+  for(const [key, , type] of GRID_COLS){
+    const ctl = colControl(key, type, rows);
+    if(ctl === "num"){
+      const lo = f[key + "_min"], hi = f[key + "_max"];
+      const v = key === "implied_cagr" ? gridKey(r, key) : (r[key] == null ? null : +r[key]);
+      if((lo !== "" && lo != null) || (hi !== "" && hi != null)){
+        if(v == null) return false;                                  // no value cannot satisfy a range
+        // implied growth is stored as a decimal but typed as a percent, so scale the bounds
+        const k = key === "implied_cagr" ? 0.01 : 1;
+        if(lo !== "" && lo != null && v < +lo * k) return false;
+        if(hi !== "" && hi != null && v > +hi * k) return false;
+      }
+    } else if(f[key]){
+      const v = (r[key] ?? "").toString();
+      if(ctl === "select"){ if(v !== f[key]) return false; }
+      else if(!v.toLowerCase().includes(f[key].toLowerCase())) return false;
+    }
+  }
+  return true;
+}
+function activeFilterCount(){
+  return Object.entries(gridFilter).filter(([k, v]) =>
+    k !== "held" && v !== "" && v != null).length + (gridFilter.held ? 1 : 0);
+}
 // Build each dropdown's options from the data actually present, ordered by the model's own ranking
 // where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
 function filterOpts(rows, key, order){
   const seen = [...new Set(rows.map(r => r[key]).filter(Boolean))];
   return order ? seen.sort((a,b) => (order[a] ?? 99) - (order[b] ?? 99)) : seen.sort();
 }
+const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_ORD",
+                   action: "ACTION_ORD", qgs_tier: "QGS_ORD"};
+// Build each dropdown's options from the data actually present, ordered by the model's own ranking
+// where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
 function selectEl(id, label, value, opts){
   return `<label class="fsel"><span>${label}</span><select id="${id}">
     <option value="">All</option>${opts.map(o =>
       `<option value="${esc(o)}"${o===value?" selected":""}>${esc(String(o).replaceAll("_"," "))}</option>`).join("")}
   </select></label>`;
 }
-let gridSort = {k:"grade", d:1};
+// Multi-key sort: an ordered list, first key wins and later keys break ties. Click a header to
+// sort by it alone; shift-click to add it as a tie-breaker (or flip it if already in the list).
+let gridSort = [{k:"grade", d:1}];
 // Rank orders so a sort reads the way the model reads: best first on a descending click.
 const GRADE_ORD = {A:0, B:1, C:2, D:3};
 const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
@@ -915,22 +970,18 @@ async function grid(el){
   const cell = (g,t) => M.filter(r => r.grade===g && r.tech_rating===t);
   const draw = () => {
     const f = gridFilter;
-    const rows = M.filter(r => (!f.held || r.held) && (!f.act || r.action===f.act) &&
-      (!f.grade  || r.grade === f.grade) &&
-      (!f.quad   || r.quadrant === f.quad) &&
-      (!f.sector || r.sector === f.sector) &&
-      (!f.tech   || r.tech_rating === f.tech) &&
-      (!f.timing || r.timing === f.timing) &&
-      (!f.qgs    || r.qgs_tier === f.qgs) &&
-      (!f.q || (r.ticker + " " + (r.sector||"") + " " + (r.grade_reason||""))
-                 .toLowerCase().includes(f.q.toLowerCase())))
+    const rows = M.filter(r => matchesFilters(r, M))
       .sort((a,b) => {
-        const x = gridKey(a, gridSort.k), y = gridKey(b, gridSort.k);
-        if(x == null && y == null) return 0;
-        if(x == null) return 1;                      // blanks always sink
-        if(y == null) return -1;
-        const c = typeof x === "string" ? x.localeCompare(y) : x - y;
-        return (c || (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9)) * gridSort.d;
+        for(const {k, d} of gridSort){
+          const x = gridKey(a, k), y = gridKey(b, k);
+          if(x == null && y == null) continue;
+          if(x == null) return 1;                    // blanks always sink, whichever key
+          if(y == null) return -1;
+          const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+          if(c) return c * d;
+        }
+        // final tie-break on grade so equal rows have a stable, meaningful order
+        return (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9);
       });
     document.getElementById("gridRows").innerHTML = rows.slice(0,400).map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
@@ -941,16 +992,35 @@ async function grid(el){
       <td>${impliedCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     document.getElementById("gridN").textContent = rows.length + " names";
-    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) =>
-      `<th data-sort="${k}" style="cursor:pointer;white-space:nowrap" title="Sort by ${label}">${label}${
-        gridSort.k === k ? (gridSort.d > 0 ? " ↑" : " ↓") : ""}</th>`).join("");
-    document.querySelectorAll("#gridHead th[data-sort]").forEach(th => th.onclick = () => {
+    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) => {
+      const at = gridSort.findIndex(x => x.k === k), on = at >= 0;
+      const arrow = on ? (gridSort[at].d > 0 ? " ↑" : " ↓") : "";
+      // show the rank only when more than one key is active, so a single sort stays uncluttered
+      const rank = on && gridSort.length > 1 ? `<sup class="srank">${at + 1}</sup>` : "";
+      return `<th data-sort="${k}" class="${on ? "sorted" : ""}" style="cursor:pointer;white-space:nowrap"
+        title="Sort by ${label} · shift-click to add as a tie-breaker">${label}${arrow}${rank}</th>`;
+    }).join("");
+    document.querySelectorAll("#gridHead th[data-sort]").forEach(th => th.onclick = e => {
       const k = th.dataset.sort;
-      // same column flips; a new column opens best-first — highest for numbers, best rank/A-Z otherwise
+      // a new column opens best-first: highest for numbers, best rank or A-Z otherwise
       const num_ = (GRID_COLS.find(c => c[0] === k) || [])[2] === "num";
-      gridSort = {k, d: gridSort.k === k ? -gridSort.d : (num_ ? -1 : 1)};
+      const at = gridSort.findIndex(x => x.k === k);
+      if(e.shiftKey){
+        if(at >= 0) gridSort[at].d = -gridSort[at].d;   // already a key — flip its direction
+        else gridSort.push({k, d: num_ ? -1 : 1});      // otherwise append as a tie-breaker
+      } else {
+        gridSort = [{k, d: (at === 0 ? -gridSort[0].d : (num_ ? -1 : 1))}];
+      }
       draw();
     });
+    const sn = document.getElementById("sortNote");
+    if(sn) sn.innerHTML = gridSort.length > 1
+      ? "sorted by " + gridSort.map((x,i) =>
+          `${(GRID_COLS.find(c => c[0] === x.k)||[,x.k])[1]} ${x.d > 0 ? "↑" : "↓"}`).join(" then ")
+        + ` · <a href="#" id="sortClear">single sort</a>`
+      : "click a header to sort · shift-click to add a tie-breaker";
+    const sc = document.getElementById("sortClear");
+    if(sc) sc.onclick = ev => { ev.preventDefault(); gridSort = [gridSort[0]]; draw(); };
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</span>`) +
@@ -959,29 +1029,52 @@ async function grid(el){
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
     }</tbody></table></div>`) +
     `<div style="margin-top:16px">` + card("Names", `<span id="gridN"></span>`,
-      `<div class="filters">
-       <input class="search" id="gq" placeholder="Ticker, sector or reason" value="${esc(gridFilter.q)}">
-       ${selectEl("fGrade","Grade",gridFilter.grade,filterOpts(M,"grade",GRADE_ORD))}
-       ${selectEl("fQuad","Quad",gridFilter.quad,filterOpts(M,"quadrant"))}
-       ${selectEl("fTech","Technical",gridFilter.tech,filterOpts(M,"tech_rating",TECH_ORD))}
-       ${selectEl("fTiming","Timing",gridFilter.timing,filterOpts(M,"timing",TIMING_ORD))}
-       ${selectEl("fQgs","QGS tier",gridFilter.qgs,filterOpts(M,"qgs_tier",QGS_ORD))}
-       ${selectEl("fAct","Action",gridFilter.act,filterOpts(M,"action",ACTION_ORD))}
-       ${selectEl("fSector","Sector",gridFilter.sector,filterOpts(M,"sector"))}
-       <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
-       <button class="lock" id="gclear">Clear</button></div>
-       <div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
+      (() => {
+        const ORD = {GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QGS_ORD};
+        const n = activeFilterCount();
+        const controls = GRID_COLS.map(([key, label, type]) => {
+          const ctl = colControl(key, type, M);
+          if(ctl === "num") return `<label class="fsel"><span>${label}</span>
+            <input class="fnum" id="fx_${key}_min" type="number" step="any" placeholder="min" value="${esc(gridFilter[key+"_min"] ?? "")}">
+            <input class="fnum" id="fx_${key}_max" type="number" step="any" placeholder="max" value="${esc(gridFilter[key+"_max"] ?? "")}"></label>`;
+          if(ctl === "select") return selectEl(`fx_${key}`, label, gridFilter[key] || "",
+            filterOpts(M, key, ORD[COL_ORDER[key]]));
+          return `<label class="fsel"><span>${label}</span>
+            <input class="fnum wide" id="fx_${key}" placeholder="contains" value="${esc(gridFilter[key] || "")}"></label>`;
+        }).join("");
+        return `<div class="filters">
+          <input class="search" id="gq" placeholder="Search any text" value="${esc(gridFilter.q)}">
+          <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
+          <button class="lock" id="gtoggle">${gridFilterOpen ? "Hide" : "Filter columns"}${n ? ` (${n})` : ""}</button>
+          ${n ? `<button class="lock" id="gclear">Clear all</button>` : ""}
+          <span class="muted" id="sortNote" style="font-size:12px;margin-left:auto"></span>
+        </div>
+        <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
+      })() +
+      `<div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
        <div class="table-wrap"><table class="tbl"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
-  document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; draw(); };
-  // a select change re-renders the whole view so the dropdowns keep their own selected state
-  [["fGrade","grade"],["fQuad","quad"],["fTech","tech"],["fTiming","timing"],
-   ["fQgs","qgs"],["fAct","act"],["fSector","sector"]].forEach(([id,key]) => {
-    const el2 = document.getElementById(id);
-    if(el2) el2.onchange = e => { gridFilter[key] = e.target.value; grid(el); };
+  document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; grid(el); };
+  document.getElementById("gtoggle").onclick = () => { gridFilterOpen = !gridFilterOpen; grid(el); };
+  // Dropdowns and number boxes re-render the view so their own state persists; free-text boxes
+  // redraw only the rows, so typing does not lose focus mid-word.
+  GRID_COLS.forEach(([key, , type]) => {
+    const ctl = colControl(key, type, M);
+    if(ctl === "num"){
+      ["min","max"].forEach(b => {
+        const e2 = document.getElementById(`fx_${key}_${b}`);
+        if(e2) e2.onchange = ev => { gridFilter[`${key}_${b}`] = ev.target.value; grid(el); };
+      });
+    } else {
+      const e2 = document.getElementById(`fx_${key}`);
+      if(!e2) return;
+      if(ctl === "select") e2.onchange = ev => { gridFilter[key] = ev.target.value; grid(el); };
+      else e2.oninput = ev => { gridFilter[key] = ev.target.value; draw(); };
+    }
   });
-  document.getElementById("gclear").onclick = () => { gridFilter = {q:"", held:false, act:""}; grid(el); };
+  const gc = document.getElementById("gclear");
+  if(gc) gc.onclick = () => { gridFilter = {q:"", held:false}; grid(el); };
   draw();
 }
 
