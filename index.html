@@ -130,6 +130,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* daily note on the Holdings tab */
 .brief{border-color:rgba(175,100,82,.28);background:linear-gradient(180deg,rgba(175,100,82,.07),rgba(255,255,255,.012))}
 .brief h3{margin:3px 0 0;font-size:19px;line-height:1.25;font-weight:650}
+.brief.universe{border-color:rgba(63,207,142,.28);background:linear-gradient(180deg,rgba(63,207,142,.06),rgba(255,255,255,.012));margin-bottom:16px}
 .brief.morning{border-color:rgba(106,166,248,.3);background:linear-gradient(180deg,rgba(106,166,248,.07),rgba(255,255,255,.012));margin-bottom:16px}
 .brief h4{margin:0 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -206,7 +207,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-12 14:44 · 2a53a18</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-12 14:53 · 76b21f5</div>
   </div>
 </section>
 
@@ -230,7 +231,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-12 14:44 · 2a53a18</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-12 14:53 · 76b21f5</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -928,6 +929,34 @@ function vdurBlock(tk){
       The gap compares an FCF requirement with a revenue forecast, so read it directionally.</p>
   </div>`;
 }
+/* ═══ UNIVERSE MORNING NOTE (Grid + Universe tabs) ════════════════════════ */
+// The book notes live on Holdings. This one is about the bench — what happened across all ~453
+// tracked names — so it belongs where the universe is looked at, not where the positions are.
+function universeNote(){
+  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+  const u = B.find(x => x.kind === "universe");
+  if(!u || !u.payload) return "";
+  const b = u.payload;
+  const moving = (b.whats_moving||[]).map(x =>
+    `<li><a href="#grid/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
+  const movers = (b.movers||[]).map(x =>
+    `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
+  const chg = (b.model_changes||[]).map(x =>
+    `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
+  return `<div class="card brief universe">
+    <div class="bhead"><div><div class="caps">Universe morning note · ${esc(u.as_of)}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    ${b.themes ? `<p class="blede">${esc(b.themes)}</p>` : ""}
+    <div class="bgrid">
+      ${moving ? `<div><h4>What's moving</h4><ul class="blist">${moving}</ul></div>` : ""}
+      ${movers ? `<div><h4>Overnight movers</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${chg ? `<div><h4>Model changed its read</h4><ul class="blist">${chg}</ul></div>` : ""}
+    </div>
+    <div class="note" style="margin-top:12px">All ~453 tracked names, not the book — the holdings notes
+      are on the Holdings tab. Built from one market-wide news pull filtered to the universe, plus the
+      grid's own grades and any change since the previous run.</div>
+  </div>`;
+}
 /* ═══ VALUATION DURATION (Kao bond floor vs growth option) ════════════════ */
 // implied_fcf_cagr is the FCF growth the current price requires over the horizon — "what you'd have
 // to believe". value_gap is that minus the consensus forward REVENUE CAGR, so it is directional
@@ -1025,6 +1054,7 @@ async function grid(el){
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</span>`) +
+    universeNote() +
     card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${t.replace("_"," ")}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
@@ -1856,6 +1886,7 @@ let uFilter = "all";
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} tracked names</span>`) +
+    (typeof universeNote === "function" ? universeNote() : "") +
   `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
       `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
