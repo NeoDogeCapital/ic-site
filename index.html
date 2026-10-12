@@ -130,6 +130,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* daily note on the Holdings tab */
 .brief{border-color:rgba(175,100,82,.28);background:linear-gradient(180deg,rgba(175,100,82,.07),rgba(255,255,255,.012))}
 .brief h3{margin:3px 0 0;font-size:19px;line-height:1.25;font-weight:650}
+.brief.morning{border-color:rgba(106,166,248,.3);background:linear-gradient(180deg,rgba(106,166,248,.07),rgba(255,255,255,.012));margin-bottom:16px}
 .brief h4{margin:0 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .bnav{display:flex;align-items:center;gap:8px;flex:none}
@@ -205,7 +206,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-08 18:13 · fd4453c</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-12 14:44 · 2a53a18</div>
   </div>
 </section>
 
@@ -229,7 +230,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-08 18:13 · fd4453c</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-12 14:44 · 2a53a18</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1533,7 +1534,7 @@ function holdings(el){
     </select></label>`;
   const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
-    briefCard() +
+    morningCard() + briefCard() +
     `<div class="filters" style="margin-top:16px">
       ${sel("hQuad","Quad",hFilter.quad,uniq("quad"))}
       ${sel("hTrend","Trend",hFilter.trend,uniq("trend"))}
@@ -1608,8 +1609,32 @@ function drawHoldings(){
 
 /* ═══ DAILY BRIEF (Holdings tab) ══════════════════════════════════════════ */
 let briefIdx = 0;
-function briefCard(){
+function morningCard(){
+  // The morning note is a different question from the evening one — what you are walking into,
+  // not how the day went — so it sits above rather than replacing it, and only for the latest day.
   const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+  const m = B.find(x => x.kind === "premarket");
+  if(!m || !m.payload) return "";
+  const evenings = B.filter(x => (x.kind || "evening") === "evening");
+  if(evenings.length && evenings[0].as_of > m.as_of) return "";   // superseded by a newer close
+  const b = m.payload;
+  const li = a => (a||[]).map(x => `<li>${x}</li>`).join("");
+  const movers = (b.movers||[]).map(x =>
+    `<li><a href="#holdings/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
+  const bell = (b.before_the_bell||[]).map(x =>
+    `<li><b>${esc(x.what)}</b><div class="muted">${esc(x.note)}</div></li>`).join("");
+  return `<div class="card brief morning">
+    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)}</div><h3>${esc(b.headline||"")}</h3></div></div>
+    <p class="blede">${esc(b.overnight||"")}</p>
+    <div class="bgrid">
+      ${movers ? `<div><h4>Moving</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${bell ? `<div><h4>Before the bell</h4><ul class="blist">${bell}</ul></div>` : ""}
+    </div>
+    ${b.watch_at_open ? `<div class="bahead"><div class="caps">What to watch at the open</div><p>${esc(b.watch_at_open)}</p></div>` : ""}
+  </div>`;
+}
+function briefCard(){
+  const B = ((typeof LIVE !== "undefined" && LIVE.briefs) || []).filter(x => (x.kind || "evening") === "evening");
   if(!B.length) return "";
   briefIdx = Math.min(briefIdx, B.length - 1);
   const row = B[briefIdx], b = row.payload || {};
