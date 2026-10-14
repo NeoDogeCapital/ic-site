@@ -58,6 +58,33 @@ nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;font-size:13px;white-space:nowrap;transition:all .15s}
 nav.tabs a:hover{color:var(--text);background:rgba(255,255,255,.04)}
 nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 0 0 1px rgba(175,100,82,.4)}
+/* The tab strip scrolls horizontally with a hidden scrollbar, so on a narrow window the tabs
+   past the fold were unreachable with no affordance that they existed. The menu lists every
+   tab and is always available; below 1150px it replaces the strip entirely. */
+.menuwrap{position:relative;flex:0 0 auto}
+.menubtn{display:inline-flex;align-items:center;gap:6px}
+.menupanel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:200px;padding:6px;
+  /* --panel is rgba(...,.72) on purpose, for cards sitting over the page. A floating dropdown
+     has to be opaque or the background grid reads straight through the labels. */
+  background:#161b24;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:10px;
+  box-shadow:0 10px 32px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:1px}
+.menupanel a{display:block;padding:8px 11px;border-radius:7px;color:var(--muted);text-decoration:none;
+  font-size:13px;font-weight:500;white-space:nowrap}
+.menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
+.menupanel a.on{color:var(--text);background:rgba(106,166,248,.15);box-shadow:inset 0 0 0 1px rgba(106,166,248,.28)}
+@media(max-width:1150px){nav.tabs{display:none}}
+@media(min-width:1151px){.menubtn .mlabel{display:none}}
+/* The brand title is white-space:nowrap and its wrapper had no min-width:0, so on a narrow
+   window it could not shrink and ran straight through the menu button. Let it truncate, and
+   drop the as-of line, which is repeated at the foot of every view anyway. */
+@media(max-width:760px){
+  .top-in{gap:10px;padding:12px 14px}
+  .brand{flex:1 1 auto;min-width:0}
+  .brand>div{min-width:0}
+  .brand b{display:block;overflow:hidden;text-overflow:ellipsis}
+  .brand #asof{display:none}
+  .buildstamp{display:none}      /* a build timestamp is not worth header space on a phone */
+}
 .lock{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
 main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
 .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 22px;flex-wrap:wrap}
@@ -210,7 +237,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 18:32 · ae45c42</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 19:00 · 0e98961</div>
   </div>
 </section>
 
@@ -235,7 +262,12 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 18:32 · ae45c42</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <div class="menuwrap">
+      <button class="lock menubtn" id="menubtn" aria-haspopup="true" aria-expanded="false"
+              title="All tabs">☰ <span class="mlabel">Menu</span></button>
+      <div class="menupanel" id="menupanel" role="menu" hidden></div>
+    </div>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 19:00 · 0e98961</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -443,7 +475,9 @@ function about(el){
     allowed and documented.`) +
   step(8, "Building the portfolio", `
     <ul class="list">
-      <li><b>Equal weight</b>, about 1/N — no oversized bets on conviction alone</li>
+      <li><b>Three position sizes</b> — 2% starter, 4% full, 6% the most we will deliberately
+          allocate to one name. A winner that drifts above 6% is left alone; nothing is trimmed
+          for getting large, and a reduction is always a decision someone makes and records</li>
       <li><b>Sector cap 28%</b> of names</li>
       <li><b>Correlation clusters</b> — names that move together are capped at four per cluster</li>
       <li><b>Turnover control</b> — a supported holding isn't sold merely for being outranked</li>
@@ -1548,14 +1582,38 @@ const VIEWS = {overview, holdings, memo, performance: performanceAll, analytics,
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.v === (VIEWS[v] ? v : "overview")));
+  const active = VIEWS[v] ? v : "overview";
+  document.querySelectorAll("#tabs a, #menupanel a").forEach(a => a.classList.toggle("on", a.dataset.v === active));
+  setMenu(false);
   clearCharts(); closeDrawer(true);
   const el = document.getElementById("view"); el.innerHTML = ""; window.scrollTo(0,0);
   fn(el);
   const sub = location.hash.split("/")[1]; if(v==="holdings" && sub) openHolding(sub);
 }
+// Built from the nav's own links rather than a second hard-coded list, so a tab added to the
+// strip (build_live.py injects Memo, Analytics, Grid, Proposal, Theses and About) shows up here
+// with no extra step and the two can never drift apart.
+function buildMenu(){
+  const panel = document.getElementById("menupanel");
+  if(!panel) return;
+  panel.innerHTML = [...document.querySelectorAll("#tabs a")]
+    .map(a => `<a href="${a.getAttribute("href")}" data-v="${a.dataset.v}">${a.textContent}</a>`).join("");
+  panel.querySelectorAll("a").forEach(a => a.onclick = () => setMenu(false));
+}
+function setMenu(open){
+  const panel = document.getElementById("menupanel"), btn = document.getElementById("menubtn");
+  if(!panel || !btn) return;
+  panel.hidden = !open;
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
 function boot(){
   document.getElementById("asof").textContent = "Data as of " + D.asof;
+  buildMenu();
+  const btn = document.getElementById("menubtn"), panel = document.getElementById("menupanel");
+  if(btn) btn.onclick = e => { e.stopPropagation(); setMenu(panel.hidden); };
+  document.addEventListener("click", e => {
+    if(panel && !panel.hidden && !panel.contains(e.target) && e.target !== btn) setMenu(false); });
+  document.addEventListener("keydown", e => { if(e.key === "Escape") setMenu(false); });
   window.addEventListener("hashchange", route); route();
 }
 const head = (kicker, title, right="") => `<div class="pagehead"><div><div class="caps">${kicker}</div><h2>${title}</h2></div><div>${right}</div></div>`;
