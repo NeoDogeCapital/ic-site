@@ -237,7 +237,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 19:00 · 0e98961</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 19:15 · 3e6298a</div>
   </div>
 </section>
 
@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 19:00 · 0e98961</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 19:15 · 3e6298a</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1477,20 +1477,10 @@ function memoLongerTerm(notes){
 }
 function memoMorning(row){
   if(!row || !row.payload) return "";
-  const b = row.payload;
-  const movers = (b.movers||[]).map(x =>
-    `<li><a href="#holdings/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
-  const bell = (b.before_the_bell||[]).map(x =>
-    `<li><b>${esc(x.what)}</b><div class="muted">${esc(x.note)}</div></li>`).join("");
   return `<div class="card brief morning">
     <div class="bhead"><div><div class="caps">Morning note · looking ahead · ${esc(row.as_of)}</div>
-      <h3>${esc(b.headline||"")}</h3></div></div>
-    <p class="blede">${esc(b.overnight||"")}</p>
-    <div class="bgrid">
-      ${movers ? `<div><h4>Moving</h4><ul class="blist">${movers}</ul></div>` : ""}
-      ${bell ? `<div><h4>Before the bell</h4><ul class="blist">${bell}</ul></div>` : ""}
-    </div>
-    ${b.watch_at_open ? `<div class="bahead"><div class="caps">What to watch at the open</div><p>${esc(b.watch_at_open)}</p></div>` : ""}
+      <h3>${esc(row.payload.headline||"")}</h3></div></div>
+    ${briefBody(row.payload)}
   </div>`;
 }
 function memoUniverse(row){
@@ -1513,31 +1503,13 @@ function memoUniverse(row){
 }
 function memoEvening(row, anchor){
   if(!row || !row.payload) return "";
-  const b = row.payload;
   const stale = row.as_of !== anchor;
-  const movers = (b.movers||[]).map(m =>
-    `<li><a href="#holdings/${m.ticker}" class="tk" style="text-decoration:none">${m.ticker}</a> — ${esc(m.note)}</li>`).join("");
-  const risks = (b.risks_this_week||[]).map(r =>
-    `<li><b>${esc(r.risk)}</b><div class="muted">${esc(r.note)}</div></li>`).join("");
-  const cats = (b.catalysts||[]).map(c =>
-    `<li><span class="mono amber" style="font-size:12px">${esc(c.when)}</span> <b>${esc(c.what)}</b><div class="muted">${esc(c.note)}</div></li>`).join("");
-  const news = (b.news||[]).map(n =>
-    `<li><a href="#holdings/${n.ticker}" class="tk" style="text-decoration:none">${n.ticker}</a>
-      <a href="${esc(n.link)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.headline)}</a>
-      <div class="muted">${esc(n.so_what)}</div></li>`).join("");
   return `<div class="card brief">
     <div class="bhead"><div><div class="caps">Close note · how the day went · ${esc(row.as_of)}</div>
-      <h3>${esc(b.headline||"")}</h3></div></div>
+      <h3>${esc(row.payload.headline||"")}</h3></div></div>
     ${stale ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} close. The note for
       ${esc(anchor)} is written after the bell.</div>` : ""}
-    <p class="blede">${esc(b.performance||"")}</p>
-    <div class="bgrid">
-      ${movers ? `<div><h4>Movers</h4><ul class="blist">${movers}</ul></div>` : ""}
-      ${risks ? `<div><h4>Risks to watch this week</h4><ul class="blist">${risks}</ul></div>` : ""}
-      ${cats ? `<div><h4>Catalysts ahead</h4><ul class="blist">${cats}</ul></div>` : ""}
-      ${news ? `<div><h4>New on our names</h4><ul class="blist">${news}</ul></div>` : ""}
-    </div>
-    ${b.week_ahead ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.week_ahead)}</p></div>` : ""}
+    ${briefBody(row.payload)}
   </div>`;
 }
 async function memo(el){
@@ -1830,28 +1802,65 @@ function drawHoldings(){
 
 /* ═══ DAILY BRIEF (Holdings tab) ══════════════════════════════════════════ */
 let briefIdx = 0;
+/* Both book notes share one shape (daily_brief.SHAPE, imported by premarket_brief), so they share
+   one renderer. The note is a set of LENSES — the book, its factor exposure, the market, the names'
+   news, risks, catalysts, what's next — rather than a narrative, and it is capped hard: the evening
+   note had grown to 1,217 words, of which risks alone were 453. */
+const OBS_SECTIONS = [["portfolio","The book"],["factors","Factor read"],["market","Market"]];
+function obsList(items){
+  return (items||[]).map(x =>
+    `<li><b>${esc(x.obs||x.risk||x.shift||"")}</b><div class="muted">${esc(x.note||"")}</div></li>`).join("");
+}
+// Notes written before 2026-10-14 used performance / movers / risks_this_week / week_ahead. The
+// Holdings arrows and the Memo tab read 30 days back, so without this every historical note would
+// render with only its news and catalysts — the rest silently gone.
+function briefShape(b){
+  if(!b) return {};
+  if(b.portfolio || b.factors || b.market) return b;
+  const movers = (b.movers || []).map(m => ({obs: m.ticker, note: m.note}));
+  // the old EVENING keys were performance / risks_this_week / week_ahead; the old MORNING ones were
+  // overnight / before_the_bell / watch_at_open. Both shapes are still in the 30-day window.
+  const lede = b.performance || b.overnight;
+  return Object.assign({}, b, {
+    portfolio: (lede ? [{obs: b.performance ? "Performance" : "Overnight", note: lede}] : []).concat(movers),
+    risks: b.risks_this_week || [],
+    catalysts: b.catalysts || (b.before_the_bell || []).map(x => ({when: "", what: x.what, note: x.note})),
+    watching: b.watching || b.week_ahead || b.watch_at_open || "",
+  });
+}
+function briefBody(b){
+  b = briefShape(b);
+  const sec = (label, inner) => inner ? `<div><h4>${label}</h4><ul class="blist">${inner}</ul></div>` : "";
+  const news = (b.news||[]).map(n => {
+    const txt = esc(n.note || n.so_what || n.headline || "");
+    return `<li><a href="#holdings/${n.ticker}" class="tk" style="text-decoration:none">${n.ticker}</a> ${
+      n.link ? `<a href="${esc(n.link)}" target="_blank" rel="noopener" style="color:inherit">${txt}</a>` : txt}</li>`;
+  }).join("");
+  const cats = (b.catalysts||[]).map(c =>
+    `<li>${c.when ? `<span class="mono amber" style="font-size:12px">${esc(c.when)}</span> ` : ""}<b>${esc(c.what)}</b>${
+      c.note ? `<div class="muted">${esc(c.note)}</div>` : ""}</li>`).join("");
+  return `<div class="bgrid">
+      ${OBS_SECTIONS.map(([k,label]) => sec(label, obsList(b[k]))).join("")}
+      ${sec("On our names", news)}
+      ${sec("Risks", obsList(b.risks))}
+      ${sec("Catalysts", cats)}
+      ${sec("Longer term", obsList(b.longer_term))}
+    </div>
+    ${b.watching ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.watching)}</p></div>` : ""}`;
+}
 function morningCard(){
-  // The morning note is a different question from the evening one — what you are walking into,
-  // not how the day went — so it sits above rather than replacing it, and only for the latest day.
+  // The morning note is a different question from the evening one — what you are walking into, not
+  // how the day went — so it sits above rather than replacing it, and only for the latest day.
   const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
   const m = B.find(x => x.kind === "premarket");
   if(!m || !m.payload) return "";
   const evenings = B.filter(x => (x.kind || "evening") === "evening");
   if(evenings.length && evenings[0].as_of > m.as_of) return "";   // superseded by a newer close
   const b = m.payload;
-  const li = a => (a||[]).map(x => `<li>${x}</li>`).join("");
-  const movers = (b.movers||[]).map(x =>
-    `<li><a href="#holdings/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
-  const bell = (b.before_the_bell||[]).map(x =>
-    `<li><b>${esc(x.what)}</b><div class="muted">${esc(x.note)}</div></li>`).join("");
   return `<div class="card brief morning">
-    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)}</div><h3>${esc(b.headline||"")}</h3></div></div>
-    <p class="blede">${esc(b.overnight||"")}</p>
-    <div class="bgrid">
-      ${movers ? `<div><h4>Moving</h4><ul class="blist">${movers}</ul></div>` : ""}
-      ${bell ? `<div><h4>Before the bell</h4><ul class="blist">${bell}</ul></div>` : ""}
-    </div>
-    ${b.watch_at_open ? `<div class="bahead"><div class="caps">What to watch at the open</div><p>${esc(b.watch_at_open)}</p></div>` : ""}
+    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    ${briefBody(b)}
   </div>`;
 }
 function briefCard(){
@@ -1859,33 +1868,16 @@ function briefCard(){
   if(!B.length) return "";
   briefIdx = Math.min(briefIdx, B.length - 1);
   const row = B[briefIdx], b = row.payload || {};
-  const li = a => (a||[]).map(x=>`<li>${x}</li>`).join("");
   const nav = `<span class="bnav">
       <button class="bbtn" data-bd="1" ${briefIdx>=B.length-1?"disabled":""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:12px">${row.as_of}</span>
       <button class="bbtn" data-bd="-1" ${briefIdx<=0?"disabled":""} title="Later">→</button></span>`;
-  const movers = (b.movers||[]).map(m =>
-    `<li><a href="#holdings/${m.ticker}" class="tk" style="text-decoration:none">${m.ticker}</a> — ${esc(m.note)}</li>`).join("");
-  const risks = (b.risks_this_week||[]).map(r =>
-    `<li><b>${esc(r.risk)}</b><div class="muted">${esc(r.note)}</div></li>`).join("");
-  const cats = (b.catalysts||[]).map(c =>
-    `<li><span class="mono amber" style="font-size:12px">${esc(c.when)}</span> <b>${esc(c.what)}</b><div class="muted">${esc(c.note)}</div></li>`).join("");
-  const news = (b.news||[]).map(n =>
-    `<li><a href="#holdings/${n.ticker}" class="tk" style="text-decoration:none">${n.ticker}</a>
-      <a href="${esc(n.link)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.headline)}</a>
-      <div class="muted">${esc(n.so_what)}</div></li>`).join("");
   return `<div class="card brief">
-    <div class="bhead"><div><div class="caps">Daily note</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
-    <p class="blede">${esc(b.performance||"")}</p>
-    <div class="bgrid">
-      ${movers ? `<div><h4>Movers</h4><ul class="blist">${movers}</ul></div>` : ""}
-      ${risks ? `<div><h4>Risks to watch this week</h4><ul class="blist">${risks}</ul></div>` : ""}
-      ${cats ? `<div><h4>Catalysts ahead</h4><ul class="blist">${cats}</ul></div>` : ""}
-      ${news ? `<div><h4>New on our names</h4><ul class="blist">${news}</ul></div>` : ""}
-    </div>
-    ${b.week_ahead ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.week_ahead)}</p></div>` : ""}
-    <div class="note" style="margin-top:12px">Written each evening from that day's computed model output — returns, risk engine,
-      decision grid, earnings calendar and the day's headlines. Commentary on what the model is showing, not advice or a forecast.</div>
+    <div class="bhead"><div><div class="caps">Close note</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
+    ${briefBody(b)}
+    <div class="note" style="margin-top:12px">Observations on what the model is showing — returns, risk
+      engine, decision grid, factor and sector rotation, earnings calendar and the day's headlines, all
+      computed before the note is written. Not advice and not a forecast.</div>
   </div>`;
 }
 function wireBrief(){
