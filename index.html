@@ -132,6 +132,9 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 .brief h3{margin:3px 0 0;font-size:19px;line-height:1.25;font-weight:650}
 .brief.universe{border-color:rgba(63,207,142,.28);background:linear-gradient(180deg,rgba(63,207,142,.06),rgba(255,255,255,.012));margin-bottom:16px}
 .brief.morning{border-color:rgba(106,166,248,.3);background:linear-gradient(180deg,rgba(106,166,248,.07),rgba(255,255,255,.012));margin-bottom:16px}
+.memotag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid;border-radius:3px;padding:1px 5px;margin-right:7px;vertical-align:1px}
+.memolt>li{margin-bottom:11px}
 .brief h4{margin:0 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .bnav{display:flex;align-items:center;gap:8px;flex:none}
@@ -207,7 +210,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-12 14:53 · 76b21f5</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 18:32 · ae45c42</div>
   </div>
 </section>
 
@@ -221,6 +224,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
     <nav class="tabs" id="tabs">
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#holdings" data-v="holdings">Holdings</a>
+      <a href="#memo" data-v="memo">Memo</a>
       <a href="#performance" data-v="performance">Performance</a>
       <a href="#analytics" data-v="analytics">Analytics</a>
       <a href="#universe" data-v="universe">Universe</a>
@@ -231,7 +235,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <a href="#history" data-v="history">History</a>
       <a href="#about" data-v="about">About</a>
     </nav>
-    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-12 14:53 · 76b21f5</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 18:32 · ae45c42</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1380,7 +1384,7 @@ async function paperCard(el){
     box.innerHTML = card("Track record",
       `${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; since ${start_} · ${days.length} trading days ·
        <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since ·
-       each series rebased to 100 at its first day in view`,
+       each series shown as cumulative % return from its first day in view`,
       `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
         tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
        <div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
@@ -1391,7 +1395,10 @@ async function paperCard(el){
       const base = +by[s][0].nav;
       return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3, connectNulls:false,
         lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s]}, itemStyle:{color:PAPER_COL[s]},
-        data:days.map(d => { const x = by[s].find(r => r.nav_date === d); return x ? +(+x.nav / base * 100).toFixed(2) : null; })};
+        // cumulative % return from each series' first day in view, not an index level: the
+        // question is "how much did this strategy make", which a 100-based index makes you do
+        // arithmetic to answer.
+        data:days.map(d => { const x = by[s].find(r => r.nav_date === d); return x ? +((+x.nav / base - 1) * 100).toFixed(2) : null; })};
     });
     const marks = [[PAPER_REAL_FROM,"model data"],[PAPER_LIVE_FROM,"live"]]
       .map(([d,l]) => { const at = days.find(x => x >= d); return at && at !== days[0] ? {xAxis:at, label:{formatter:l}} : null; })
@@ -1402,16 +1409,142 @@ async function paperCard(el){
     mk(document.getElementById("paperChart"), {
       legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
         selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))},
-      grid:{left:48,right:16,top:20,bottom:40}, tooltip:{trigger:"axis"},
+      grid:{left:56,right:16,top:20,bottom:40},
+      tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : (v > 0 ? "+" : "") + (+v).toFixed(2) + "%"},
       xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
-      yAxis:{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+      yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:C.line}},
+        axisLabel:{color:C.muted, formatter:v => (v > 0 ? "+" : "") + v + "%"}},
       series});
     box.querySelectorAll("button[data-range]").forEach(b => b.onclick = () => { paperRange = b.dataset.range; draw(); });
   };
   draw();
 }
+/* ═══ MARKET MEMO (all three daily notes, one day at a time) ══════════════ */
+// The three notes answer three different questions and were scattered across two tabs: the morning
+// note and the evening close note on Holdings, the universe note on Grid and Universe. Read in
+// sequence they are a record of how the market and the bench have been changing, which is what this
+// tab is for — one day per screen, with the longer-term observations from all three pulled together
+// at the top so trends are readable without scrolling three cards.
+let memoIdx = 0;
+function memoDates(){
+  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+  return [...new Set(B.map(x => x.as_of))].sort().reverse();
+}
+function memoLongerTerm(notes){
+  // every longer_term item on screen, tagged with the note it came from
+  const items = notes.flatMap(([label, col, row]) =>
+    ((row && row.payload && row.payload.longer_term) || []).map(x => ({label, col, ...x})));
+  if(!items.length) return "";
+  return card("Longer-term observations",
+    "what has been building over weeks and months, from all three notes on this day",
+    `<ul class="blist memolt">${items.map(x => `<li>
+      <span class="memotag" style="color:${x.col};border-color:${x.col}44">${x.label}</span>
+      <b>${esc(x.shift || "")}</b><div class="muted">${esc(x.note || "")}</div></li>`).join("")}</ul>`);
+}
+function memoMorning(row){
+  if(!row || !row.payload) return "";
+  const b = row.payload;
+  const movers = (b.movers||[]).map(x =>
+    `<li><a href="#holdings/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
+  const bell = (b.before_the_bell||[]).map(x =>
+    `<li><b>${esc(x.what)}</b><div class="muted">${esc(x.note)}</div></li>`).join("");
+  return `<div class="card brief morning">
+    <div class="bhead"><div><div class="caps">Morning note · looking ahead · ${esc(row.as_of)}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    <p class="blede">${esc(b.overnight||"")}</p>
+    <div class="bgrid">
+      ${movers ? `<div><h4>Moving</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${bell ? `<div><h4>Before the bell</h4><ul class="blist">${bell}</ul></div>` : ""}
+    </div>
+    ${b.watch_at_open ? `<div class="bahead"><div class="caps">What to watch at the open</div><p>${esc(b.watch_at_open)}</p></div>` : ""}
+  </div>`;
+}
+function memoUniverse(row){
+  if(!row || !row.payload) return "";
+  const b = row.payload;
+  const moving = (b.whats_moving||[]).map(x =>
+    `<li><a href="#grid/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
+  const movers = (b.movers||[]).map(x => `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
+  const chg = (b.model_changes||[]).map(x => `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
+  return `<div class="card brief universe">
+    <div class="bhead"><div><div class="caps">Universe note · the whole bench · ${esc(row.as_of)}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    ${b.themes ? `<p class="blede">${esc(b.themes)}</p>` : ""}
+    <div class="bgrid">
+      ${moving ? `<div><h4>What's moving</h4><ul class="blist">${moving}</ul></div>` : ""}
+      ${movers ? `<div><h4>Overnight movers</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${chg ? `<div><h4>Model changed its read</h4><ul class="blist">${chg}</ul></div>` : ""}
+    </div>
+  </div>`;
+}
+function memoEvening(row, anchor){
+  if(!row || !row.payload) return "";
+  const b = row.payload;
+  const stale = row.as_of !== anchor;
+  const movers = (b.movers||[]).map(m =>
+    `<li><a href="#holdings/${m.ticker}" class="tk" style="text-decoration:none">${m.ticker}</a> — ${esc(m.note)}</li>`).join("");
+  const risks = (b.risks_this_week||[]).map(r =>
+    `<li><b>${esc(r.risk)}</b><div class="muted">${esc(r.note)}</div></li>`).join("");
+  const cats = (b.catalysts||[]).map(c =>
+    `<li><span class="mono amber" style="font-size:12px">${esc(c.when)}</span> <b>${esc(c.what)}</b><div class="muted">${esc(c.note)}</div></li>`).join("");
+  const news = (b.news||[]).map(n =>
+    `<li><a href="#holdings/${n.ticker}" class="tk" style="text-decoration:none">${n.ticker}</a>
+      <a href="${esc(n.link)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.headline)}</a>
+      <div class="muted">${esc(n.so_what)}</div></li>`).join("");
+  return `<div class="card brief">
+    <div class="bhead"><div><div class="caps">Close note · how the day went · ${esc(row.as_of)}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    ${stale ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} close. The note for
+      ${esc(anchor)} is written after the bell.</div>` : ""}
+    <p class="blede">${esc(b.performance||"")}</p>
+    <div class="bgrid">
+      ${movers ? `<div><h4>Movers</h4><ul class="blist">${movers}</ul></div>` : ""}
+      ${risks ? `<div><h4>Risks to watch this week</h4><ul class="blist">${risks}</ul></div>` : ""}
+      ${cats ? `<div><h4>Catalysts ahead</h4><ul class="blist">${cats}</ul></div>` : ""}
+      ${news ? `<div><h4>New on our names</h4><ul class="blist">${news}</ul></div>` : ""}
+    </div>
+    ${b.week_ahead ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.week_ahead)}</p></div>` : ""}
+  </div>`;
+}
+async function memo(el){
+  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+  if(!B.length){
+    el.innerHTML = head("Memo", "Market memo", "") +
+      card("No notes yet", "", `<p class="muted">The notes are written by the scheduled jobs — pre-open,
+        mid-morning for the universe, and after the close.</p>`);
+    return;
+  }
+  const dates = memoDates();
+  const draw = () => {
+    memoIdx = Math.max(0, Math.min(memoIdx, dates.length - 1));
+    const d = dates[memoIdx];
+    const at = k => B.find(x => x.as_of === d && (x.kind || "evening") === k);
+    // the close note for the anchored day may not exist yet; fall back to the most recent one
+    // before it, clearly labelled with its own date rather than presented as this day's
+    const ev = at("evening") || B.filter(x => (x.kind||"evening") === "evening" && x.as_of < d)[0];
+    const mo = at("premarket"), un = at("universe");
+    const nav = `<span class="bnav">
+      <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
+      <span class="mono muted" style="font-size:12px">${d}</span>
+      <button class="bbtn" data-md="-1" ${memoIdx<=0?"disabled":""} title="Later">→</button></span>`;
+    const have = [mo && "morning", un && "universe", ev && "close"].filter(Boolean).join(" · ");
+    el.innerHTML = head("Memo", "Market memo",
+      `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
+      memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
+      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) +
+      `<div class="note" style="margin-top:14px">Three notes, each from a different point in the day:
+       the morning note is what you are walking into, the universe note covers all ~453 tracked names
+       rather than the book, and the close note is how the day actually went. Every figure in them is
+       computed first and the model is told to add none of its own — commentary on what the model is
+       showing, not advice or a forecast. Use ← → to read back through earlier days.</div>`;
+    el.querySelectorAll(".bbtn[data-md]").forEach(b =>
+      b.onclick = () => { memoIdx += Number(b.dataset.md); draw(); });
+  };
+  draw();
+}
 
-const VIEWS = {overview, holdings, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, about, risk: performanceAll, factors: performanceAll};
+
+const VIEWS = {overview, holdings, memo, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, about, risk: performanceAll, factors: performanceAll};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
