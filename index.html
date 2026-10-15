@@ -109,6 +109,25 @@ main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
 table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .t th{text-align:left;font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--panel-solid)}
 .t th:hover{color:var(--muted)}
+.todayrow{text-decoration:none;color:inherit;gap:12px}
+.todayrow:hover{background:rgba(255,255,255,.035)}
+.todaybreach{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+/* .tbl / .table-wrap / .pill are emitted by every view build_live.py injects — the Grid, Signals,
+   Risk, Proposal, Analytics and the drawers — and had NO rules at all, so six tabs including the
+   decision grid rendered as browser-default tables. Match .t, which the template's own tables use,
+   so the two table systems look like one product. */
+.table-wrap{overflow:auto;border-radius:10px;border:1px solid var(--line)}
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px}
+.tbl th{text-align:left;font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;
+  position:sticky;top:0;background:var(--panel-solid);z-index:1}
+.tbl th.sorted{color:var(--text)}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover{background:rgba(255,255,255,.028)}
+.tbl .srank{font-size:8.5px;opacity:.75;margin-left:1px}
+.pill{display:inline-block;font:500 9.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;
+  padding:2px 6px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);vertical-align:1px}
 .t td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
 .t tr.row{cursor:pointer;transition:background .12s} .t tr.row:hover{background:rgba(106,166,248,.06)}
 .t .r{text-align:right}
@@ -237,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 14:00 · 5682a39</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 15:25 · c79cefa</div>
   </div>
 </section>
 
@@ -267,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 14:00 · 5682a39</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 15:25 · c79cefa</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -303,6 +322,23 @@ async function loadQuotes(){
   LIVE.jobs = await q("site_job_runs");
   applyQuotes();
 }
+// One glance at whether the run that produced these numbers passed its own assertions. Until now
+// nothing on the page answered that: only price_refresh wrote ic_job_runs and its status was
+// fetched and never shown, so a chain that died at step 13 looked identical to one that finished.
+function renderPipeline(){
+  const el = document.getElementById("pipestate");
+  const h = (LIVE.pipeline || {}).health;
+  if(!el || !h) return;
+  let v; try{ v = typeof h.value === "string" ? JSON.parse(h.value) : h.value; }catch(e){ return; }
+  if(!v) return;
+  const age = Math.round((Date.now() - new Date(h.updated_at)) / 36e5);
+  const bad = v.failed > 0, stale = age > 30;
+  const col = bad ? C.red : stale ? C.amber : C.green;
+  const txt = bad ? `${v.failed} check${v.failed > 1 ? "s" : ""} failing`
+            : stale ? `checks ${age}h old` : `${v.checks} checks ok${v.warnings ? ` · ${v.warnings} warn` : ""}`;
+  const detail = [...(v.failing || []), ...(v.warning || [])].join(", ");
+  el.innerHTML = `<span class="caps" style="font-size:9px;color:${col}" title="${esc(detail || "all checks passed")}">● ${esc(txt)}</span>`;
+}
 function applyQuotes(){
   if(!D) return;
   let total = 0;
@@ -329,6 +365,10 @@ async function enter(){
     LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
     LIVE.ranges = {};
     for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
+    try{
+      LIVE.pipeline = Object.fromEntries((await q("site_pipeline_state")).map(r => [r.key, r]));
+      renderPipeline();
+    }catch(e){ LIVE.pipeline = {}; }
     LIVE.cards = Object.fromEntries((await qAll("site_company_card")).map(v => [v.ticker, v])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
@@ -339,7 +379,17 @@ async function enter(){
   clearInterval(QUOTE_TIMER);
   QUOTE_TIMER = setInterval(async () => {
     if(document.hidden) return;
-    try{ await loadQuotes(); const v = (location.hash||"#overview").slice(1).split("/")[0]; if(["overview","holdings"].includes(v) && !document.querySelector(".drawer.open")) route(); }catch(e){}
+    // The drawer's open class is "on" (index.html:196), not "open" — so this guard was always
+    // false and the 60-second tick re-routed underneath an open drawer, which closes it and
+    // scrolls to top. Reading a holding for more than a minute meant losing your place.
+    // Also skip while the page is hidden: a backgrounded tab does not need a re-render.
+    try{
+      await loadQuotes();
+      const v = (location.hash||"#overview").slice(1).split("/")[0];
+      const drawerOpen = !!document.querySelector(".drawer.on");
+      const filtering = document.activeElement && ["INPUT","SELECT","TEXTAREA"].includes(document.activeElement.tagName);
+      if(["overview","holdings"].includes(v) && !drawerOpen && !filtering && !document.hidden) route();
+    }catch(e){}
   }, 60000);
 }
 document.getElementById("gateForm").addEventListener("submit", async e => {
@@ -565,7 +615,10 @@ function sigKey(v, k, M){
 async function signalsV2(el){
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">loading…</span>`);
   if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
-  if(!LIVE.events) LIVE.events = await qAll("site_technical_events", r => r.order("event_date", {ascending:false}));
+  // Only the newest 300 are ever shown (sliced to 120 below), but this used qAll, which pages the
+  // ENTIRE view: 12,167 rows / 2.24 MB over 13 serial requests to render 120. Ask for what is used.
+  if(!LIVE.events) LIVE.events = await q("site_technical_events",
+    r => r.order("event_date", {ascending:false}).limit(300));
   if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
   if(!Object.keys(LIVE.ranges || {}).length){
     LIVE.ranges = {};
@@ -1130,7 +1183,8 @@ async function grid(el){
         // final tie-break on grade so equal rows have a stable, meaningful order
         return (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9);
       });
-    document.getElementById("gridRows").innerHTML = rows.slice(0,400).map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
+    const CAP = 400, shown = rows.slice(0, CAP);
+    document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
@@ -1138,7 +1192,11 @@ async function grid(el){
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${impliedCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
-    document.getElementById("gridN").textContent = rows.length + " names";
+    // The count used to read the full row count while the table rendered only the first 400, so 56
+    // names — under the default grade sort, the tail of the D grades — were invisible with nothing
+    // saying so. Held names can fall in that tail.
+    document.getElementById("gridN").textContent = rows.length + " names"
+      + (rows.length > CAP ? ` · showing first ${CAP}, filter or sort to reach the rest` : "");
     document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) => {
       const at = gridSort.findIndex(x => x.k === k), on = at >= 0;
       const arrow = on ? (gridSort[at].d > 0 ? " ↑" : " ↓") : "";
@@ -1201,7 +1259,14 @@ async function grid(el){
       })() +
       `<div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
        <div class="table-wrap"><table class="tbl"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
-  el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => { gridFilter.act = td.dataset.act; draw(); });
+  // This set gridFilter.act, but matchesFilters iterates GRID_COLS where the key is "action" — so
+  // nothing read it and clicking a cell silently did nothing, while the filter badge counted it as
+  // an active filter. Set the key the filter actually uses, and re-render so the dropdown shows it.
+  el.querySelectorAll("td[data-act]").forEach(td => td.onclick = () => {
+    const a = td.dataset.act;
+    gridFilter.action = (gridFilter.action === a) ? "" : a;   // click again to clear
+    grid(el);
+  });
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
   document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; grid(el); };
   document.getElementById("gtoggle").onclick = () => { gridFilterOpen = !gridFilterOpen; grid(el); };
@@ -1243,7 +1308,7 @@ async function risk(el){
     ${kpi("1-yr drawdown P50", pct(mc.p50,1,false), `limit ${pct(mc.p50_limit,0,false)} · ${passTag(mc.p50_pass)}`)}
     ${kpi("1-yr drawdown P95", pct(mc.p95,1,false), `limit ${pct(mc.p95_limit,0,false)} · ${passTag(mc.p95_pass)}`)}
     ${kpi("Effective N", num(co.effective_n,1), `top 5 = ${pct(co.top5,0,false)}`)}
-    ${kpi("Daily VaR 95", pct(m.var95_daily), `Sharpe ${num(m.sharpe)}`)}
+    ${kpi("Daily VaR 95", pct(m.var95_daily), `Sharpe ${num(m.sharpe)} · today's weights, 1y`)}
   </div>
   <div class="grid g2">
     ${card("Limit breaches", `${(co.breaches||[]).length} flagged`, `<ul class="list">${(co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||"<li class='muted'>None</li>"}</ul>`)}
@@ -1704,6 +1769,80 @@ function periodStats(key){
           port: p-1, spy: b-1, excess: (p-1)-(b-1), beat_days: n ? up/n : null,
           max_dd: Math.min(...dd, 0), x: [dates[i], ...dates.slice(i)], cum_p: cp, cum_b: cb};
 }
+// ── TODAY ────────────────────────────────────────────────────────────────────
+// The grid has always computed one plain-English instruction per holding — pace(action, timing)
+// in decision_matrix.py, e.g. "Accumulate · BUY NOW", "Exit Review · TRIM ON STRENGTH" — and it
+// was reachable only inside the Grid table and a drawer. The answer to "what do I do today" was
+// computed nightly and buried two tabs deep. site_build now carries it onto each holdings row,
+// so this can sit above everything else.
+//
+// Ordered by what demands a decision, not by weight: exits first, then trims, then adds that are
+// actually at a good price, then names the model has something against. A name appears ONCE, in
+// the most urgent bucket it qualifies for.
+const ACT_NOW = new Set(["EXIT", "EXIT_REVIEW", "REDUCE", "TRIM_CANDIDATE"]);
+const ADD_ACT = new Set(["ACCUMULATE", "ADD_ON_WEAKNESS", "STARTER", "STARTER_ADD"]);
+function flagsFor(h){
+  const f = [];
+  if(h.comp != null && h.comp < 6.5) f.push(`composite ${num(h.comp)}`);
+  if((h.p2 != null && h.p2 < 6) || (h.p3 != null && h.p3 < 6)) f.push("pillar floor");
+  if(h.bucket === "DISTRIBUTE") f.push("distribute");
+  if(h.trend === "DOWNTREND") f.push("downtrend");
+  if(h.eq === "EPS_ENGINEERED") f.push("engineered EPS");
+  if(h.thesis_status === "BROKEN" || h.thesis_status === "REVIEW") f.push("thesis " + h.thesis_status.toLowerCase());
+  if(h.range && h.range.rev) f.push("range reversed");
+  return f;
+}
+function todayBlock(H){
+  if(!H || !H.length) return "";
+  const seen = new Set(), rows = [];
+  const take = (test, bucket, tone) => H.filter(h => !seen.has(h.tk) && test(h))
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .forEach(h => { seen.add(h.tk); rows.push({h, bucket, tone, flags: flagsFor(h)}); });
+
+  take(h => ACT_NOW.has(h.action), "Act", "bad");
+  take(h => h.timing === "TRIM_ZONE", "Trim zone", "warn");
+  take(h => ADD_ACT.has(h.action) && (h.timing === "BUY_ZONE" || h.timing === "ACCUMULATE_OK"), "Buy zone", "good");
+
+  const n = rows.length;
+  // Everything else the model has something against is the "Needs attention" card below. Including
+  // it here put 26 of 29 holdings in a list whose whole job is to prioritise.
+  const alsoFlagged = H.filter(h => !seen.has(h.tk) && flagsFor(h).length).length;
+  const line = ({h, bucket, tone, flags}) => `<a class="li todayrow" href="#holdings/${h.tk}">
+    <span style="display:flex;gap:9px;align-items:baseline;min-width:0">
+      <span class="chip ${tone}">${bucket}</span>
+      <span class="tk">${h.tk}</span>
+      <span class="muted" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.guidance || h.action || "")}</span>
+    </span>
+    <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:baseline">
+      ${flags.slice(0,3).map(x => `<span class="chip ${/floor|broken|engineered|reversed/.test(x) ? "bad" : "warn"}">${x}</span>`).join("")}
+      <span class="mono muted" style="font-size:11px">${pct(h.weight, 1, false)}</span>
+    </span></a>`;
+
+  // Dry powder. Position weights are weights of INVESTED capital (db/023), so cash is shown as its
+  // own figure rather than folded into them — it is an input to "what do I do today", and until
+  // now it left the model entirely the moment a trim settled.
+  const cashAmt = D.cash && D.cash.amount ? +D.cash.amount : 0;
+  const invested = (D.book_value || 0);
+  const cashChip = cashAmt > 0
+    ? `<span class="chip">cash ${usd(cashAmt)} · ${pct(cashAmt / (invested + cashAmt), 1, false)} of total</span>`
+    : "";
+
+  // Book-level rules that no single name owns. Sector breach is the live one.
+  const bySec = {};
+  H.forEach(h => { if(h.sector) bySec[h.sector] = (bySec[h.sector] || 0) + (h.weight || 0); });
+  const breach = Object.entries(bySec).filter(([, w]) => w > 0.28)
+    .sort((a, b) => b[1] - a[1])
+    .map(([sec, w]) => `<span class="chip bad">${esc(sec)} ${pct(w, 1, false)} &gt; 28%</span>`).join(" ");
+
+  return `<div style="margin-top:16px">` + card("Today",
+    n ? `${n} of ${H.length} holdings are at a decision point · exits first, then trims, then adds at a good price`
+        + (alsoFlagged ? ` · ${alsoFlagged} more flagged below` : "")
+      : "nothing in the book is at a decision point"
+        + (alsoFlagged ? ` · ${alsoFlagged} flagged below` : ""),
+    (breach || cashChip ? `<div class="todaybreach">${breach}${cashChip}</div>` : "") +
+    (n ? `<div class="list">${rows.map(line).join("")}</div>`
+       : `<div class="muted">No exits, trims or buy-zone adds today.</div>`)) + `</div>`;
+}
 function overview(el){
   const m = D.perf.metrics, H = D.holdings;
   const last = arr => arr.filter(v=>v!=null).slice(-1)[0];
@@ -1712,6 +1851,7 @@ function overview(el){
   const toggle = `<span class="seg" id="ovSeg">${PERIODS.map(([k,l]) =>
       `<button data-p="${k}" class="${k===S.key?"on":""}" ${periodStats(k)?"":"disabled"}>${l}</button>`).join("")}</span>`;
   el.innerHTML = head("Portfolio", "Overview", `<span class="muted">${H.length} holdings · book ${usd(D.book_value)}</span>${toggle}`) +
+  todayBlock(H) +
   `<div class="kpis">
     ${kpi(`${pl} return`, pct(S.port), `SPY ${pct(S.spy)}`, cls(S.port))}
     ${kpi(`${pl} vs SPY`, pct(S.excess), `${S.from} → ${S.to}`, cls(S.excess))}
@@ -1789,7 +1929,9 @@ function overview(el){
       if(h.trend==="DOWNTREND") f.push("downtrend");
       if(h.eq==="EPS_ENGINEERED") f.push("engineered EPS");
       if(h.thesis_status==="BROKEN"||h.thesis_status==="REVIEW") f.push("thesis "+h.thesis_status.toLowerCase());
-      return {h, f}; }).filter(x=>x.f.length).sort((a,b)=>b.f.length-a.f.length).slice(0,9);
+      return {h, f}; }).filter(x=>x.f.length).sort((a,b)=>b.f.length-a.f.length);
+  // This used .slice(0,9) with no count, so 9 of 18 flagged holdings were silently invisible —
+  // including STX, a hard-rule composite breach. Show them all; the list is short enough.
   document.getElementById("ovFlags").innerHTML = flags.map(({h,f}) =>
     `<a class="li" href="#holdings/${h.tk}" style="text-decoration:none;color:inherit"><span class="tk">${h.tk}</span>
      <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${f.map(x=>`<span class="chip ${/floor|broken|engineered/.test(x)?'bad':'warn'}">${x}</span>`).join("")}</span></a>`).join("") || `<div class="muted">Nothing flagged.</div>`;
@@ -1832,7 +1974,7 @@ function holdings(el){
 }
 function drawHoldings(){
   const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
+                ["align","Alignment"],["trend","Trend"],["_timing","Timing"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
   const q = hQuery.toLowerCase(), f = hFilter;
   // "Flagged" means the model has something to say against the name: composite under the 6.5
   // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
@@ -1893,6 +2035,18 @@ function obsList(items){
 // Notes written before 2026-10-14 used performance / movers / risks_this_week / week_ahead. The
 // Holdings arrows and the Memo tab read 30 days back, so without this every historical note would
 // render with only its news and catalysts — the rest silently gone.
+// When a note was actually written, not just which day it is about. The pre-open note on
+// 2026-10-14 was generated at 15:12 ET — five hours into the session — and read identically to one
+// written before the bell. created_at ships in site_daily_brief and was never rendered.
+function writtenAt(row){
+  if(!row || !row.created_at) return "";
+  try{
+    const d = new Date(row.created_at);
+    const t = d.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
+    const day = d.toLocaleDateString("en-CA", {timeZone:"America/New_York"});
+    return `<span class="muted" style="font-size:11px">written ${day === row.as_of ? "" : day + " "}${t} ET</span>`;
+  }catch(e){ return ""; }
+}
 function briefShape(b){
   if(!b) return {};
   if(b.portfolio || b.factors || b.market) return b;
@@ -1937,7 +2091,7 @@ function morningCard(){
   if(evenings.length && evenings[0].as_of > m.as_of) return "";   // superseded by a newer close
   const b = m.payload;
   return `<div class="card brief morning">
-    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)}</div>
+    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)} ${writtenAt(m)}</div>
       <h3>${esc(b.headline||"")}</h3></div></div>
     ${briefBody(b)}
   </div>`;
@@ -1952,7 +2106,7 @@ function briefCard(){
       <span class="mono muted" style="font-size:12px">${row.as_of}</span>
       <button class="bbtn" data-bd="-1" ${briefIdx<=0?"disabled":""} title="Later">→</button></span>`;
   return `<div class="card brief">
-    <div class="bhead"><div><div class="caps">Close note</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
+    <div class="bhead"><div><div class="caps">Close note ${writtenAt(row)}</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
     ${briefBody(b)}
     <div class="note" style="margin-top:12px">Observations on what the model is showing — returns, risk
       engine, decision grid, factor and sector rotation, earnings calendar and the day's headlines, all
@@ -2038,7 +2192,7 @@ function performance(el){
     ${kpi("Total return", pct(m.total_return), `SPY ${pct(m.spy_total)}`, cls(m.total_return))}
     ${kpi("CAGR", pct(m.cagr), `SPY ${pct(m.spy_cagr)}`, cls(m.cagr))}
     ${kpi("Volatility", pct(m.vol,1,false), `downside ${pct(m.downside_dev,1,false)}`)}
-    ${kpi("Sharpe / Sortino", `${num(m.sharpe)} / ${num(m.sortino)}`, `Calmar ${num(m.calmar)}`)}
+    ${kpi("Sharpe / Sortino", `${num(m.sharpe)} / ${num(m.sortino)}`, `Calmar ${num(m.calmar)} · since inception`)}
     ${kpi("Up / down capture", `${num(m.up_capture)} / ${num(m.down_capture)}`, `ratio ${num(m.updown)}`)}
     ${kpi("Info ratio", num(m.info_ratio), `Treynor ${num(m.treynor)}`)}
   </div>
