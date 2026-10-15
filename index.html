@@ -256,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 15:25 · c79cefa</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 16:51 · b0f3210</div>
   </div>
 </section>
 
@@ -286,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 15:25 · c79cefa</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 16:51 · b0f3210</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -415,7 +415,26 @@ const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleStri
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qchip = q => q ? `<span class="chip ${q.toLowerCase()}">${q}</span>` : `<span class="chip">—</span>`;
-const trendChip = t => !t ? "—" : `<span class="chip ${t==='UPTREND'?'up':t==='DOWNTREND'?'down':'flat'}">${t==='UPTREND'?'▲ Up':t==='DOWNTREND'?'▼ Down':'■ Flat'}</span>`;
+// TWO ENGINES, TWO VOCABULARIES, ONE CONCEPT. ic_technicals (v1, the 200-day read that drives the
+// decision grid) says UPTREND / NEUTRAL / DOWNTREND. ic_technicals_v2 (the track line) says
+// BULLISH / BEARISH with no neutral. This chip only knew v1's words, so every BULLISH and BEARISH
+// fell through to "Flat" — the Signals tab rendered all 456 names as "■ Flat" and the name drawer
+// did the same, which is total information loss on a column, not a cosmetic slip.
+//
+// Both vocabularies are now mapped, and the label says WHICH read it is, because the two genuinely
+// disagree: on 2026-10-15 NEM was NEUTRAL to v1 and BULLISH to v2, AVGO NEUTRAL and BEARISH. A
+// reader seeing "Up" on one tab and "Down" on another for the same name deserves to know they are
+// different measurements rather than a contradiction.
+const TREND_LOOK = {
+  UPTREND:   ["up",   "▲ Up",   "200-day trend (drives the grid)"],
+  DOWNTREND: ["down", "▼ Down", "200-day trend (drives the grid)"],
+  NEUTRAL:   ["flat", "■ Flat", "200-day trend (drives the grid)"],
+  BULLISH:   ["up",   "▲ Bull", "track line (technical v2)"],
+  BEARISH:   ["down", "▼ Bear", "track line (technical v2)"],
+};
+const trendChip = t => { if(!t) return "—";
+  const [cls, label, title] = TREND_LOOK[t] || ["flat", t, ""];
+  return `<span class="chip ${cls}" title="${title}">${label}</span>`; };
 const alignBar = (v, b) => { if(v==null) return "—"; const col = v>=65?C.green:v<35?C.red:C.accent;
   return `<span class="bar"><i style="width:${Math.max(3,Math.min(100,v))}%;background:${col}"></i></span> <span class="mono" style="font-size:12px;color:${col}">${v.toFixed(0)}</span>`; };
 const thesisChip = s => !s ? `<span class="chip">—</span>` : `<span class="chip ${s==='BROKEN'||s==='REVIEW'?'bad':s==='WATCH'?'warn':'ok'}">${s}</span>`;
