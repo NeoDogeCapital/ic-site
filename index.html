@@ -237,7 +237,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-14 19:15 · 3e6298a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 14:00 · 5682a39</div>
   </div>
 </section>
 
@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-14 19:15 · 3e6298a</span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 14:00 · 5682a39</span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -280,7 +280,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}, ranges:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -327,6 +327,8 @@ async function enter(){
     LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
     LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false}));
     LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
+    LIVE.ranges = {};
+    for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
     LIVE.cards = Object.fromEntries((await qAll("site_company_card")).map(v => [v.ticker, v])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
@@ -527,8 +529,23 @@ const SIG_COLS = [
   ["ticker","Ticker","txt"], ["close","Price","num"], ["trend","Trend line","ord"], ["range_pos","Timing","ord"],
   ["trade_mid","Trade range (1w)","num"], ["trend_mid","Trend range (1m)","num"], ["rsi","RSI","num"],
   ["rvol","Rel vol","num"], ["above_52w_low_avwap","52w-low VWAP","ord"], ["td","TD b/s","num"],
+  ["range_move","Range moving","ord"],
   ["tech_rating","Rating","ord"],
 ];
+// Sort order puts the directional reads first and the two non-directional ones last, so sorting by
+// this column groups bullish ranges at one end and bearish at the other rather than alphabetically.
+const RANGE_ORD = {HIGHER_HIGHS: 0, BROADENING: 1, STABLE: 2, NARROWING: 3, LOWER_LOWS: 4};
+// One compact cell: which way the 1-week range is moving, with a marker when it just reversed and
+// an arrow for a width that is expanding or compressing.
+function rangeCell(tk){
+  const r = ((typeof LIVE !== "undefined" && LIVE.ranges) || {})[tk];
+  const d = r && r.trade; if(!d || !d.direction) return '<span class="muted">—</span>';
+  const [what,, col] = RANGE_DIR[d.direction] || ["", "", "muted"];
+  const c = {green:C.green, red:C.red, amber:C.amber, muted:C.muted}[col];
+  const w = d.volatility === "EXPANDING" ? " ↔" : d.volatility === "COMPRESSING" ? " ><" : "";
+  return `<span style="color:${c};white-space:nowrap">${d.reversal ? "⚑ " : ""}${esc(what)}</span>` +
+         (w ? `<span class="muted" style="font-size:10px" title="range ${esc(d.volatility.toLowerCase())}">${w}</span>` : "");
+}
 function sigKey(v, k, M){
   const n = x => x == null ? null : +x;
   if(k === "trend") return TREND_ORD[v.trend] ?? 9;
@@ -538,6 +555,10 @@ function sigKey(v, k, M){
   if(k === "trade_mid") return v.trade_low == null ? null : (+v.trade_low + +v.trade_high) / 2;
   if(k === "trend_mid") return v.trend_low == null ? null : (+v.trend_low + +v.trend_high) / 2;
   if(k === "td") return (v.td_buy_count || 0) - (v.td_sell_count || 0);
+  if(k === "range_move"){
+    const d = ((LIVE.ranges||{})[v.ticker]||{}).trade;
+    return d && d.direction ? (RANGE_ORD[d.direction] ?? 9) : 9;
+  }
   if(k === "ticker") return v.ticker.toLowerCase();
   return n(v[k]);
 }
@@ -546,8 +567,16 @@ async function signalsV2(el){
   if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
   if(!LIVE.events) LIVE.events = await qAll("site_technical_events", r => r.order("event_date", {ascending:false}));
   if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
+  if(!Object.keys(LIVE.ranges || {}).length){
+    LIVE.ranges = {};
+    for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
+  }
   const M = Object.fromEntries(LIVE.matrix.map(r => [r.ticker, r]));
   const V = Object.values(LIVE.v2), held = new Set(D.holdings.map(h => h.tk));
+  const RD = t => (LIVE.ranges[t] || {}).trade || {};
+  // the bull<->bear crossing only: ~6-8 names a session, against 76-231 for any label change
+  const reversals = V.map(v => ({v, r: RD(v.ticker)})).filter(x => x.r.reversal)
+    .sort((a,b) => Math.abs(+b.r.high_chg||0) - Math.abs(+a.r.high_chg||0));
   const count = (k, v) => V.filter(x => x[k] === v).length;
   const T_COUNT = {BULLISH: count("trend","BULLISH"), BEARISH: count("trend","BEARISH")};
   const draw = () => {
@@ -580,6 +609,7 @@ async function signalsV2(el){
         <td>${num(v.rvol,1)}×</td>
         <td>${v.above_52w_low_avwap ? '<span style="color:'+C.green+'">above</span>' : '<span class="muted">below</span>'}</td>
         <td class="muted" style="font-size:11px">${v.td_buy_count||0} / ${v.td_sell_count||0}</td>
+        <td>${rangeCell(v.ticker)}</td>
         <td>${esc(m.tech_rating ? m.tech_rating.replace("_"," ") : "—")}</td></tr>`;
     }).join("");
     document.getElementById("sigN").textContent = rows.length + " names";
@@ -603,6 +633,17 @@ async function signalsV2(el){
     ${kpi("Wait / extended", count("timing","WAIT_FOR_LOW_END") + count("timing","AVOID_EXTENDED"), "do not chase", "neg")}
     ${kpi("Above 52w-low VWAP", V.filter(v=>v.above_52w_low_avwap).length, "buyers since the low in profit")}
   </div>
+  ` + (reversals.length ? `<div style="margin-top:16px">` + card("Risk range reversed direction",
+      `${reversals.length} name(s) whose 1-week range crossed between higher highs and lower lows since ${esc(RD(reversals[0].v.ticker).prior_as_of||"")}`,
+      tbl(["Ticker","Was","Now","High","Low","Width","Timing"], reversals.map(({v, r}) => {
+        const [what,, col] = RANGE_DIR[r.direction] || ["","","muted"];
+        const c = {green:C.green, red:C.red, amber:C.amber, muted:C.muted}[col];
+        return [`<b>${held.has(v.ticker)?"★ ":""}${esc(v.ticker)}</b>`,
+                `<span class="muted">${esc((r.direction_prev||"").replaceAll("_"," ").toLowerCase())}</span>`,
+                `<span style="color:${c}">${esc(what)}</span>`,
+                pct(+r.high_chg,1), pct(+r.low_chg,1), pct(+r.width_chg,1),
+                timingChip(v.timing, v.range_pos)];
+      }))) + `</div>` : "") + `
   <div style="margin-top:16px">` + card("Universe technicals", `<span id="sigN"></span>`,
     `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <input class="search" id="sq" placeholder="Ticker or sector" value="${esc(sigFilter.q)}">
@@ -840,6 +881,43 @@ const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, 
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
 const timingChip = (t, pos) => !t ? "—" :
   `<span style="color:${TIMING_COL[t]||C.text}">${esc(t.replaceAll("_"," "))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
+// Which way the risk range is moving, and whether it is widening. The levels alone say where the
+// range is; this says where it is going, which is the part that carries information. Direction and
+// width are separate reads on purpose — a range can walk up while narrowing (a grinding uptrend) or
+// walk down while broadening (a disorderly selloff). See scripts/range_tracker.py.
+const RANGE_DIR = {
+  HIGHER_HIGHS: ["higher highs", "bullish", "green"],
+  LOWER_LOWS:   ["lower lows", "bearish", "red"],
+  BROADENING:   ["both edges pulling apart", "no directional read", "amber"],
+  NARROWING:    ["both edges pulling in", "no directional read", "amber"],
+  STABLE:       ["holding its level", "", "muted"],
+};
+const RANGE_VOL = {
+  EXPANDING:   "widening, so a bigger move is more likely",
+  COMPRESSING: "tightening, so volatility is coming in",
+  STABLE:      "",
+};
+function rangeMove(tk){
+  const R = (typeof LIVE !== "undefined" && LIVE.ranges) || {};
+  const rows = R[tk]; if(!rows) return "";
+  const line = h => {
+    const r = rows[h]; if(!r || !r.direction) return "";
+    const [what, read, col] = RANGE_DIR[r.direction] || ["", "", "muted"];
+    const vol = RANGE_VOL[r.volatility] || "";
+    const c = {green:C.green, red:C.red, amber:C.amber, muted:C.muted}[col];
+    const label = h === "trade" ? "1 week" : "1 month";
+    return `<li><b>${label}</b> — <span style="color:${c}">${what}${read ? ", " + read : ""}</span>${
+      vol ? `; the range is ${vol}` : ""}
+      <div class="muted" style="font-size:11px">high ${pct(+r.high_chg,1)} · low ${pct(+r.low_chg,1)} · width ${pct(+r.width_chg,1)}
+      over ${r.lookback_sessions} sessions${r.reversal ? ` · <span style="color:${C.amber}">reversed from ${esc((r.direction_prev||"").replaceAll("_"," ").toLowerCase())}</span>` : ""}</div></li>`;
+  };
+  const body = ["trade", "trend"].map(line).join("");
+  if(!body) return "";
+  return `<div class="sec"><h4>Where the range is going</h4><ul class="blist">${body}</ul>
+    <div class="note">Change measured against the session ${rows.trade ? rows.trade.prior_as_of : ""}.
+    Width is judged against the universe median for the same run, because every name's range drifts
+    together; "widening" means widening relative to everything else.</div></div>`;
+}
 function rangeBar(v2){
   if(!v2 || v2.trade_low == null) return "";
   const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
@@ -854,7 +932,8 @@ function rangeBar(v2){
       ${v2.above_52w_low_avwap ? "above" : "below"} the 52-week-low VWAP ·
       ${v2.above_earnings_avwap == null ? "no earnings anchor" :
         (v2.above_earnings_avwap ? "above" : "below") + " the VWAP since earnings " + esc(v2.earnings_anchor) +
-        " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>`;
+        " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>
+    ${rangeMove(v2.ticker)}`;
 }
 
 /* ═══ GRID (decision matrix, live) ═════════════════════════════════════════ */
@@ -1907,8 +1986,6 @@ function openHolding(tk){
       <div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
       <div><span class="caps">Next ER</span><b style="font-size:14px">${h.next_er||"—"}</b></div>
     </div>
-    <div class="card" style="padding:12px"><div class="chart" id="drChart" style="height:300px"></div>
-      <div class="legend" style="margin-top:4px"><span><i style="background:${C.accent}"></i>Price</span><span><i style="background:${C.gold}"></i>35-day EMA</span><span><i style="background:${C.muted}"></i>200-day MA</span><span><i style="background:rgba(139,147,163,.25)"></i>±1σ band</span></div></div>
     ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
@@ -1933,22 +2010,10 @@ function openHolding(tk){
   document.getElementById("drawer").scrollTop = 0;
   drawTechCard(tk);
   setTimeout(() => {
-    const px = h.px || []; const d = px.map(p=>p[0]), c = px.map(p=>p[1]);
-    const e35 = ema(c,35), s200 = sma(c,200), s = sd(c,200);
-    const hi = s200.map((v,i)=>v==null?null:v+s[i]), lo = s200.map((v,i)=>v==null?null:v-s[i]);
-    const band = s200.map((v,i)=>v==null?null:hi[i]-lo[i]);
-    mk(document.getElementById("drChart"), {
-      grid:{left:52,right:12,top:14,bottom:26},
-      xAxis:axX({type:"category",data:d,boundaryGap:false,axisLabel:{color:C.dim,fontSize:10.5,formatter:v=>v.slice(2,7)}}),
-      yAxis:axY({type:"value",scale:true,axisLabel:{color:C.dim,fontSize:10.5,formatter:v=>"$"+v.toLocaleString()}}),
-      tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":usd(v,2)},
-      series:[
-        {name:"lo",type:"line",data:lo,symbol:"none",stack:"band",lineStyle:{opacity:0},tooltip:{show:false}},
-        {name:"±1σ",type:"line",data:band,symbol:"none",stack:"band",lineStyle:{opacity:0},areaStyle:{color:"rgba(139,147,163,.14)"},tooltip:{show:false}},
-        {name:"200-day MA",type:"line",data:s200,symbol:"none",lineStyle:{width:1.2,color:C.muted,type:"dashed"}},
-        {name:"35-day EMA",type:"line",data:e35,symbol:"none",lineStyle:{width:1.6,color:C.gold}},
-        {name:"Price",type:"line",data:c,symbol:"none",lineStyle:{width:2,color:C.accent}}]
-    });
+    // The simple price / 35-EMA / 200-MA / ±1σ chart used to render here above the technical
+    // card, so every holding drawer showed two charts of the same price. The technical v2 card
+    // (track line, risk-range bands, anchored VWAPs, RSI) is strictly the better one and carries
+    // the same trend information, so this one is gone rather than duplicated.
     const q = r.quarters || [];
     if(q.length && document.getElementById("drQ")){
       const qq = [...q].reverse();
