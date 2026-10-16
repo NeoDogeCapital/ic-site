@@ -256,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 14:55 · a81c7e1</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 19:24 · ac77f0d</div>
   </div>
 </section>
 
@@ -286,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 14:55 · a81c7e1</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 19:24 · ac77f0d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -299,7 +299,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}, ranges:{}, funda:{}, fundaHist:{}}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, vdurHist:{}, vdurStats:null, vskips:{}, vskipsOk:false, rbeta:{}, rbetaOk:false, rgaps:{}, rgapsOk:false, rbetaHist:{}, cards:{}, ranges:{}, funda:{}, fundaHist:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -363,6 +363,28 @@ async function enter(){
     LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
     LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false}));
     LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
+    LIVE.vdurStats = null; LIVE.vdurHist = {};     // cross-section facts and per-name history are derived from it
+    // WHY a name is absent from the DCF set, as recorded by valuation_duration.py for the current run
+    // (db/029). The page used to assert one reason for every absence; six foreign filers that had both
+    // a cash flow and an enterprise value were told they lacked them. Degrades to "no reason recorded".
+    try{
+      LIVE.vskips = Object.fromEntries((await qAll("site_valuation_duration_skips")).map(r => [r.ticker, r]));
+      LIVE.vskipsOk = true;
+    }catch(e){ LIVE.vskips = {}; LIVE.vskipsOk = false; }
+    // Measured rate sensitivity (ic_rate_beta). Its own view and its own coverage (411 core companies
+    // against ~390 in the DCF set; benchmark and theme ETFs and the micro sleeve are not in it), and a
+    // page build can reach a database that has not had db/027 applied yet — so a failure here
+    // degrades to "unavailable" instead of failing the boot.
+    try{
+      LIVE.rbeta = Object.fromEntries((await qAll("site_rate_beta")).map(r => [r.ticker, r]));
+      LIVE.rbetaOk = true;
+    }catch(e){ LIVE.rbeta = {}; LIVE.rbetaOk = false; }
+    // WHY a name has no rate beta (db/029): micro-sleeve names are excluded by design, a name whose
+    // price series stopped is a data problem, and the page must not call both "too few returns".
+    try{
+      LIVE.rgaps = Object.fromEntries((await qAll("site_rate_beta_gaps")).map(r => [r.ticker, r]));
+      LIVE.rgapsOk = true;
+    }catch(e){ LIVE.rgaps = {}; LIVE.rgapsOk = false; }
     LIVE.ranges = {};
     for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
     // One row per name — small. The 24-vintage HISTORY is ~11,000 rows and is fetched per ticker
@@ -951,6 +973,7 @@ async function openName(tk){
   document.getElementById("scrim").classList.add("on");
   document.getElementById("drawer").classList.add("on");
   loadFundaHist(tk);                      // fills the Change column once the history arrives
+  loadVdurHist(tk);                       // fills the visible-share history once it arrives
   document.getElementById("drawer").scrollTop = 0;
   const bars = await loadBars(tk);
   if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
@@ -960,6 +983,36 @@ const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, 
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
 const timingChip = (t, pos) => !t ? "—" :
   `<span style="color:${TIMING_COL[t]||C.text}">${esc(t.replaceAll("_"," "))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
+// The risk range as one scannable cell: the 1-week band's low and high with a marker for where the
+// price sits in it. Timing already names the zone; this shows the distance to each edge, which is
+// what you need to size an entry or a trim, and it belongs on any row you scroll rather than only
+// in a drawer (Niko, 2026-10-16).
+//
+// THE MARKER IS CLAMPED, THE NUMBER IS NOT. range_pos runs outside [0,1] whenever price has broken
+// its own band — AMAT reads -0.151 today, i.e. 15% of a band-width BELOW the low. Clamping silently
+// would draw that identically to "sitting on the low", which is the one case worth seeing, so an
+// out-of-band marker is outlined in red and the tooltip says so.
+function rangeBand(lo, hi, pos, timing){
+  if(lo == null || hi == null) return '<span class="muted">—</span>';
+  const L = +lo, H = +hi, p = pos == null ? null : +pos;
+  const col = TIMING_COL[timing] || C.accent;
+  const cl = p == null ? 0.5 : Math.max(0, Math.min(1, p));
+  const out = p != null && (p < 0 || p > 1);
+  const dp = H < 10 ? 2 : 0;
+  const tip = (timing ? timing.replaceAll("_", " ") + " · " : "")
+    + (p == null ? "position in band unknown"
+       : out ? `price is ${Math.abs(Math.round((p < 0 ? -p : p - 1) * 100))}% of a band-width `
+               + `${p < 0 ? "BELOW the low" : "ABOVE the high"}`
+       : `price sits ${Math.round(p * 100)}% up the band`)
+    + ` · 1-week risk range ${usd(L, dp)}–${usd(H, dp)}`;
+  return `<div style="min-width:92px" title="${esc(tip)}">
+    <div class="mono" style="font-size:10px;color:${C.muted};display:flex;justify-content:space-between;gap:8px">
+      <span>${usd(L, dp)}</span><span>${usd(H, dp)}</span></div>
+    <div style="position:relative;height:4px;border-radius:2px;background:${C.line};margin-top:3px">
+      <span style="position:absolute;left:${(cl * 100).toFixed(1)}%;transform:translateX(-50%);top:-3px;
+        width:3px;height:10px;border-radius:1px;background:${out ? C.red : col};
+        ${out ? "box-shadow:0 0 0 1px " + C.red : ""}"></span></div></div>`;
+}
 // Which way the risk range is moving, and whether it is widening. The levels alone say where the
 // range is; this says where it is going, which is the part that carries information. Direction and
 // width are separate reads on purpose — a range can walk up while narrowing (a grinding uptrend) or
@@ -1026,6 +1079,12 @@ const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.gree
 let gridFilter = {q:"", held:false};
 let gridFilterOpen = false;
 const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
+// Numeric columns whose value lives in LIVE (the duration tables) rather than on the matrix row, so
+// the filter and the sort must both resolve them through gridKey().
+const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta"]);
+// Of those, the ones stored as a DECIMAL but typed as a PERCENT in the filter box. The bounds are
+// scaled once, in matchesFilters, by this one rule — rate_beta is a plain coefficient and is not.
+const PCT_TYPED = new Set(["implied_cagr", "vis_pct", "range_pos"]);
 function colControl(key, type, rows){
   if(type === "num") return "num";
   if(FREE_TEXT_COLS.has(key)) return "text";
@@ -1040,11 +1099,11 @@ function matchesFilters(r, rows){
     const ctl = colControl(key, type, rows);
     if(ctl === "num"){
       const lo = f[key + "_min"], hi = f[key + "_max"];
-      const v = key === "implied_cagr" ? gridKey(r, key) : (r[key] == null ? null : +r[key]);
+      const v = LIVE_NUM.has(key) ? gridKey(r, key) : (r[key] == null ? null : +r[key]);
       if((lo !== "" && lo != null) || (hi !== "" && hi != null)){
         if(v == null) return false;                                  // no value cannot satisfy a range
-        // implied growth is stored as a decimal but typed as a percent, so scale the bounds
-        const k = key === "implied_cagr" ? 0.01 : 1;
+        // stored as a decimal but typed as a percent, so scale the bounds
+        const k = PCT_TYPED.has(key) ? 0.01 : 1;
         if(lo !== "" && lo != null && v < +lo * k) return false;
         if(hi !== "" && hi != null && v > +hi * k) return false;
       }
@@ -1194,26 +1253,299 @@ function cardBlock(tk){
       This is a summary, not a thesis: only held names carry a locked thesis with invalidation triggers.</div>
   </div>`;
 }
-function vdurBlock(tk){
-  const v = (typeof LIVE !== "undefined" && LIVE.vdur) ? LIVE.vdur[tk] : null;
-  if(!v || v.implied_fcf_cagr == null) return "";
-  const g = +v.implied_fcf_cagr, gap = v.value_gap == null ? null : +v.value_gap;
-  const a = v.assumptions || {};
-  // The claim is "here is what the price is assuming" — so it sits with the thesis, where the
-  // question is whether we believe it. Deliberately no floor-share ranking (horizon artifact).
-  return `<div class="sec"><h4>What the price is assuming</h4>
+/* ═══ VALUATION DURATION — per name (drawer) ═════════════════════════════
+   Two different things sit in this block and the page says which is which. The DCF split is MODELLED
+   (every name discounted at the same rate and faded to the same terminal growth). Rate beta is
+   MEASURED (what the stock actually did against long Treasuries, with the market taken out). The split
+   is one degree of freedom: measured 2026-10-14 over 395 names, spearman(visible share, implied FCF
+   growth) = -1.0000 and spearman(visible share, +100bp shock) = +1.0000 exactly, share sd 2.7pp. So the
+   level is never shown without its cross-sectional percentile, and the framing line quotes the live
+   numbers rather than a frozen sentence — if the methodology changes and the three come apart, the
+   page will say so instead of repeating a claim that stopped being true. */
+function ordinalOf(n){
+  const k = Math.round(+n), m = k % 100;
+  return k + ((m >= 11 && m <= 13) ? "th" : ({1:"st", 2:"nd", 3:"rd"}[k % 10] || "th"));
+}
+function signedNum(x, d = 2){
+  const t = Number(x).toFixed(d);
+  return Number(t) === 0 ? (0).toFixed(d) : (x > 0 ? "+" : "") + t;     // never print "-0.00"
+}
+const pc1 = x => x == null || isNaN(x) ? "—" : (+x * 100).toFixed(1) + "%";
+function qtile(sorted, p){
+  if(!sorted.length) return null;
+  const i = (sorted.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+// Rank correlation with AVERAGE ranks for ties: the names pinned at the solver's floor tie in both
+// series, and ordinal ranks would manufacture a correlation below 1 out of nothing.
+function spearman(xs, ys){
+  if(xs.length < 3) return null;
+  const rk = a => {
+    const o = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]), r = new Array(a.length);
+    for(let i = 0; i < o.length;){
+      let j = i; while(j + 1 < o.length && o[j + 1][0] === o[i][0]) j++;
+      for(let k = i; k <= j; k++) r[o[k][1]] = (i + j) / 2;
+      i = j + 1;
+    }
+    return r;
+  };
+  const x = rk(xs), y = rk(ys), n = x.length;
+  const mx = x.reduce((s_, v) => s_ + v, 0) / n, my = y.reduce((s_, v) => s_ + v, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for(let i = 0; i < n; i++){ sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; }
+  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+}
+function vdurStats(){
+  if(LIVE.vdurStats) return LIVE.vdurStats;
+  const rows = Object.values(LIVE.vdur || {}).filter(v =>
+    v.bond_floor_share != null && v.implied_fcf_cagr != null && v.shock_100bp != null);
+  const sh = rows.map(v => +v.bond_floor_share), sorted = sh.slice().sort((a, b) => a - b);
+  return LIVE.vdurStats = {
+    n: rows.length, p5: qtile(sorted, .05), p95: qtile(sorted, .95),
+    rhoGrowth: spearman(sh, rows.map(v => +v.implied_fcf_cagr)),
+    rhoShock: spearman(sh, rows.map(v => +v.shock_100bp)),
+  };
+}
+const SUBH = (t, top = 0) => `<div class="caps" style="margin:${top}px 0 9px">${t}</div>`;
+const SUBP = "font-size:12.5px;margin-top:9px";
+const RANK = p => p == null ? "" : `<small class="muted" style="font-size:11.5px">${ordinalOf(p)} percentile</small>`;
+// WHY a name is absent from the DCF set. The sentence is stored by valuation_duration.py for the current
+// run (ic_valuation_duration_skips) — the code that rejected the name is the one that knows the cause,
+// and it distinguishes things this page used to flatten into "no positive FCF or no enterprise value":
+// a currency mismatch (ATAT, HTHT, ZTO report CNY; BIRK, SRAD, SPOT report EUR — all had both), negative
+// FCF, a missing balance sheet, and a price so extreme the solver gives up, which is a reading and not
+// a failed fetch. This function only chooses the words for the case where nothing was stored.
+function vdurWhy(tk){
+  const s_ = (LIVE.vskips || {})[tk];
+  if(s_) return {code: s_.reason_code, text: s_.reason};
+  return {code: null, text: LIVE.vskipsOk
+    ? "No reason was recorded for the current run."
+    : "The reason could not be loaded."};
+}
+// A name refused for its currency never had a trustworthy row: every stored run set a local-currency
+// cash flow against a USD enterprise value (the check was added 2026-10-15; the six names' 2026-10-14
+// rows pre-date it — ZTO's "$14.8B" of FCF is CNY 14.8B). Their history is withheld, not "last computed".
+function vdurFxRefused(tk){
+  return !LIVE.vdur[tk] && vdurWhy(tk).code === "FX_MISMATCH";
+}
+// WHY a name has no rate beta (site_rate_beta_gaps). Two unrelated groups: micro-sleeve names are left out
+// of the core cross-section on purpose (44 of the 45 grid names without one, 2026-10-16), and a core name
+// whose price series stopped (CSGS: ends 2026-05-15) has too little history. "Too few overlapping returns"
+// is true of only the second, and says nothing useful about the first.
+function rateWhy(tk){
+  if(!LIVE.rbetaOk) return "Rate beta could not be loaded.";
+  const g = (LIVE.rgaps || {})[tk];
+  if(!g) return LIVE.rgapsOk
+    ? "No rate beta is stored for this name and no reason was recorded."
+    : "No rate beta is stored for this name (the reason could not be loaded).";
+  if(g.reason_code === "MICRO_SLEEVE")
+    return "Not measured, by design: this is a micro-sleeve name, and rate beta is ranked against the core universe only.";
+  if(g.reason_code === "NOT_IN_CORE")
+    return "Not measured: the name is neither an active core company nor a holding, and rate beta covers those only.";
+  if(g.reason_code === "THIN_HISTORY"){
+    const days = g.last_price_date && g.latest_session
+      ? Math.round((Date.parse(g.latest_session) - Date.parse(g.last_price_date)) / 864e5) : null;
+    const ends = g.last_price_date
+      ? ` (the price series ends ${g.last_price_date}${days != null && days > 5 ? `, ${days} days before the latest session` : ""})` : "";
+    return `Not measured: only ${g.n_prices} of the last ${g.window_sessions} sessions have a price${ends}, under the `
+      + `${g.min_returns} overlapping daily returns with SPY and TLT the regression needs. None is shown rather than a noisy one.`;
+  }
+  return "No rate beta is stored although the price history looks sufficient; the cause is not recorded.";
+}
+function vdurSplit(v, h, tk){
+  const head = SUBH("Modelled · DCF split");
+  if(!v || v.bond_floor_share == null){
+    const why = vdurWhy(tk), r0 = h && h.rows && h.rows.length ? h.rows[0] : null;
+    if(why.code === "FX_MISMATCH"){
+      const old = h && h.rows && h.rows.length ? h.rows[h.rows.length - 1] : null;
+      const withheld = old ? ` Earlier runs (${esc(old.as_of)} to ${esc(r0.as_of)}) are not shown: they pre-date that check and
+        compared a local-currency cash flow with a USD enterprise value.` : "";
+      return head + `<p class="muted" style="${SUBP}">Not in the current valuation-duration set. ${esc(why.text)}${withheld}</p>`;
+    }
+    const last = r0 ? ` Last computed ${esc(r0.as_of)}, when ${pc1(r0.bond_floor_share)} was visible.` : "";
+    return head + `<p class="muted" style="${SUBP}">Not in the current valuation-duration set. ${esc(why.text)}${last}</p>`;
+  }
+  const a = v.assumptions || {}, H = a.horizon_years || 5, s_ = +v.bond_floor_share;
+  const p = v.bond_floor_share_pct == null ? null : +v.bond_floor_share_pct;
+  const st = vdurStats(), g = +v.implied_fcf_cagr, gap = v.value_gap == null ? null : +v.value_gap;
+  // the 3- and 10-year rows are the SAME company at the SAME price, only the horizon changes
+  const hz = [[3, v.floor_share_h3, false], [H, s_, true], [10, v.floor_share_h10, false]]
+    .filter((x, i, arr) => x[2] || !arr.some(y => y[2] && y[0] === x[0])).sort((x, y) => x[0] - y[0]);
+  const rho = x => x == null ? "—" : signedNum(x);
+  const tight = st.rhoGrowth != null && Math.abs(st.rhoGrowth) >= 0.99;
+  return head + `
+    <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin:0 0 10px" role="img"
+         aria-label="${pc1(s_)} visible, ${pc1(1 - s_)} terminal">
+      <i style="width:${(s_ * 100).toFixed(1)}%;background:var(--accent)"></i><i style="flex:1;background:var(--violet)"></i></div>
     <div class="kvs">
+      <div class="kv"><span class="muted">Visible · next ${H}y</span><b>${pc1(s_)}</b>${RANK(p)}</div>
+      <div class="kv"><span class="muted">Terminal · beyond ${H}y</span><b>${pc1(1 - s_)}</b>${RANK(p == null ? null : 100 - p)}</div>
+    </div>
+    <div style="margin-top:10px">${tbl(["Horizon", "Visible", "Terminal"], hz.map(([yrs, f, used]) =>
+      [used ? `<b>${yrs} years · used</b>` : `${yrs} years`, pc1(f), f == null ? "—" : pc1(1 - f)]))}</div>
+    <p class="note" style="margin-top:7px">Same company, same price — only the horizon changes. The level is set by the
+      horizon we chose, not by the business.</p>
+    <div class="kvs" style="margin-top:12px">
       <div class="kv"><span class="muted">Required FCF growth</span><b style="color:${g>=1?C.red:g>=.5?C.amber:C.text}">${pct(g,0)} a year</b></div>
       ${gap!=null?`<div class="kv"><span class="muted">vs consensus revenue</span><b class="${gap>0?"neg":"pos"}">${gap>=0?"+":""}${(gap*100).toFixed(0)} pts</b></div>`:""}
-      <div class="kv"><span class="muted">Value in the next ${a.horizon_years||5} years</span><b>${pct(+v.bond_floor_share,0,false)}</b></div>
       <div class="kv"><span class="muted">If long rates rise 1%</span><b class="neg">${pct(+v.shock_100bp,1)}</b></div>
     </div>
-    <p class="muted" style="margin-top:9px;font-size:12.5px">To justify today's price, free cash flow has to compound at
-      <b>${pct(g,0)}</b> a year for ${a.horizon_years||5} years${gap!=null?`, which is <b>${Math.abs(gap*100).toFixed(0)} points ${gap>0?"more than":"less than"}</b> the revenue growth analysts forecast`:""}.
-      ${pct(1-(+v.bond_floor_share),0,false)} of the value sits beyond that window, so it rests on assumptions rather than
+    <p class="muted" style="${SUBP}">To justify today's price, free cash flow has to compound at
+      <b>${pct(g,0)}</b> a year for ${H} years${gap!=null?`, which is <b>${Math.abs(gap*100).toFixed(0)} points ${gap>0?"more than":"less than"}</b> the revenue growth analysts forecast`:""}.
+      ${pc1(1 - s_)} of the value sits beyond that window, so it rests on assumptions rather than
       cash flows anyone can see yet. Discounted at the 10-year Treasury plus ${pct(+v.erp,2,false)}.
       The gap compares an FCF requirement with a revenue forecast, so read it directionally.</p>
-  </div>`;
+    <p class="muted" style="${SUBP}"><b>How to read the percentile.</b> Across the ${st.n} names scored, the middle 90%
+      sit between ${pc1(st.p5)} and ${pc1(st.p95)} visible, and the visible share ranks the names ${tight ? "identically to" : "almost the same as"}
+      implied growth, backwards (rank correlation ${rho(st.rhoGrowth)}; ${rho(st.rhoShock)} with the +100bp shock).
+      It is one number seen three ways, not three signals — so the percentile is the part worth reading, and the
+      level on its own says little about this company.</p>`;
+}
+function rateBetaBlock(b, tk){
+  const head = SUBH("Measured · rate beta", 18);
+  if(!b || b.rate_beta == null) return head + `<p class="muted" style="${SUBP}">${esc(rateWhy(tk))}</p>`;
+  const x = +b.rate_beta, t = b.rate_beta_t == null ? null : +b.rate_beta_t, bk = b.duration_bucket;
+  const sig = t != null && Math.abs(t) >= 2;
+  const bkLabel = bk === "LONG_DURATION" ? "Long duration" : bk === "SHORT_DURATION" ? "Short duration" : "Neutral";
+  const bkCol = bk === "LONG_DURATION" ? C.amber : bk === "SHORT_DURATION" ? C.accent : C.muted;
+  const read = bk === "LONG_DURATION"
+      ? "It tends to rise when long Treasuries rally, i.e. when long yields fall, after the market move is taken out: long duration."
+    : bk === "SHORT_DURATION"
+      ? "It tends to rise when long yields rise, after the market move is taken out: short duration."
+    : sig
+      ? `It leans ${x > 0 ? "long" : "short"} duration and is distinguishable from zero, but is not in the extreme fifth of the cross-section, so it is labelled neutral.`
+      : `Not distinguishable from zero over this window (|t| ${t == null ? "—" : Math.abs(t).toFixed(1)}, under 2), so it is labelled neutral whatever the point estimate.`;
+  return head + `
+    <div class="kvs">
+      <div class="kv"><span class="muted">Rate beta · ${esc(b.rate_instrument || "TLT")}</span><b>${signedNum(x)}</b>${RANK(b.rate_beta_pct)}</div>
+      <div class="kv"><span class="muted">t-stat</span><b>${t == null ? "—" : signedNum(t, 1)}</b><small class="muted" style="font-size:11.5px">${sig ? "distinguishable from zero" : "inside ±2: noise"}</small></div>
+      <div class="kv"><span class="muted">Bucket</span><b style="color:${bkCol}">${bkLabel}</b></div>
+      <div class="kv"><span class="muted">Market beta · R²</span><b>${num(b.mkt_beta)} · ${num(b.r2)}</b></div>
+    </div>
+    <p class="muted" style="${SUBP}">${read} Measured over the last ${b.window_sessions || 252} sessions (${b.obs} usable) as this
+      stock's daily return on SPY and TLT: what it actually did, as against the modelled split above. The two can
+      disagree, which is why both are here. The percentile is ranked across the ${Object.keys(LIVE.rbeta || {}).length} core
+      companies measured; benchmark and theme ETFs and the micro sleeve are not part of it.</p>`;
+}
+function vdurHistory(h){
+  const head = SUBH("History · visible share by run", 18);
+  if(h === undefined) return head + `<p class="muted" style="${SUBP}">loading…</p>`;
+  if(h.err) return head + `<p class="muted" style="${SUBP}">History could not be loaded.</p>`;
+  const R = h.rows || [];
+  if(!R.length) return head + `<p class="muted" style="${SUBP}">No stored runs for this name.</p>`;
+  const first = R[R.length - 1], last = R[0], d = (k, sc, dp) =>
+    first[k] == null || last[k] == null ? "—" : signedNum((+last[k] - +first[k]) * sc, dp);
+  const yld = r => r.risk_free == null ? "—" : (+r.risk_free * 100).toFixed(2) + "%";
+  const summary = R.length < 2
+    ? `One run stored so far (${esc(last.as_of)}); the series grows with each nightly run.`
+    : `Since ${esc(first.as_of)} (${R.length} runs): visible share ${pc1(first.bond_floor_share)} to ${pc1(last.bond_floor_share)}
+       (${d("bond_floor_share", 100, 1)} pts), percentile ${first.bond_floor_share_pct == null ? "—" : Math.round(+first.bond_floor_share_pct)}
+       to ${last.bond_floor_share_pct == null ? "—" : Math.round(+last.bond_floor_share_pct)}, 10-year yield ${yld(first)} to ${yld(last)}.`;
+  return head + `<p class="muted" style="${SUBP};margin-top:0">${summary}</p>
+    <div style="margin-top:8px">${tbl(["Run", "Visible", "Percentile", "Implied growth", "10y yield"], R.slice(0, 8).map(r => [
+      esc(r.as_of), pc1(r.bond_floor_share), r.bond_floor_share_pct == null ? "—" : Math.round(+r.bond_floor_share_pct),
+      r.implied_fcf_cagr == null ? "—" : pct(+r.implied_fcf_cagr, 0), yld(r)]))}</div>
+    <p class="note" style="margin-top:7px">Latest ${Math.min(8, R.length)} of ${R.length} stored runs. The level moves for every
+      name together when the 10-year yield or the price moves; the percentile is the part that is specific to this company.</p>`;
+}
+// Rate beta by snapshot as a small chart. The x axis is DATE, not index: the series is weekly (reconstructed
+// from prices) until the nightly job began and daily after, so an index axis would stretch the daily
+// stretch and draw a change of cadence as a change in the stock. Every observation is drawn as a dot for
+// the same reason: the line between two weekly dots is interpolation, and only the dots were measured.
+function rateSpark(asc){
+  const W = 640, H = 84, pad = 8, T = r => Date.parse(r.as_of), t0 = T(asc[0]);
+  const span = Math.max(T(asc[asc.length - 1]) - t0, 1);
+  const ys = asc.map(r => +r.rate_beta), mn = Math.min(...ys), mx = Math.max(...ys);
+  const lo = Math.min(0, mn), hi = Math.max(0, mx), rg = (hi - lo) || 1;
+  const X = r => (pad + (W - 2 * pad) * (T(r) - t0) / span).toFixed(1), Y = v => (pad + (H - 2 * pad) * (1 - (v - lo) / rg)).toFixed(1);
+  const firstLive = asc.find(r => !r.backfilled), both = firstLive && asc.some(r => r.backfilled);
+  const dots = asc.map(r => { const sig = r.rate_beta_t != null && Math.abs(+r.rate_beta_t) >= 2;
+    return `<circle cx="${X(r)}" cy="${Y(+r.rate_beta)}" r="${sig ? 4 : 2.8}" fill="${C.accent}" opacity="${sig ? 1 : .45}"/>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img"
+      aria-label="Rate beta at ${asc.length} snapshots, ${esc(asc[0].as_of)} to ${esc(asc[asc.length - 1].as_of)}, from ${signedNum(mn)} to ${signedNum(mx)}">
+    <line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" stroke="${C.dim}" stroke-dasharray="3 3"/>
+    ${both ? `<line x1="${X(firstLive)}" x2="${X(firstLive)}" y1="0" y2="${H}" stroke="${C.gold}" opacity=".55"/>` : ""}
+    <polyline points="${asc.map(r => X(r) + "," + Y(+r.rate_beta)).join(" ")}" fill="none" stroke="${C.accent}"
+      stroke-width="1.4" stroke-linejoin="round" opacity=".8"/>${dots}</svg>`;
+}
+// Rate beta over time. ic_rate_beta has weekly snapshots back to 2025-10-03 (rate_beta.py --backfill) and
+// gains one a night. Two things must travel with the series or it misleads:
+//  - CADENCE: weekly then daily, so the line is not evenly sampled.
+//  - POINT-IN-TIME: on a reconstructed date the beta and t-stat are exact (a regression on the price window
+//    ending then), but the percentile and bucket rank TODAY'S list of companies, not the one that existed
+//    then. Those two columns are therefore blank on reconstructed rows rather than shown with a footnote.
+// `backfilled` comes from site_rate_beta_history (written more than 5 days after its as_of).
+function rateHistory(h, b){
+  if(!LIVE.rbetaOk) return "";
+  const head = SUBH("History · rate beta by snapshot", 18);
+  // A name with no current rate beta (micro sleeve, or a stale price series) already says why above; only a
+  // name that HAS history gets a block, so a micro name is not shown an empty "history".
+  if(h === undefined) return b ? head + `<p class="muted" style="${SUBP}">loading…</p>` : "";
+  if(h.err) return b ? head + `<p class="muted" style="${SUBP}">History could not be loaded.</p>` : "";
+  const R = h.rows || [];
+  if(!R.length) return b ? head + `<p class="muted" style="${SUBP}">No stored snapshots for this name.</p>` : "";
+  const asc = R.slice().reverse(), first = asc[0], last = R[0];
+  const back = asc.filter(r => r.backfilled), live = asc.filter(r => !r.backfilled);
+  const gapDays = back.slice(1).map((r, i) => Math.round((Date.parse(r.as_of) - Date.parse(back[i].as_of)) / 864e5)).sort((x, y) => x - y);
+  const med = gapDays.length ? gapDays[Math.floor(gapDays.length / 2)] : null;
+  const bs = asc.map(r => +r.rate_beta), sig = asc.filter(r => r.rate_beta_t != null && Math.abs(+r.rate_beta_t) >= 2).length;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const both = back.length && live.length;
+  const bucketOf = k => k === "LONG_DURATION" ? "Long" : k === "SHORT_DURATION" ? "Short" : k ? "Neutral" : "—";
+  const cadence = (back.length
+      ? `${plural(back.length, "snapshot")} reconstructed from prices (${esc(back[0].as_of)} to ${esc(back[back.length - 1].as_of)}${med ? `, about every ${med} days` : ""})`
+      : "No reconstructed snapshots")
+    + (live.length ? `, then ${plural(live.length, "nightly run")} (${esc(live[0].as_of)}${live.length > 1 ? " to " + esc(live[live.length - 1].as_of) : ""}).`
+                   : ", and no nightly run yet.");
+  return head + `
+    <p class="muted" style="${SUBP};margin-top:0">${plural(R.length, "snapshot")}, ${esc(first.as_of)} to ${esc(last.as_of)}: rate beta
+      ${signedNum(+first.rate_beta)} to ${signedNum(+last.rate_beta)}, ranging ${signedNum(Math.min(...bs))} to ${signedNum(Math.max(...bs))};
+      distinguishable from zero (|t| 2 or more) on ${sig} of ${R.length}.${b ? "" : " It has no current rate beta (see above); this is the last stretch it could be measured."}</p>
+    <div style="margin-top:8px">${asc.length > 1 ? rateSpark(asc) : ""}</div>
+    <div style="margin-top:8px">${tbl(["Snapshot", "Beta", "t", "Percentile", "Bucket"], R.slice(0, 8).map(r => [
+      `<span style="white-space:nowrap">${esc(r.as_of)}</span>` + (r.backfilled ? ' <span class="muted" style="font-size:10.5px">reconstructed</span>' : ""),
+      signedNum(+r.rate_beta), r.rate_beta_t == null ? "—" : signedNum(+r.rate_beta_t, 1),
+      r.backfilled || r.rate_beta_pct == null ? "—" : Math.round(+r.rate_beta_pct),
+      r.backfilled ? "—" : bucketOf(r.duration_bucket)]))}</div>
+    <p class="note" style="margin-top:7px"><b>Not evenly sampled.</b> ${cadence} Nightly runs add a point a day from here on, so the
+      right-hand end of the chart gets denser; points are spaced by date, and the line between two dots is interpolation.
+      Faint dots are snapshots where |t| is under 2 (noise); the dashed line is zero${both ? "; the gold rule marks the first nightly run" : ""}.</p>
+    <p class="note" style="margin-top:7px"><b>Point in time.</b> On a reconstructed date the beta and t-stat are exact: each is a regression on
+      the price window ending that day. The percentile and bucket on those dates rank today's list of companies, not the one that existed
+      then, so they are left blank rather than shown as if they were known at the time.</p>`;
+}
+// Fetched when a drawer opens, never at boot: the tables gain a row per name per night. The two histories
+// load together and fail separately — rate beta's view is newer (db/029), and a database that lacks it must
+// not take the visible-share history down with it.
+async function loadVdurHist(tk){
+  const jobs = [];
+  if(!LIVE.vdurHist[tk] || LIVE.vdurHist[tk].err){
+    jobs.push((async () => {
+      try{
+        LIVE.vdurHist[tk] = {err: false, rows: await q("site_valuation_duration_history",
+          r => r.eq("ticker", tk).order("as_of", {ascending: false}))};
+      }catch(e){ LIVE.vdurHist[tk] = {err: true, rows: []}; }
+    })());
+  }
+  if(LIVE.rbetaOk && (!LIVE.rbetaHist[tk] || LIVE.rbetaHist[tk].err)){
+    jobs.push((async () => {
+      try{
+        LIVE.rbetaHist[tk] = {err: false, rows: await q("site_rate_beta_history",
+          r => r.eq("ticker", tk).order("as_of", {ascending: false}))};
+      }catch(e){ LIVE.rbetaHist[tk] = {err: true, rows: []}; }
+    })());
+  }
+  await Promise.all(jobs);
+  // the drawer is reused: repaint only if it is still showing the name this fetch was for
+  const el = document.getElementById("vdurBlock");
+  if(el && el.dataset.tk === tk) el.outerHTML = vdurBlock(tk);
+}
+function vdurBlock(tk){
+  if(typeof LIVE === "undefined" || !LIVE.vdur) return "";
+  const h = (LIVE.vdurHist || {})[tk];     // undefined until the drawer has fetched it
+  const b = (LIVE.rbeta || {})[tk] || null, rh = (LIVE.rbetaHist || {})[tk];
+  return `<div class="sec" id="vdurBlock" data-tk="${esc(tk)}"><h4>Valuation duration</h4>
+    ${vdurSplit(LIVE.vdur[tk] || null, h, tk)}${rateBetaBlock(b, tk)}${vdurFxRefused(tk) ? "" : vdurHistory(h)}${rateHistory(rh, b)}</div>`;
 }
 /* ═══ UNIVERSE MORNING NOTE (Grid + Universe tabs) ════════════════════════ */
 // The book notes live on Holdings. This one is about the bench — what happened across all ~453
@@ -1247,12 +1579,14 @@ function universeNote(){
 // implied_fcf_cagr is the FCF growth the current price requires over the horizon — "what you'd have
 // to believe". value_gap is that minus the consensus forward REVENUE CAGR, so it is directional
 // rather than precise (an FCF requirement measured against a revenue forecast). The bond-floor share
-// is deliberately NOT shown per name: it is a horizon artifact, near-identical across companies
-// (~18% of value at a 3-year horizon, ~47% at 15), and ranking names on it would mislead.
+// is shown per name only beside its cross-sectional percentile (visCell, vdurBlock): the level is a
+// horizon artifact (~18% of value at a 3-year horizon, ~47% at 15) and measured rank-identical to
+// implied growth, so the level alone would read as a second signal when it is the first one, backwards.
 const VDUR_WARN = 1.00;   // a price requiring 100%+ annual FCF growth gets coloured
 function impliedCell(tk){
   const v = (typeof LIVE !== "undefined" && LIVE.vdur) ? LIVE.vdur[tk] : null;
-  if(!v || v.implied_fcf_cagr == null) return '<span class="muted">—</span>';
+  if(!v || v.implied_fcf_cagr == null)
+    return `<span class="muted" title="${esc("Not in the current valuation-duration set. " + vdurWhy(tk).text)}">—</span>`;
   const g = +v.implied_fcf_cagr, gap = v.value_gap == null ? null : +v.value_gap;
   const col = g >= VDUR_WARN ? C.red : g >= 0.50 ? C.amber : C.text;
   const tip = `price requires ${(g*100).toFixed(0)}% FCF growth a year`
@@ -1260,10 +1594,38 @@ function impliedCell(tk){
     + (v.shock_100bp != null ? ` · ${(+v.shock_100bp*100).toFixed(1)}% value at +100bp` : "");
   return `<span class="mono" style="color:${col}" title="${esc(tip)}">${(g*100).toFixed(0)}%</span>`;
 }
+// Visible share of value, always with its percentile beside it. Sorting this column is sorting implied
+// growth backwards, so the percentile is what the eye should land on; the level is the filterable value.
+function visCell(tk){
+  const v = LIVE.vdur[tk];
+  if(!v || v.bond_floor_share == null)
+    return `<span class="muted" title="${esc("Not in the current valuation-duration set. " + vdurWhy(tk).text)}">—</span>`;
+  const s_ = +v.bond_floor_share, p = v.bond_floor_share_pct == null ? null : +v.bond_floor_share_pct;
+  const H = (v.assumptions || {}).horizon_years || 5, pTip = p == null ? "" : `${ordinalOf(p)} percentile of ${vdurStats().n} names`;
+  const tip = `${pc1(s_)} of value falls inside the ${H}-year horizon, ${pc1(1 - s_)} is terminal`
+    + (pTip ? " · " + pTip : "") + " · modelled; the level is mostly the horizon, the percentile is what separates names";
+  return `<span class="mono" title="${esc(tip)}">${(s_ * 100).toFixed(1)}%</span>`
+    + (p == null ? "" : ` <span class="muted mono" style="font-size:10.5px" title="${esc(pTip)}">p${Math.round(p)}</span>`);
+}
+// Measured TLT coefficient. Dimmed when |t| < 2: a beta inside the noise band is not a rate signal.
+function rateCell(tk){
+  const b = LIVE.rbeta[tk];
+  if(!b || b.rate_beta == null)
+    return `<span class="muted" title="${esc("No rate beta. " + rateWhy(tk))}">—</span>`;
+  const x = +b.rate_beta, t = b.rate_beta_t == null ? null : +b.rate_beta_t, sig = t != null && Math.abs(t) >= 2;
+  const bk = b.duration_bucket === "LONG_DURATION" ? "long" : b.duration_bucket === "SHORT_DURATION" ? "short" : "";
+  const tip = `rate beta ${signedNum(x)} to ${b.rate_instrument || "TLT"} with SPY held out (t ${t == null ? "—" : t.toFixed(1)}, `
+    + `R² ${num(b.r2)}, ${b.obs} sessions) · ${sig ? "distinguishable from zero" : "inside the noise band"} · measured, not modelled`
+    + ` · positive = rallies when long yields fall (long duration)`;
+  return `<span class="mono${sig ? "" : " muted"}" title="${esc(tip)}">${signedNum(x)}</span>`
+    + (bk ? ` <span class="muted" style="font-size:10.5px">${bk}</span>` : "");
+}
 const GRID_COLS = [
   ["ticker","Ticker","txt"], ["grade","Grade","ord"], ["tech_rating","Technical","ord"], ["action","Action","ord"],
-  ["timing","Timing","ord"], ["guidance","Guidance","txt"], ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
-  ["composite","Composite","num"], ["implied_cagr","Implied growth","num"], ["trend","Trend","txt"],
+  ["timing","Timing","ord"], ["range_pos","Risk range","num"], ["guidance","Guidance","txt"],
+  ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
+  ["composite","Composite","num"], ["implied_cagr","Implied growth","num"], ["vis_pct","Visible %","num"],
+  ["rate_beta","Rate beta","num"], ["trend","Trend","txt"],
   ["sector","Sector","txt"], ["grade_reason","Why","txt"],
 ];
 const QGS_ORD = {RARE_ELITE:0, EXCEPTIONAL:1, GOOD_COMPOUNDER:2, AVERAGE:3, LOW_QUALITY:4};
@@ -1277,6 +1639,11 @@ function gridKey(r, k){
   // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
   if(k === "implied_cagr"){
     const v = (LIVE.vdur[r.ticker]||{}).implied_fcf_cagr; return v == null ? null : +v; }
+  // share of value inside the horizon (DECIMAL). Rank-identical to implied growth, reversed.
+  if(k === "vis_pct"){
+    const v = (LIVE.vdur[r.ticker]||{}).bond_floor_share; return v == null ? null : +v; }
+  if(k === "rate_beta"){
+    const v = (LIVE.rbeta[r.ticker]||{}).rate_beta; return v == null ? null : +v; }
   return (r[k] ?? "").toString().toLowerCase();
 }
 async function grid(el){
@@ -1304,9 +1671,11 @@ async function grid(el){
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
-      <td>${timingChip(r.timing, r.range_pos)}</td><td>${esc(r.guidance||"")}</td>
+      <td>${timingChip(r.timing, r.range_pos)}</td>
+      <td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>
+      <td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
-      <td>${impliedCell(r.ticker)}</td>
+      <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     // The count used to read the full row count while the table rendered only the first 400, so 56
     // names — under the default grade sort, the tail of the D grades — were invisible with nothing
@@ -1474,12 +1843,61 @@ function regress(y, x){
           cum: y.reduce((a,v)=>a*(1+v),1)-1, bench_cum: x.reduce((a,v)=>a*(1+v),1)-1};
 }
 /* book-level valuation duration: how much of what we own is terminal value */
+const VDUR_H4 = "margin:14px 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)";
+// The book's MEASURED rate profile (ic_rate_beta), position-value weighted like the rest of this card:
+// the question is how much of OUR money behaves like long duration, not how many names do.
+function bookRateBeta(){
+  const R = LIVE.rbeta || {};
+  const rows = D.holdings.map(h => ({h, b: R[h.tk]})).filter(x => x.b && x.b.rate_beta != null && (x.h.value || 0) > 0);
+  if(!rows.length) return "";
+  const wsum = rows.reduce((a, x) => a + x.h.value, 0), total = D.holdings.reduce((a, h) => a + (h.value || 0), 0);
+  const book = rows.reduce((a, x) => a + x.h.value * (+x.b.rate_beta), 0) / wsum;
+  // The universe is the STOCKS on the decision grid. Until 2026-10-16 ic_rate_beta ALSO carried 23 factor
+  // and sector ETFs (478 series, 455 stocks), which dragged this median toward the rate-sensitive
+  // sectors; rate_beta.py now ranks the 411 core companies only and site_rate_beta holds no ETF. The
+  // filter stays as a guard: an ETF reintroduced upstream would silently shift a median again.
+  // Without the stock list there is no honest median, so it reads "—" rather than a polluted number.
+  const names = LIVE.matrix ? new Set(LIVE.matrix.map(m => m.ticker)) : null;
+  const uni = names ? Object.values(R).filter(b => b.rate_beta != null && names.has(b.ticker)) : [];
+  const sorted = uni.map(b => +b.rate_beta).sort((a, b) => a - b);
+  const med = sorted.length ? qtile(sorted, .5) : null;
+  const share = k => rows.filter(x => x.b.duration_bucket === k).reduce((a, x) => a + x.h.value, 0) / wsum;
+  const uShare = k => uni.length ? uni.filter(b => b.duration_bucket === k).length / uni.length : null;
+  const kv = (label, val, sub) => `<div class="kv"><span class="muted">${label}</span><b>${val}</b>${sub ? `<small class="muted" style="font-size:11.5px">${sub}</small>` : ""}</div>`;
+  const bucket = (label, k) => kv(label, pct(share(k), 0, false),
+    "of book value" + (uShare(k) == null ? "" : ` · ${pct(uShare(k), 0, false)} of universe names`));
+  const side = arr => tbl(["Holding", "Rate beta", "t", "Weight"], arr.map(x => [`<b>${esc(x.h.tk)}</b>`,
+    signedNum(+x.b.rate_beta), x.b.rate_beta_t == null ? "—" : signedNum(+x.b.rate_beta_t, 1), pct(x.h.weight, 1, false)]));
+  const byBeta = rows.slice().sort((a, b) => +b.b.rate_beta - +a.b.rate_beta), k = Math.min(5, Math.floor(rows.length / 2));
+  const spread = sorted.length ? ` Unlike the DCF split above, this separates companies: the middle 90% of stocks run from ${signedNum(qtile(sorted, .05))} to ${signedNum(qtile(sorted, .95))}.` : "";
+  return `<h4 style="${VDUR_H4}">Measured rate sensitivity</h4>
+    <div class="kvs">
+      ${kv("Book rate beta", signedNum(book), `value-weighted · ${rows.length} of ${D.holdings.length} holdings, ${pct(wsum / total, 0, false)} of value`)}
+      ${kv("Universe median", med == null ? "—" : signedNum(med), sorted.length ? `${sorted.length} stocks, equal-weighted` : "stock list not loaded")}
+      ${kv("Book vs median", med == null ? "—" : signedNum(book - med), med == null ? "" : (book - med > 0 ? "longer duration than the typical stock" : "shorter duration than the typical stock"))}
+    </div>
+    <div class="kvs" style="margin-top:8px">
+      ${bucket("Long duration", "LONG_DURATION")}${bucket("Short duration", "SHORT_DURATION")}${bucket("Neutral", "NEUTRAL")}
+    </div>
+    ${k ? `<div class="grid g2" style="margin-top:12px">
+      <div><div class="caps" style="margin-bottom:6px">Longest duration · highest rate beta</div>${side(byBeta.slice(0, k))}</div>
+      <div><div class="caps" style="margin-bottom:6px">Shortest duration · lowest rate beta</div>${side(byBeta.slice(-k).reverse())}</div>
+    </div>` : ""}
+    <div class="note" style="margin-top:10px">Measured, not modelled: each stock's daily return regressed on SPY and TLT over the last
+      ${rows[0].b.window_sessions || 252} sessions, so the rate coefficient is the part of its move that tracks long Treasuries once the
+      market move is removed. Positive = rallies when long yields fall (long duration); negative = rallies when they rise (short
+      duration). A t-stat inside ±2 is labelled neutral whatever the point estimate. The book figure is the position-value-weighted
+      average of the holdings' betas. The two lists are ordered by signed beta, so the second is the most negative, not the smallest
+      in magnitude.${spread}</div>`;
+}
 function vdurCard(){
   const V = (typeof LIVE !== "undefined" && LIVE.vdur) || {};
   const rows = D.holdings.map(h => ({h, v: V[h.tk]})).filter(x => x.v && x.v.implied_fcf_cagr != null);
-  if(!rows.length) return "";
+  const rb = bookRateBeta();
+  if(!rows.length) return rb ? card("Valuation duration", "rate sensitivity only · no holding is in the current DCF set", rb) : "";
   // Weight by position value, not equally: the question is what share of OUR money sits in terminal
-  // value. Names without a computable floor (negative trailing FCF, no EV) are excluded and counted.
+  // value. Names without a computable floor are excluded and counted (negative trailing FCF, no EV, a non-USD
+  // reporter, ...: each name's reason is in ic_valuation_duration_skips, shown in its drawer).
   const wsum = rows.reduce((a,x) => a + (x.h.value||0), 0);
   const floorW = rows.reduce((a,x) => a + (x.h.value||0) * (+x.v.bond_floor_share), 0) / wsum;
   const covered = wsum / D.holdings.reduce((a,h) => a + (h.value||0), 0);
@@ -1504,12 +1922,16 @@ function vdurCard(){
       free cash flow inside a ${a0.assumptions ? a0.assumptions.horizon_years : 5}-year horizon, discounted at the
       10-year Treasury plus a ${pct(+a0.erp,2,false)} equity risk premium; everything beyond it is terminal value.
       <b>Implied FCF growth is what today's price requires</b> — compare it to the consensus revenue forecast, not to
-      zero. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so it
-      is shown for the book as context and deliberately not ranked per name.</div>`);
+      zero. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so for a
+      single name it appears only beside its cross-sectional percentile (Grid, name drawer).</div>${rb}`);
 }
 async function analytics(el){
   el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">loading…</span>`);
   if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
+  // The rate-beta median is over the decision grid's stocks (a guard: ic_rate_beta held ETFs until
+  // 2026-10-16 and no longer does); if this fetch fails the median reads "—" rather than the whole tab
+  // failing for a supplementary figure.
+  if(!LIVE.matrix){ try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){} }
   const HA = LIVE.hanal, B = HA.book || {}, P = D.perf;
   if(!LIVE.benchPx){
     const rows = await qAll("site_price_history", r => r.in("ticker", ["QQQ","IWM"]).gte("price_date", P.dates[0]).order("price_date"));
@@ -1623,24 +2045,123 @@ async function theses(el){
 }
 
 /* ═══ forward track record (paper) ══════════════════════════════════════════ */
+// The registry of every book paper_tracker.py locks (its STRATS; 36 on 2026-10-16). Labels and colours are editorial,
+// so this is a registry rather than a loop over whatever the database holds, and the failure that invites is the one
+// that already happened: the stats table and the chart iterated PAPER_LABEL, so a book missing from it did not render at
+// all. value_implied_growth was invisible from 2026-10-08 and 17 more joined it on 10-16. paperCard() now diffs the data
+// against this registry and shows anything unregistered under "Unlabelled" with a warning, so the next omission is loud.
+// Strategy KEYS are never renamed here or in the tracker: they key the locked rows in ic_paper_positions and ic_paper_nav.
 const PAPER_LABEL = {grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Strong Buy", tech_buy:"Technical Buy only", grade_a:"Grade A only",
   ls_a_buy_vs_q4_weak:"Long A+Buy / Short weak Q4", ls_a_buy_vs_cd_sell:"Long A+Buy / Short C-D Sell",
   grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
   quad_q1:"Q1 names", quad_q2:"Q2 names", quad_q3:"Q3 names", quad_q4:"Q4 names", universe_ew:"Universe EW",
-  proposal:"Proposal", actual_book:"Actual book", spy:"SPY"};
+  proposal:"Proposal", actual_book:"Actual book", spy:"SPY",
+  // Duration. "Modelled" = the DCF split of a price into visible cash flows and terminal value; "Measured" = each name's
+  // observed beta to TLT with SPY held constant. The basis is in the label because the two L/S books read as opposites
+  // and are not (see PAPER_NOTES.duration), and the side each one holds is in the label for the same reason.
+  value_implied_growth:"Modelled: low implied growth", dur_terminal_heavy:"Modelled: high implied growth",
+  ls_visible_vs_terminal:"Modelled L/S: long visible / short terminal",
+  rate_long_duration:"Measured: high rate beta", rate_short_duration:"Measured: low rate beta",
+  ls_rate_duration:"Measured L/S: long high / short low beta",
+  // Factors, one pair each: the long-only "tilt" (top fifth) and its long/short (top fifth against the bottom fifth)
+  fac_value:"Value tilt", ls_fac_value:"Value L/S", fac_momentum:"Momentum tilt", ls_fac_momentum:"Momentum L/S",
+  fac_quality:"Quality tilt", ls_fac_quality:"Quality L/S", fac_lowvol:"Low-vol tilt", ls_fac_lowvol:"Low-vol L/S",
+  fac_size:"Small-cap tilt", ls_fac_size:"Small-cap L/S", fac_growth:"Growth tilt", ls_fac_growth:"Growth L/S"};
+// Colour carries the relationship. Duration: cyan = Modelled, amber = Measured, each long-only book darker than its L/S.
+// Factors: one hue per factor with the L/S a lighter tint of its tilt's hue. violet (Universe EW) and grey (SPY) are
+// the references and are kept out of both families. L/S books are also drawn dashed (any key starting ls_).
 const PAPER_COL = {grid_ab_buy:C.green, grid_a_buy:"#2fa874", tech_buy:C.accent2, grade_a:"#c9a1ff", grade_cd:"#b66",
   ls_a_buy_vs_q4_weak:"#e8c468", ls_a_buy_vs_cd_sell:"#d98cb3",
   ab_not_down:"#7fd1c8", grade_ab:"#9ab", ab_tech_weak:"#d98", quad_q1:C.q.Q1, quad_q2:C.q.Q2, quad_q3:C.q.Q3, quad_q4:C.q.Q4,
-  universe_ew:C.violet, proposal:C.accent, actual_book:C.gold, spy:C.muted};
-const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];
+  universe_ew:C.violet, proposal:C.accent, actual_book:C.gold, spy:C.muted,
+  value_implied_growth:"#4cc9f0", dur_terminal_heavy:"#3a86d6", ls_visible_vs_terminal:"#a5e4f7",
+  rate_long_duration:"#ff9f43", rate_short_duration:"#c97a2b", ls_rate_duration:"#ffd199",
+  fac_value:"#3fcf8e", ls_fac_value:"#a1ead0", fac_momentum:"#4d8bff", ls_fac_momentum:"#a9c6ff",
+  fac_quality:"#f2c744", ls_fac_quality:"#f7e3a0", fac_lowvol:"#ec6fb0", ls_fac_lowvol:"#f6b5d7",
+  fac_size:"#ff8a5c", ls_fac_size:"#ffc3ab", fac_growth:"#35d0d0", ls_fac_growth:"#a2ecec"};
+const PAPER_FACTOR_NAME = {value:"Value", momentum:"Momentum", quality:"Quality", lowvol:"Low volatility", size:"Size (high = small)", growth:"Growth"};
+const PAPER_TIP = {   // hover text on the series name: construction and, for the duration books, which side each leg holds
+  value_implied_growth:"MODELLED. Long the fifth of core names whose price needs the LEAST free-cash-flow growth (lowest implied FCF CAGR) = the visible-heavy end of the DCF split, read as short duration. Equal weight, fully invested.",
+  dur_terminal_heavy:"MODELLED. Long the fifth whose price needs the MOST growth (highest implied FCF CAGR) = the terminal-heavy end of the DCF split, read as long duration. Equal weight, fully invested.",
+  ls_visible_vs_terminal:"MODELLED. 100% long the visible-heavy fifth (read as SHORT duration), 50% short the terminal-heavy fifth (read as LONG duration).",
+  rate_long_duration:"MEASURED. Long the fifth with the highest TLT beta, SPY held constant: it rallies when long yields fall = long duration. Equal weight, fully invested.",
+  rate_short_duration:"MEASURED. Long the fifth with the lowest TLT beta: it has done better when long yields rose = short duration. Most of this fifth is not statistically distinguishable from zero. Equal weight, fully invested.",
+  ls_rate_duration:"MEASURED. 100% long the long-duration fifth (high TLT beta), 50% short the short-duration fifth (low TLT beta). On its face the reverse of the Modelled L/S, but in practice it holds the same side of the same names."};
+Object.entries(PAPER_FACTOR_NAME).forEach(([f, n]) => {
+  PAPER_TIP["fac_" + f] = `Long the top fifth of core names on ${n}, equal weight, fully invested.`;
+  PAPER_TIP["ls_fac_" + f] = `100% long the top fifth on ${n}, 50% short the bottom fifth.`;
+});
+// Three different questions, so three views rather than 36 undifferentiated lines. `refs` are drawn in a view whose
+// own books are younger than the references (Universe EW is what a long-only tilt has to beat; SPY is the market).
+const PAPER_GROUPS = [
+  {id:"model", name:"Grid and quad books", refs:[], keys:["grid_ab_buy","grid_a_buy","tech_buy","grade_a","ls_a_buy_vs_q4_weak","ls_a_buy_vs_cd_sell",
+    "grade_cd","ab_not_down","grade_ab","ab_tech_weak","quad_q1","quad_q2","quad_q3","quad_q4","universe_ew","proposal","actual_book","spy"]},
+  {id:"duration", name:"Duration", refs:["universe_ew","spy"], keys:["value_implied_growth","dur_terminal_heavy","ls_visible_vs_terminal",
+    "rate_long_duration","rate_short_duration","ls_rate_duration"]},
+  {id:"factor", name:"Factors", refs:["universe_ew","spy"], keys:Object.keys(PAPER_FACTOR_NAME).flatMap(f => ["fac_" + f, "ls_fac_" + f])}];
+const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];   // legend defaults, model view only
 const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
 const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
+const PAPER_FALLBACK_COL = ["#e07a5f", "#81b29a", "#f2cc8f", "#8ab6d6", "#c8a2c8"];   // for unregistered books only
 let paperRange = "all";                      // YTD / 1Y / All
+let paperGroup = "model";
+// The two duration L/S books as they were actually LOCKED: how many names each side they share. Read from the locked
+// positions rather than written into the page, so it stays true after the next monthly lock. null if unavailable.
+async function paperDurationOverlap(){
+  try{
+    const ids = ["ls_visible_vs_terminal", "ls_rate_duration"];
+    const rows = await qAll("site_paper_positions", r => r.in("strategy", ids).order("strategy").order("rebalance_date").order("ticker"));
+    const latest = {}, book = {};
+    rows.forEach(r => { if(!latest[r.strategy] || r.rebalance_date > latest[r.strategy]) latest[r.strategy] = r.rebalance_date; });
+    rows.forEach(r => { if(r.rebalance_date === latest[r.strategy]) (book[r.strategy] ||= {})[r.ticker] = +r.weight; });
+    const a = book[ids[0]], b = book[ids[1]];
+    if(!a || !b) return null;
+    const o = {both_long:0, both_short:0, vis_long_rate_short:0, vis_short_rate_long:0, dates:[...new Set(ids.map(i => latest[i]))].sort()};
+    Object.keys(a).forEach(t => {
+      if(!(t in b)) return;
+      if(a[t] > 0 && b[t] > 0) o.both_long++; else if(a[t] < 0 && b[t] < 0) o.both_short++;
+      else if(a[t] > 0) o.vis_long_rate_short++; else o.vis_short_rate_long++;
+    });
+    return o;
+  }catch(e){ return null; }
+}
+const PAPER_NOTES = {
+  model: () => `Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
+       one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
+       returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
+       unreliable regardless.`,
+  duration: ov => {
+    const same = ov ? `As locked ${ov.dates.join(" / ")}: <b>${ov.both_long} names are long in both books and ${ov.both_short} are short in both</b>; only
+         ${ov.vis_long_rate_short + ov.vis_short_rate_long} sit on opposite sides (${ov.vis_long_rate_short} and ${ov.vis_short_rate_long}).`
+      : `Measured 2026-10-16: 23 names long in both books, 31 short in both, 9 and 10 on opposite sides (the locked positions could not be read just now).`;
+    return `<div><b style="color:var(--text)">The two long/short books are not opposites, although they read as if they were.</b> Modelled L/S is long
+       visible-heavy names (read as short duration) and short terminal-heavy ones (read as long duration); Measured L/S is long high rate-beta names
+       (long duration) and short low ones. In this universe the two measures disagree, so the books hold the same side of the same names. ${same}</div>
+       <div style="margin-top:6px"><b>Modelled</b> = the DCF split of each price into visible cash flows and terminal value; <b>Measured</b> = each name's observed
+       beta to TLT with SPY held constant. Why they disagree: terminal share rises with implied growth, and the largest block of the high-implied-growth names is Information
+       Technology (30 of 77), which tends to move against long bonds once the market is taken out. Measured 2026-10-16: rank correlation of terminal share with rate beta &minus;0.27, mean TLT beta
+       &minus;0.014 for the terminal-heavy fifth against +0.328 for the visible-heavy fifth. On the same date the Measured short-duration leg is also the thinly measured one:
+       66 of its 82 names have |t| &lt; 2, against 70 of 82 significant on the long side. Each book is a fifth of the core universe, equal weight; the L/S books run
+       100% long / 50% short. These books were first locked 2026-10-16 and are forward-only: no proxy or back-filled history.</div>`;
+  },
+  factor: () => `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
+       An <b>L/S</b> holds that fifth long against the bottom fifth short (100% long / 50% short, drawn dashed in the tint of its tilt's colour), which takes the market out
+       and asks whether the factor premium itself is being paid. Size is oriented so that high means small: the Small-cap books are long the smallest names.
+       These books were first locked 2026-10-16 and are forward-only: no proxy or back-filled history, so read the day counts before the returns.`
+};
 async function paperCard(el){
-  const rows = await qAll("site_paper_nav", r => r.order("nav_date"));
+  const rows = await qAll("site_paper_nav", r => r.order("nav_date").order("strategy"));   // (nav_date, strategy) is unique: with only nav_date, ties let a page boundary drop or repeat rows
   if(!rows.length) return;
   const all = {}; rows.forEach(r => (all[r.strategy] ||= []).push(r));
   const lastDate = rows.reduce((a, r) => r.nav_date > a ? r.nav_date : a, "");
+  // Anything in the data the registry does not know is shown, never silently dropped.
+  const groups = PAPER_GROUPS.slice();
+  const unlabelled = Object.keys(all).filter(k => !(k in PAPER_LABEL)).sort();
+  unlabelled.forEach((k, i) => { PAPER_LABEL[k] = k + " (unlabelled)"; PAPER_COL[k] = PAPER_FALLBACK_COL[i % PAPER_FALLBACK_COL.length]; });
+  if(unlabelled.length) groups.push({id:"other", name:"Unlabelled", refs:["spy"], keys:unlabelled});
+  const avail = groups.filter(g => g.keys.some(k => all[k]));
+  if(!avail.some(g => g.id === paperGroup)) paperGroup = (avail[0] || groups[0]).id;
+  const overlap = avail.some(g => g.id === "duration") ? await paperDurationOverlap() : null;
   const cutoff = () => {
     if(paperRange === "ytd") return lastDate.slice(0,4) + "-01-01";
     if(paperRange === "1y"){ const d = new Date(lastDate); d.setFullYear(d.getFullYear()-1); return d.toISOString().slice(0,10); }
@@ -1649,9 +2170,15 @@ async function paperCard(el){
   const box = document.createElement("div"); box.style.marginTop = "16px"; el.appendChild(box);
 
   const draw = () => {
-    const from = cutoff();
+    const grp = avail.find(g => g.id === paperGroup);
+    const view = [...grp.keys, ...grp.refs.filter(k => !grp.keys.includes(k))].filter(k => all[k]);
+    // A view of young books starts at the first of them, not at the references' first day: Universe EW and SPY run from
+    // January, and drawn from there the new books would sit as a few dots at the far right of an empty chart.
+    const firstOf = k => all[k][0].nav_date;
+    const born = ["model", "other"].includes(grp.id) ? "0000-01-01" : grp.keys.filter(k => all[k]).map(firstOf).sort()[0];
+    const from = [cutoff(), born].sort().pop();
     const by = {};
-    Object.entries(all).forEach(([s, ser]) => { const w = ser.filter(r => r.nav_date >= from); if(w.length) by[s] = w; });
+    view.forEach(s => { const w = all[s].filter(r => r.nav_date >= from); if(w.length) by[s] = w; });
     const days = [...new Set(Object.values(by).flat().map(r => r.nav_date))].sort();
     const start_ = days[0], liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
     const spyAt = d => { const r = (by.spy||[]).filter(x => x.nav_date <= d).slice(-1)[0]; return r ? +r.nav : null; };
@@ -1663,32 +2190,37 @@ async function paperCard(el){
       const sd = Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0) / (r.length-1));
       return sd > 0 ? (m*252 - rf) / (sd*Math.sqrt(252)) : null;
     };
-    const stats = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
+    const stats = view.filter(s => by[s]).map(s => {
       const first = by[s][0], last = by[s].slice(-1)[0];
       const ret = +last.nav / +first.nav - 1;
       const s0 = spyAt(first.nav_date), s1 = spyAt(last.nav_date);
       const bench = s0 && s1 ? s1 / s0 - 1 : null;
       const sh = sharpe(by[s]);
-      return [`<span style="color:${PAPER_COL[s]}">&#9679;</span> ${PAPER_LABEL[s]}`,
+      return [`<span title="${esc(PAPER_TIP[s] || "")}"><span style="color:${PAPER_COL[s]}">&#9679;</span> ${esc(PAPER_LABEL[s])}</span>`,
               `<span class="muted" style="font-size:11px">${first.nav_date}</span>`,
               pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
               sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
     });
     const btn = (k, label) => `<button class="lock" data-range="${k}"${paperRange===k?' style="border-color:var(--brand);color:var(--text)"':""}>${label}</button>`;
+    const gbtn = g => `<button class="lock" data-group="${g.id}"${paperGroup===g.id?' style="border-color:var(--brand);color:var(--text)"':""}>${esc(g.name)}</button>`;
+    const span = grp.id === "model"
+      ? `since ${start_} · ${days.length} trading days · <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since`
+      : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"} · forward-locked only`;
+    const noteHtml = grp.id === "other"
+      ? `<b style="color:var(--text)">${unlabelled.length} strateg${unlabelled.length === 1 ? "y has" : "ies have"} no label registered in this page</b> (${unlabelled.map(esc).join(", ")}) and
+         ${unlabelled.length === 1 ? "is" : "are"} shown by key. Add ${unlabelled.length === 1 ? "it" : "them"} to PAPER_LABEL, PAPER_COL and PAPER_GROUPS in build_live.py.`
+      : PAPER_NOTES[grp.id](overlap);
     box.innerHTML = card("Track record",
-      `${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; since ${start_} · ${days.length} trading days ·
-       <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since ·
+      `${avail.map(gbtn).join(" ")} &nbsp; ${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; ${span} ·
        each series shown as cumulative % return from its first day in view`,
       `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
         tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
-       <div class="muted" style="margin-top:8px">Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
-       one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
-       returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
-       unreliable regardless.</div>`);
-    const series = Object.keys(PAPER_LABEL).filter(s => by[s]).map(s => {
+       <div class="muted" style="margin-top:8px">${noteHtml}</div>`);
+    const series = view.filter(s => by[s]).map(s => {
       const base = +by[s][0].nav;
-      return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3, connectNulls:false,
-        lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s]}, itemStyle:{color:PAPER_COL[s]},
+      return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3 || by[s].length < 3, symbolSize:7, connectNulls:false,
+        lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s], type:s.startsWith("ls_") ? "dashed" : "solid"},
+        itemStyle:{color:PAPER_COL[s]},
         // cumulative % return from each series' first day in view, not an index level: the
         // question is "how much did this strategy make", which a 100-based index makes you do
         // arithmetic to answer.
@@ -1702,7 +2234,7 @@ async function paperCard(el){
         label:{color:C.muted, fontSize:10}, data:marks};
     mk(document.getElementById("paperChart"), {
       legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
-        selected:Object.fromEntries(Object.keys(PAPER_LABEL).map(s => [PAPER_LABEL[s], PAPER_DEFAULT.includes(s)]))},
+        selected:Object.fromEntries(view.filter(s => by[s]).map(s => [PAPER_LABEL[s], grp.id === "model" ? PAPER_DEFAULT.includes(s) : true]))},
       grid:{left:56,right:16,top:20,bottom:40},
       tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : (v > 0 ? "+" : "") + (+v).toFixed(2) + "%"},
       xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
@@ -1710,6 +2242,7 @@ async function paperCard(el){
         axisLabel:{color:C.muted, formatter:v => (v > 0 ? "+" : "") + v + "%"}},
       series});
     box.querySelectorAll("button[data-range]").forEach(b => b.onclick = () => { paperRange = b.dataset.range; draw(); });
+    box.querySelectorAll("button[data-group]").forEach(b => b.onclick = () => { paperGroup = b.dataset.group; draw(); });
   };
   draw();
 }
@@ -2089,8 +2622,11 @@ function holdings(el){
   drawHoldings();
 }
 function drawHoldings(){
+  // 14 headers against 13 cells until 2026-10-16: the Timing header had no <td>, so every column
+  // from Implied growth rightward rendered one place to the LEFT of its own heading. What read as
+  // Timing was the implied growth, and Thesis was empty. The risk range is new beside it.
   const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["_timing","Timing"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
+                ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
   const q = hQuery.toLowerCase(), f = hFilter;
   // "Flagged" means the model has something to say against the name: composite under the 6.5
   // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
@@ -2107,6 +2643,10 @@ function drawHoldings(){
     (!f.flagged || flagged(h)));
   const hval = (r,k) => k === "implied_cagr"
     ? (((typeof LIVE !== "undefined" && LIVE.vdur ? LIVE.vdur[r.tk] : null)||{}).implied_fcf_cagr ?? null)
+    // ordinal, not alphabetical: sorting BUY_ZONE next to AVOID_EXTENDED by first letter
+    // misrepresents a field whose whole point is its order.
+    : k === "timing" ? (typeof TIMING_ORD !== "undefined" ? (TIMING_ORD[r.timing] ?? 9) : r.timing)
+    : k === "range_pos" ? (r.range_pos == null ? null : +r.range_pos)
     : r[k];
   rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
@@ -2125,6 +2665,8 @@ function drawHoldings(){
       <td>${alignBar(h.align)}</td>
       <td>${trendChip(h.trend)}</td>
       <td style="font-size:12px">${timingChip((LIVE.v2[h.tk]||{}).timing, (LIVE.v2[h.tk]||{}).range_pos)}</td>
+      <td>${typeof timingChip === "function" ? timingChip(h.timing, h.range_pos) : ""}</td>
+      <td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>
       <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
       <td class="mono muted" style="font-size:12px">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
       <td class="mono muted" style="font-size:12px">${h.next_er||"—"}</td>
@@ -2278,6 +2820,7 @@ function openHolding(tk){
     <div class="sec"><h4>Position</h4><p class="muted mono" style="font-size:12.5px">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)}</p></div>`;
   document.getElementById("drawer").classList.add("on"); document.getElementById("scrim").classList.add("on");
   if(typeof loadFundaHist === "function") loadFundaHist(tk);   // fills the Change column
+  if(typeof loadVdurHist === "function") loadVdurHist(tk);     // fills the visible-share history
   document.getElementById("drawer").scrollTop = 0;
   drawTechCard(tk);
   setTimeout(() => {
