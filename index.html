@@ -256,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-15 16:51 · b0f3210</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 14:55 · a81c7e1</div>
   </div>
 </section>
 
@@ -286,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-15 16:51 · b0f3210</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 14:55 · a81c7e1</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -299,7 +299,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}, ranges:{}}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, cards:{}, ranges:{}, funda:{}, fundaHist:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -365,6 +365,12 @@ async function enter(){
     LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
     LIVE.ranges = {};
     for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
+    // One row per name — small. The 24-vintage HISTORY is ~11,000 rows and is fetched per ticker
+    // when a drawer opens, so the boot payload does not carry a series nobody is looking at.
+    try{
+      LIVE.funda = Object.fromEntries((await qAll("site_company_fundamentals")).map(r => [r.ticker, r]));
+    }catch(e){ LIVE.funda = {}; }
+    LIVE.fundaHist = {};
     try{
       LIVE.pipeline = Object.fromEntries((await q("site_pipeline_state")).map(r => [r.key, r]));
       renderPipeline();
@@ -937,13 +943,14 @@ async function openName(tk){
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
     <div class="card" style="padding:12px"><div class="chart" id="nmChart" style="height:360px"></div></div>
-    ${rangeBar(v2)}${vdurBlock(tk)}${thesisBlock(tk, true) || cardBlock(tk)}
+    ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${cardBlock(tk)}${thesisBlock(tk, true)}
     ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
       [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
     ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
       .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "")}`;
   document.getElementById("scrim").classList.add("on");
   document.getElementById("drawer").classList.add("on");
+  loadFundaHist(tk);                      // fills the Change column once the history arrives
   document.getElementById("drawer").scrollTop = 0;
   const bars = await loadBars(tk);
   if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
@@ -1078,6 +1085,95 @@ const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
 const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
   HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+// ── FUNDAMENTALS ─────────────────────────────────────────────────────────────
+// The card was pure prose. These are the numbers behind it, read straight from the model's own
+// columns, plus how each has MOVED across the vintages in company_market_data. Trailing
+// fundamentals step when a filing or a screen lands — roughly 3-5 times over the last 4.5 months —
+// so direction is drawn as a step change against the previous distinct value, never as a trend
+// line through daily noise.
+//
+// UNITS are per-metric and measured, not assumed (db/025): most are already PERCENT, sbc_pct is
+// DECIMAL, net_debt_ebitda is a MULTIPLE where negative means net cash.
+const FUNDA_ROWS = [
+  ["roic_trailing",            "Return on capital",  "pct",  1, "P1 economics · Quality indicator ≥10%"],
+  ["roic_spread",              "ROIC vs 8% hurdle",  "pts",  1, "P2 reads the trajectory of this"],
+  ["gross_margin_trailing",    "Gross margin",       "pct",  1, "Pricing power · indicator ≥30%"],
+  ["op_margin",                "Operating margin",   "pct",  1, "Operational efficiency · ≥15%"],
+  ["fcf_margin_trailing",      "FCF margin",         "pct",  1, "Cash conversion · ≥7%"],
+  ["fwd_revenue_3y_cagr",      "Revenue · forward",  "pct",  1, "Quad X axis, forward leg"],
+  ["revenue_3y_cagr_trailing", "Revenue · trailing", "pct",  1, "Quad X axis, trailing leg · ≥5%"],
+  ["fwd_eps_3y_cagr",          "EPS · forward",      "pct",  1, "Quad Y axis. The SCREEN's forward-EPS column is frozen per name (CLAUDE.md §5.1); changes here come from a name entering or leaving a screen, not from an estimate revision"],
+  ["eps_3y_cagr_trailing",     "EPS · trailing",     "pct",  1, "Quad Y axis, trailing leg"],
+  ["net_debt_ebitda",          "Net debt / EBITDA",  "x",    2, "Balance sheet · indicator ≤3.0×"],
+  ["fcf_yield_current",        "FCF yield",          "pct",  1, "Feeds QGS and the FCF/EV rank"],
+  ["buyback_yield",            "Buyback yield",      "pct",  1, "P2 capital allocation"],
+  ["sbc_pct_revenue",          "SBC / revenue",      "dec",  1, "GER denominator"],
+  ["quality_growth_score",     "QGS",                "raw",  4, "Quality Growth Score"],
+];
+function fundaFmt(v, kind, dp){
+  if(v == null) return null;
+  const n = +v;
+  if(kind === "pct" || kind === "pts") return n.toFixed(dp) + (kind === "pts" ? " pts" : "%");
+  if(kind === "dec") return (n * 100).toFixed(dp) + "%";
+  if(kind === "x")   return n.toFixed(dp) + "×";
+  return n.toFixed(dp);
+}
+// Step change against the previous DISTINCT value, with the date it changed — "what moved and when"
+// rather than a slope through a series that is flat by construction between filings.
+function fundaMove(hist, key){
+  if(!hist || hist.length < 2) return null;
+  const vals = hist.filter(r => r[key] != null);
+  if(vals.length < 2) return null;
+  const now = +vals[0][key];
+  const prior = vals.find(r => +r[key] !== now);
+  if(!prior) return {flat: true, since: vals[vals.length - 1].data_date};
+  return {from: +prior[key], to: now, since: prior.data_date, delta: now - +prior[key]};
+}
+// Fetch a name's metric history the first time its drawer opens, then re-render the block in place.
+// Keeps ~11,000 rows out of the boot payload while still giving every name a real track record.
+async function loadFundaHist(tk){
+  if(LIVE.fundaHist[tk]) return LIVE.fundaHist[tk];
+  try{
+    LIVE.fundaHist[tk] = await q("site_fundamentals_history",
+      r => r.eq("ticker", tk).order("data_date", {ascending:false}));
+  }catch(e){ LIVE.fundaHist[tk] = []; }
+  const el = document.getElementById("fundaBlock");
+  if(el) el.outerHTML = fundaBlock(tk);
+  return LIVE.fundaHist[tk];
+}
+function fundaBlock(tk){
+  const f = ((typeof LIVE !== "undefined" && LIVE.funda) || {})[tk];
+  if(!f) return "";
+  const hist = ((typeof LIVE !== "undefined" && LIVE.fundaHist) || {})[tk] || null;
+  const rows = FUNDA_ROWS.map(([key, label, kind, dp, why]) => {
+    const txt = fundaFmt(f[key], kind, dp);
+    if(txt == null) return null;
+    const mv = fundaMove(hist, key);
+    let chg = '<span class="muted">—</span>';
+    if(mv && !mv.flat){
+      const up = mv.delta > 0;
+      const col = up ? C.green : C.red;
+      const d = fundaFmt(Math.abs(mv.delta), kind === "dec" ? "dec" : kind, dp);
+      chg = `<span style="color:${col}">${up ? "▲" : "▼"} ${d}</span>` +
+            `<span class="muted" style="font-size:10px"> since ${esc(mv.since)}</span>`;
+    } else if(mv && mv.flat){
+      chg = `<span class="muted" style="font-size:10px">unchanged since ${esc(mv.since)}</span>`;
+    }
+    return `<tr><td title="${esc(why)}">${esc(label)}</td>
+      <td class="r mono">${txt}</td><td class="r" style="font-size:11px">${chg}</td></tr>`;
+  }).filter(Boolean).join("");
+  if(!rows) return "";
+  const prov = [f.trailing_source ? "trailing " + esc(f.trailing_source) : null,
+                f.fwd_source ? "forward " + esc(f.fwd_source) : null,
+                f.data_date ? "as of " + esc(f.data_date) : null].filter(Boolean).join(" · ");
+  return `<div class="sec" id="fundaBlock"><h4>Fundamentals</h4>
+    <div class="table-wrap"><table class="tbl"><thead><tr>
+      <th>Metric</th><th class="r">Now</th><th class="r">Change</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <div class="note" style="margin-top:8px">${prov || ""}${prov ? " · " : ""}Change is against the
+      previous different value, not yesterday: trailing fundamentals step when a filing or screen
+      lands. Hover a metric to see which pillar or indicator it feeds.</div></div>`;
+}
 function cardBlock(tk){
   const c = (typeof LIVE !== "undefined" && LIVE.cards) ? LIVE.cards[tk] : null;
   if(!c || !c.card) return "";
@@ -1089,6 +1185,7 @@ function cardBlock(tk){
     ${meta ? `<div class="caps" style="margin:2px 0 9px">${esc(meta)}</div>` : ""}
     <p>${esc(k.business||"")}</p>
     ${k.story ? `<h4 style="margin-top:12px">The story</h4><p>${esc(k.story)}</p>` : ""}
+    ${k.fundamentals ? `<h4 style="margin-top:12px">The economics</h4><p>${esc(k.fundamentals)}</p>` : ""}
     ${k.model_read ? `<h4 style="margin-top:12px">What the model says</h4><p>${esc(k.model_read)}</p>` : ""}
     ${k.watch ? `<h4 style="margin-top:12px">What would change it</h4><p>${esc(k.watch)}</p>` : ""}
     ${peers.length ? `<div class="caps" style="margin-top:11px">Peers · ${peers.map(esc).join(" · ")}</div>` : ""}
@@ -2159,7 +2256,7 @@ function openHolding(tk){
       <div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
       <div><span class="caps">Next ER</span><b style="font-size:14px">${h.next_er||"—"}</b></div>
     </div>
-    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${fundaBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
@@ -2180,6 +2277,7 @@ function openHolding(tk){
       ${(ins.notable||[]).length?`<ul>${ins.notable.slice(0,3).map(s=>`<li class="muted">${esc(s)}</li>`).join("")}</ul>`:""}</div>` : ""}
     <div class="sec"><h4>Position</h4><p class="muted mono" style="font-size:12.5px">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)}</p></div>`;
   document.getElementById("drawer").classList.add("on"); document.getElementById("scrim").classList.add("on");
+  if(typeof loadFundaHist === "function") loadFundaHist(tk);   // fills the Change column
   document.getElementById("drawer").scrollTop = 0;
   drawTechCard(tk);
   setTimeout(() => {
