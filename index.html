@@ -256,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 19:24 · ac77f0d</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 19:26 · c201924</div>
   </div>
 </section>
 
@@ -286,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 19:24 · ac77f0d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 19:26 · c201924</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2664,7 +2664,6 @@ function drawHoldings(){
       <td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor?' <span class="chip bad" title="P2 or P3 below 6.0">floor</span>':''}</td>
       <td>${alignBar(h.align)}</td>
       <td>${trendChip(h.trend)}</td>
-      <td style="font-size:12px">${timingChip((LIVE.v2[h.tk]||{}).timing, (LIVE.v2[h.tk]||{}).range_pos)}</td>
       <td>${typeof timingChip === "function" ? timingChip(h.timing, h.range_pos) : ""}</td>
       <td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>
       <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
