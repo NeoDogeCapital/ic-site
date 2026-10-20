@@ -265,7 +265,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:23 · 52516a7</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:26 · 80ec267</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:23 · 52516a7</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:26 · 80ec267</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -510,6 +510,15 @@ function facWhy(u, tag, what){
     return `Stored market cap is ${usd(u.mcap_bad, 2)}, which cannot be a company's cap; it looks like a figure in $ millions written where dollars belong. Not shown`;
   if(what === "mcap") return "No market cap on file";
   return "Not enough data to score this factor";
+}
+// factor_scorer stores the conventional academic names, so a name loading on size reads "Size" —
+// directly contradicting the column beside it, which is called Smallness precisely because the
+// factor is -ln(market_cap). 103 names carry this profile and every one is a small cap. Renamed at
+// display time rather than in the scorer, so the stored value keeps the convention the literature
+// uses and only the user-facing word changes.
+function profileLabel(p){
+  if(!p) return "—";
+  return String(p).split(" / ").map(x => x.trim() === "Size" ? "Smallness" : x).join(" / ");
 }
 function capCell(u, tag){
   const v = u ? u.market_cap : null;
@@ -1171,6 +1180,10 @@ const PCT_TYPED = new Set(["implied_cagr", "vis_pct", "range_pos"]);
 // and filtered in $ billions (nobody types 5000000000). The factor percentiles are already 0-100, so they
 // need no entry here.
 const FILTER_UNITS = {mcap: {scale: 1e9, hint: "$B"}};
+// Columns whose cell is rounded for display, and to how many decimals. The filter rounds to the
+// same precision so a row can never contradict the filter that hid it. The six factor percentiles
+// render at 0 dp; derived from FACTORS so a seventh factor cannot be forgotten here.
+const FILTER_DP = Object.fromEntries(FACTORS.map(f => ["f_" + f.k, 0]));
 function colControl(key, type, rows){
   if(type === "num") return "num";
   if(FREE_TEXT_COLS.has(key)) return "text";
@@ -1190,8 +1203,15 @@ function matchesFilters(r, rows){
         if(v == null) return false;                                  // no value cannot satisfy a range
         // stored as a decimal but typed as a percent, so scale the bounds
         const k = PCT_TYPED.has(key) ? 0.01 : (FILTER_UNITS[key] ? FILTER_UNITS[key].scale : 1);
-        if(lo !== "" && lo != null && v < +lo * k) return false;
-        if(hi !== "" && hi != null && v > +hi * k) return false;
+        // Compare what the CELL SHOWS, not the value behind it. A percentile renders at 0 decimals,
+        // so TILE's 98.54 reads "99" and was then excluded by a "Smallness at least 99" filter —
+        // the row disagreed with the filter on screen, which is indefensible however correct the
+        // arithmetic. FILTER_DP names the columns whose display is rounded; everything else, market
+        // cap included, keeps full precision because its cell is not rounded to the filter's scale.
+        const dp = FILTER_DP[key];
+        const cmp = dp == null ? v : Number(v.toFixed(dp));
+        if(lo !== "" && lo != null && cmp < +lo * k) return false;
+        if(hi !== "" && hi != null && cmp > +hi * k) return false;
       }
     } else if(f[key]){
       const v = (r[key] ?? "").toString();
@@ -2487,7 +2507,20 @@ function route(){
   clearCharts(); closeDrawer(true);
   const el = document.getElementById("view"); el.innerHTML = ""; window.scrollTo(0,0);
   fn(el);
-  const sub = location.hash.split("/")[1]; if(v==="holdings" && sub) openHolding(sub);
+  // A sub-path opens that name. Only holdings was handled, so every #grid/TICKER link the universe
+  // morning note writes landed on the Grid tab and then sat there, which reads as a dead link.
+  // The drawer needs LIVE.matrix for grade / quad / guidance and only the Grid tab loads it, so the
+  // same await the Universe table's row click uses is repeated here rather than a second path.
+  const sub = location.hash.split("/")[1];
+  if(sub){
+    if(v === "holdings") openHolding(sub);
+    else if(["grid", "universe", "signals"].includes(v)) (async () => {
+      if(typeof LIVE !== "undefined" && !LIVE.matrix && typeof qAll === "function"){
+        try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){}
+      }
+      if(typeof openName === "function") openName(sub);
+    })();
+  }
 }
 // Built from the nav's own links rather than a second hard-coded list, so a tab added to the
 // strip (build_live.py injects Memo, Analytics, Grid, Proposal, Theses and About) shows up here
@@ -3137,7 +3170,7 @@ function drawUniverseTable(){
         <td class="muted">${esc(u.sector || "—")}</td>
         <td class="fac fb0">${capCell(su, null)}</td>
         ${FACTORS.map(f => `<td class="fac">${facCell(su, f, null)}</td>`).join("")}
-        <td class="muted" style="font-size:12px"${su && su.mcap_bad != null ? ` title="${esc("Profile withheld: it was scored using a market cap that is a units defect")}"` : ""}>${esc((su && su.factor_profile) || "—")}</td>
+        <td class="muted" style="font-size:12px"${su && su.mcap_bad != null ? ` title="${esc("Profile withheld: it was scored using a market cap that is a units defect")}"` : ""}>${esc(profileLabel(su && su.factor_profile))}</td>
         <td>${qchip(u.quad)}</td>
         <td class="mono ${u.comp!=null&&u.comp<6.5?'neg':''}">${num(u.comp)}</td>
         <td style="white-space:nowrap">${alignBar(u.align)}</td></tr>`; }).join("") +
