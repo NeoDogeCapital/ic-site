@@ -265,7 +265,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:17 · e9de360</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:23 · 52516a7</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:17 · e9de360</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:23 · 52516a7</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -454,6 +454,8 @@ const C = {accent:"#6aa6f8", accent2:"#8fbcff", gold:"#d4b25c", green:"#3fcf8e",
            q:{Q1:"#6aa6f8",Q2:"#3fcf8e",Q3:"#ef6464",Q4:"#f0a94a"}};
 const pct = (v, d=1, sign=true) => v==null||isNaN(v) ? "—" : (sign && v>0 ? "+" : "") + (v*100).toFixed(d) + "%";
 const pctRaw = (v, d=0) => v==null||isNaN(v) ? "—" : (v>0?"+":"") + Number(v).toFixed(d) + "%";   // already-percent values
+// Already-percent, no sign. A margin or a return on capital is not a change, so "+54%" reads wrong.
+const pctFlat = (v, d=0) => v==null||isNaN(v) ? "—" : Number(v).toFixed(d) + "%";
 const num = (v, d=2) => v==null||isNaN(v) ? "—" : Number(v).toFixed(d);
 const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
@@ -1764,7 +1766,10 @@ async function grid(el){
         // final tie-break on grade so equal rows have a stable, meaningful order
         return (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9);
       });
-    const CAP = 400, shown = rows.slice(0, CAP);
+    // 400 was below the universe (454 graded names), so 54 names were always off the end whichever
+    // way you sorted — and sorting by Mkt cap is now a headline feature, where the tail is the point.
+    // 600 clears the universe with room to grow; the "showing first N" note stays as the backstop.
+    const CAP = 600, shown = rows.slice(0, CAP);
     document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
@@ -2080,7 +2085,14 @@ async function analytics(el){
       // 1921% and its gross margin as 7458%, for every holding, since the card was written. mcap is
       // RAW DOLLARS and was divided by 1000 and labelled "B", giving "$95019360B". pctRaw() is the
       // helper for an already-percent value; usdB() formats a raw-dollar cap.
-      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pctRaw(h.roic,0), pctRaw(h.gm,0), pctRaw(h.fcfm,0), pctRaw(h.fcfev,1), num(h.nde,1), pctRaw(h.fwd_rev,0), pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`)}
+      // SCALES DIFFER WITHIN THIS ONE ROW, which is how both the original bug and my first fix for it
+      // went in. Measured on the live payload: roic 53.95, gm 48.65, fcfm 29.28, fwd_rev 12.70 and
+      // fwd_eps 12.20 are PERCENT, while fcfev is a DECIMAL (AAPL 0.0282). The original applied pct()
+      // — which multiplies by 100 — to all of them, so ROIC read 5395% and gross margin 4865%; the
+      // first repair swung the other way and sent fcfev through pctRaw(), which rendered AEM's 4.9%
+      // as "+0.0%". Percent fields take pctFlat (no sign: a margin is not a change), the forward
+      // CAGRs take pctRaw (signed, they can be negative), and fcfev alone takes pct().
+      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pctFlat(h.roic,0), pctFlat(h.gm,0), pctFlat(h.fcfm,0), pct(h.fcfev,1,false), num(h.nde,1), pctRaw(h.fwd_rev,0), pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`)}
   </div>
   <div style="margin-top:16px">${card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
     tbl(["Date","Holding","Headline","Why it matters"], news.map(n => [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`)}</div>`;
