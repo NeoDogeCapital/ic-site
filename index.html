@@ -265,7 +265,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:26 · 80ec267</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:36 · 7bcac59</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:26 · 80ec267</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:36 · 7bcac59</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2792,8 +2792,17 @@ function drawHoldings(){
   // 14 headers against 13 cells until 2026-10-16: the Timing header had no <td>, so every column
   // from Implied growth rightward rendered one place to the LEFT of its own heading. What read as
   // Timing was the implied growth, and Thesis was empty. The risk range is new beside it.
-  const cols = [["tk","Holding"],["weight","Weight"],["value","Value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],["next_er","Next ER"],["thesis_status","Thesis"]];
+  // "Value" became ambiguous the moment the factor block arrived: the position's dollar value and
+  // the Value factor are different quantities and were sitting in the same table under one word.
+  // The position column is the one that moves, to "Mkt value", because the factor's name is the
+  // standard one and is shared with the Grid and Universe tables.
+  // The size and factor block is the same one the Grid and Universe tables use, built from FAC_KEYS
+  // so all three cannot disagree about how many columns there are. LIVE.suniv is loaded at boot, not
+  // per tab, so Holdings needs no extra fetch for it.
+  const cols = [["tk","Holding"],["weight","Weight"],["value","Mkt value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
+                ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],
+                ["mcap","Mkt cap"], ...FACTORS.map(f => ["f_" + f.k, f.label]),
+                ["next_er","Next ER"],["thesis_status","Thesis"]];
   const q = hQuery.toLowerCase(), f = hFilter;
   // "Flagged" means the model has something to say against the name: composite under the 6.5
   // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
@@ -2814,6 +2823,9 @@ function drawHoldings(){
     // misrepresents a field whose whole point is its order.
     : k === "timing" ? (typeof TIMING_ORD !== "undefined" ? (TIMING_ORD[r.timing] ?? 9) : r.timing)
     : k === "range_pos" ? (r.range_pos == null ? null : +r.range_pos)
+    // Size and the factors live in LIVE.suniv, keyed by ticker, exactly as the Grid resolves them.
+    : k === "mcap" ? (((typeof LIVE !== "undefined" && LIVE.suniv ? LIVE.suniv[r.tk] : null)||{}).market_cap ?? null)
+    : k.startsWith("f_") ? (((typeof LIVE !== "undefined" && LIVE.suniv ? LIVE.suniv[r.tk] : null)||{})[k.slice(2) + "_pct"] ?? null)
     : r[k];
   rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
@@ -2835,6 +2847,7 @@ function drawHoldings(){
       <td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>
       <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
       <td class="mono muted" style="font-size:12px">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
+      ${facCells({ticker: h.tk, universe_tag: null})}
       <td class="mono muted" style="font-size:12px">${h.next_er||"—"}</td>
       <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
