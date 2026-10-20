@@ -126,6 +126,15 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .tbl tbody tr:last-child td{border-bottom:none}
 .tbl tbody tr:hover{background:rgba(255,255,255,.028)}
 .tbl .srank{font-size:8.5px;opacity:.75;margin-left:1px}
+/* Size + factor block (Grid and Universe tables): the first column carries a rule so the seven read as
+   one group, and the cells sit tighter than the text columns around them. */
+.tbl th.fac,.tbl td.fac{padding-left:7px;padding-right:7px;white-space:nowrap}
+.tbl th.fb0,.tbl td.fb0{border-left:1px solid var(--line2);padding-left:12px}
+/* On a phone the size/factor block is a swipe to the right of the ticker, and a row you cannot name is no use, so
+   the first column stays put while the rest scrolls under it. Opt-in per table. */
+.tbl.stickfirst th:first-child,.tbl.stickfirst td:first-child{position:sticky;left:0;z-index:2;background:var(--panel-solid);box-shadow:1px 0 0 var(--line)}
+.tbl.stickfirst th:first-child{z-index:3}
+@media(max-width:700px){.tbl.stickfirst td:first-child .nm{max-width:96px}}   /* a pinned column must leave room to scroll past it */
 .pill{display:inline-block;font:500 9.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;
   padding:2px 6px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);vertical-align:1px}
 .t td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -256,7 +265,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 17:13 · 688950a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:17 · e9de360</div>
   </div>
 </section>
 
@@ -286,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 17:13 · 688950a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:17 · e9de360</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -299,7 +308,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* ═══ auth + live data ═════════════════════════════════════════════════ */
 const SB = supabase.createClient(IC_CONFIG.supabaseUrl, IC_CONFIG.supabaseAnonKey,
   {auth:{persistSession:true, autoRefreshToken:true}});
-let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, vdurHist:{}, vdurStats:null, vskips:{}, vskipsOk:false, rbeta:{}, rbetaOk:false, rgaps:{}, rgapsOk:false, rbetaHist:{}, cards:{}, ranges:{}, funda:{}, fundaHist:{}}, QUOTE_TIMER = null;
+let D = null, LIVE = {v2:{}, theses:{}, quotes:{}, jobs:[], matrix:null, risk:null, proposal:null, builtAt:null, briefs:[], vdur:{}, vdurHist:{}, vdurStats:null, vskips:{}, vskipsOk:false, rbeta:{}, rbetaOk:false, rgaps:{}, rgapsOk:false, rbetaHist:{}, suniv:{}, sunivOk:false, cards:{}, ranges:{}, funda:{}, fundaHist:{}}, QUOTE_TIMER = null;
 async function q(view, build){ let r = SB.from(view).select("*"); if(build) r = build(r); const {data, error} = await r; if(error) throw error; return data; }
 async function qAll(view, build, page = 1000){   // PostgREST caps a response at 1000 rows; page past it
   const out = [];
@@ -385,6 +394,13 @@ async function enter(){
       LIVE.rgaps = Object.fromEntries((await qAll("site_rate_beta_gaps")).map(r => [r.ticker, r]));
       LIVE.rgapsOk = true;
     }catch(e){ LIVE.rgaps = {}; LIVE.rgapsOk = false; }
+    // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
+    // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
+    // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
+    try{
+      LIVE.suniv = Object.fromEntries((await qAll("site_universe")).map(u => [u.ticker, sunivNorm(u)]));
+      LIVE.sunivOk = true;
+    }catch(e){ LIVE.suniv = {}; LIVE.sunivOk = false; }
     LIVE.ranges = {};
     for(const r of await qAll("site_range_dynamics")) (LIVE.ranges[r.ticker] ||= {})[r.horizon] = r;
     // One row per name — small. The 24-vintage HISTORY is ~11,000 rows and is fetched per ticker
@@ -443,6 +459,70 @@ const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleStri
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qchip = q => q ? `<span class="chip ${q.toLowerCase()}">${q}</span>` : `<span class="chip">—</span>`;
+
+/* ═══ size + factor cells (shared by the Grid and the Universe table) ═══════════════
+   site_universe carries market cap and six factor percentiles for every active name. factor_scorer.py
+   signs each percentile so that HIGH = MORE OF THE FACTOR, which reads naturally for five of them and
+   backwards for one: size is scored as -ln(market cap), so size_pct 99 is among the SMALLEST names.
+   A column plainly called "Size" that sorted large-first on it would put the smallest company in the
+   universe on top, so the column is called Smallness and its tooltip says why. Low vol is the other
+   one to read twice: high means a LOWER beta and volatility, i.e. calm. */
+const MCAP_FLOOR = 1e6;     // below $1M a "market cap" is a units defect, not a company (see sunivNorm)
+const FACTORS = [
+  {k:"value",    label:"Value",     tip:"high = cheaper: FCF/EV yield, forward P/E, EV/EBITDA"},
+  {k:"momentum", label:"Momentum",  tip:"high = stronger risk-adjusted 12-1 and 12-month return"},
+  {k:"quality",  label:"Quality",   tip:"high = higher ROIC and margins, lower net debt / EBITDA"},
+  {k:"lowvol",   label:"Low vol",   tip:"high = LOWER beta and 12-month volatility, i.e. calm; not high volatility"},
+  {k:"size",     label:"Smallness", tip:"high = SMALLER. The size factor is scored as -ln(market cap), so 99 is among the smallest names and 1 among the largest. Sort Mkt cap for literal size"},
+  {k:"growth",   label:"Growth",    tip:"high = faster consensus forward revenue and EPS growth"},
+];
+// Column ids for the block. Grid headers, Grid cells and the Universe table all derive from these two
+// lists, so the header count and the cell count cannot drift apart.
+const FAC_KEYS = ["mcap", ...FACTORS.map(f => "f_" + f.k)];
+// Normalise one site_universe row. Numerics arrive as numbers or strings depending on the driver, and a
+// stored market cap under $1M is not a company: KSPI is stored as 17,670.64, which is its cap in
+// $ MILLIONS written into a column that holds dollars. Left alone it sorts as the smallest company in
+// the universe, and its size percentile (derived from the same figure) says so too. Both are blanked
+// here, the raw figure is kept for the tooltip, and the cause is upstream, not on this page.
+function sunivNorm(u){
+  const o = {...u};
+  for(const k of ["market_cap","value_pct","momentum_pct","quality_pct","lowvol_pct","size_pct","growth_pct"])
+    o[k] = u[k] == null || isNaN(u[k]) ? null : +u[k];
+  // the factor profile names the factors a stock loads on, and size is one of the six, so it is withheld too
+  if(o.market_cap != null && o.market_cap < MCAP_FLOOR){ o.mcap_bad = o.market_cap; o.market_cap = null; o.size_pct = null; o.factor_profile = null; }
+  return o;
+}
+function fmtCap(v){
+  if(v == null || isNaN(v)) return "—";
+  v = +v;
+  return v >= 999.95e9 ? "$" + (v/1e12).toFixed(2) + "T"
+       : v >= 999.5e6  ? "$" + (v/1e9).toFixed(1) + "B"
+       : "$" + Math.round(v/1e6) + "M";
+}
+// WHY a cell is blank, so a dash never has to be guessed at.
+function facWhy(u, tag, what){
+  if(typeof LIVE !== "undefined" && LIVE.sunivOk === false) return "The size and factor table could not be loaded";
+  if(!u) return tag === "micro" ? "Micro-sleeve name: not in the core factor cross-section"
+                                : "Not in the size and factor table";
+  if(u.mcap_bad != null && (what === "mcap" || what === "f_size"))
+    return `Stored market cap is ${usd(u.mcap_bad, 2)}, which cannot be a company's cap; it looks like a figure in $ millions written where dollars belong. Not shown`;
+  if(what === "mcap") return "No market cap on file";
+  return "Not enough data to score this factor";
+}
+function capCell(u, tag){
+  const v = u ? u.market_cap : null;
+  if(v == null) return `<span class="muted" title="${esc(facWhy(u, tag, "mcap"))}">—</span>`;
+  return `<span class="mono" title="${esc("Market cap " + usd(v))}">${fmtCap(v)}</span>`;
+}
+// A percentile, 0 decimals. Extremes (top or bottom fifth) are set in full text colour and bold, the middle
+// is muted, so a column of 400 numbers still shows where the unusual names are. No colour is used for
+// "good" or "bad": for Smallness and Low vol, high is not better, it is just more of that factor.
+function facCell(u, f, tag){
+  const v = u ? u[f.k + "_pct"] : null;
+  if(v == null) return `<span class="muted" title="${esc(f.label + ": " + facWhy(u, tag, "f_" + f.k))}">—</span>`;
+  const hot = v >= 80 || v <= 20;
+  return `<span class="mono${hot ? "" : " muted"}"${hot ? ' style="font-weight:600"' : ""} title="${esc(f.label + " percentile " + Math.round(v) + " of 100 · " + f.tip)}">${Math.round(v)}</span>`;
+}
 // TWO ENGINES, TWO VOCABULARIES, ONE CONCEPT. ic_technicals (v1, the 200-day read that drives the
 // decision grid) says UPTREND / NEUTRAL / DOWNTREND. ic_technicals_v2 (the track line) says
 // BULLISH / BEARISH with no neutral. This chip only knew v1's words, so every BULLISH and BEARISH
@@ -1081,10 +1161,14 @@ let gridFilterOpen = false;
 const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
 // Numeric columns whose value lives in LIVE (the duration tables) rather than on the matrix row, so
 // the filter and the sort must both resolve them through gridKey().
-const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta"]);
+const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta", ...FAC_KEYS]);
 // Of those, the ones stored as a DECIMAL but typed as a PERCENT in the filter box. The bounds are
 // scaled once, in matchesFilters, by this one rule — rate_beta is a plain coefficient and is not.
 const PCT_TYPED = new Set(["implied_cagr", "vis_pct", "range_pos"]);
+// Columns whose filter box is typed in a friendlier unit than the stored one. Market cap is stored in dollars
+// and filtered in $ billions (nobody types 5000000000). The factor percentiles are already 0-100, so they
+// need no entry here.
+const FILTER_UNITS = {mcap: {scale: 1e9, hint: "$B"}};
 function colControl(key, type, rows){
   if(type === "num") return "num";
   if(FREE_TEXT_COLS.has(key)) return "text";
@@ -1103,7 +1187,7 @@ function matchesFilters(r, rows){
       if((lo !== "" && lo != null) || (hi !== "" && hi != null)){
         if(v == null) return false;                                  // no value cannot satisfy a range
         // stored as a decimal but typed as a percent, so scale the bounds
-        const k = PCT_TYPED.has(key) ? 0.01 : 1;
+        const k = PCT_TYPED.has(key) ? 0.01 : (FILTER_UNITS[key] ? FILTER_UNITS[key].scale : 1);
         if(lo !== "" && lo != null && v < +lo * k) return false;
         if(hi !== "" && hi != null && v > +hi * k) return false;
       }
@@ -1626,7 +1710,12 @@ const GRID_COLS = [
   ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
   ["composite","Composite","num"], ["implied_cagr","Implied growth","num"], ["vis_pct","Visible %","num"],
   ["rate_beta","Rate beta","num"], ["trend","Trend","txt"],
-  ["sector","Sector","txt"], ["grade_reason","Why","txt"],
+  ["sector","Sector","txt"],
+  // Size and the six factor percentiles, as one block. Derived from FAC_KEYS / FACTORS in the template, so the
+  // header list and facCells() below cannot disagree about how many columns there are.
+  ["mcap","Mkt cap","num","Market capitalisation. First click is largest first; click again for smallest first"],
+  ...FACTORS.map(f => ["f_" + f.k, f.label, "num", f.label + " percentile, 0-100 · " + f.tip]),
+  ["grade_reason","Why","txt"],
 ];
 const QGS_ORD = {RARE_ELITE:0, EXCEPTIONAL:1, GOOD_COMPOUNDER:2, AVERAGE:3, LOW_QUALITY:4};
 function gridKey(r, k){
@@ -1644,7 +1733,16 @@ function gridKey(r, k){
     const v = (LIVE.vdur[r.ticker]||{}).bond_floor_share; return v == null ? null : +v; }
   if(k === "rate_beta"){
     const v = (LIVE.rbeta[r.ticker]||{}).rate_beta; return v == null ? null : +v; }
+  // size and factors: null when the name has no row or the value is blank, so blanks sink on either direction
+  if(k === "mcap"){ const u = LIVE.suniv[r.ticker]; return u && u.market_cap != null ? +u.market_cap : null; }
+  if(k.startsWith("f_")){ const u = LIVE.suniv[r.ticker], v = u ? u[k.slice(2) + "_pct"] : null; return v == null ? null : +v; }
   return (r[k] ?? "").toString().toLowerCase();
+}
+// The seven size / factor cells for one grid row, in GRID_COLS order. The micro sleeve is firewalled from the
+// core factor cross-section, so those names are dashes by design and the tooltip says so.
+function facCells(r){
+  const u = LIVE.suniv[r.ticker] || null, tag = r.universe_tag;
+  return `<td class="fac fb0">${capCell(u, tag)}</td>` + FACTORS.map(f => `<td class="fac">${facCell(u, f, tag)}</td>`).join("");
 }
 async function grid(el){
   el.innerHTML = head("Process", "Decision grid", `<span class="muted">loading…</span>`);
@@ -1676,19 +1774,25 @@ async function grid(el){
       <td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
-      <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td><td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
+      <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
+    // Header and row are built from two lists and had drifted before (a cell added without its header
+    // renders every column to its right under the wrong name). Say so loudly if it happens again.
+    { const first = document.querySelector("#gridRows tr");
+      if(first && first.children.length !== GRID_COLS.length)
+        console.error("grid: " + GRID_COLS.length + " headers but " + first.children.length + " cells per row"); }
     // The count used to read the full row count while the table rendered only the first 400, so 56
     // names — under the default grade sort, the tail of the D grades — were invisible with nothing
     // saying so. Held names can fall in that tail.
     document.getElementById("gridN").textContent = rows.length + " names"
       + (rows.length > CAP ? ` · showing first ${CAP}, filter or sort to reach the rest` : "");
-    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label]) => {
+    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label,,tip]) => {
       const at = gridSort.findIndex(x => x.k === k), on = at >= 0;
       const arrow = on ? (gridSort[at].d > 0 ? " ↑" : " ↓") : "";
       // show the rank only when more than one key is active, so a single sort stays uncluttered
       const rank = on && gridSort.length > 1 ? `<sup class="srank">${at + 1}</sup>` : "";
-      return `<th data-sort="${k}" class="${on ? "sorted" : ""}" style="cursor:pointer;white-space:nowrap"
-        title="Sort by ${label} · shift-click to add as a tie-breaker">${label}${arrow}${rank}</th>`;
+      const blk = FAC_KEYS.includes(k) ? " fac" + (k === "mcap" ? " fb0" : "") : "";
+      return `<th data-sort="${k}" class="${on ? "sorted" : ""}${blk}" style="cursor:pointer;white-space:nowrap"
+        title="${esc(tip || "Sort by " + label)} · shift-click to add as a tie-breaker">${label}${arrow}${rank}</th>`;
     }).join("");
     document.querySelectorAll("#gridHead th[data-sort]").forEach(th => th.onclick = e => {
       const k = th.dataset.sort;
@@ -1726,8 +1830,8 @@ async function grid(el){
         const controls = GRID_COLS.map(([key, label, type]) => {
           const ctl = colControl(key, type, M);
           if(ctl === "num") return `<label class="fsel"><span>${label}</span>
-            <input class="fnum" id="fx_${key}_min" type="number" step="any" placeholder="min" value="${esc(gridFilter[key+"_min"] ?? "")}">
-            <input class="fnum" id="fx_${key}_max" type="number" step="any" placeholder="max" value="${esc(gridFilter[key+"_max"] ?? "")}"></label>`;
+            <input class="fnum" id="fx_${key}_min" type="number" step="any" placeholder="min${FILTER_UNITS[key] ? " " + FILTER_UNITS[key].hint : ""}" value="${esc(gridFilter[key+"_min"] ?? "")}">
+            <input class="fnum" id="fx_${key}_max" type="number" step="any" placeholder="max${FILTER_UNITS[key] ? " " + FILTER_UNITS[key].hint : ""}" value="${esc(gridFilter[key+"_max"] ?? "")}"></label>`;
           if(ctl === "select") return selectEl(`fx_${key}`, label, gridFilter[key] || "",
             filterOpts(M, key, ORD[COL_ORDER[key]]));
           return `<label class="fsel"><span>${label}</span>
@@ -1742,8 +1846,10 @@ async function grid(el){
         </div>
         <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
       })() +
-      `<div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.</div>
-       <div class="table-wrap"><table class="tbl"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
+      `<div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.
+         Between Sector and Why sit size and the six factors: market cap, then Value, Momentum, Quality, Low vol, Smallness and Growth as percentiles
+         (0-100, high = more of the factor). <b>Smallness is the size factor, so high means small</b>; Low vol high means calm. Micro-sleeve names are not scored (dash).</div>
+       <div class="table-wrap"><table class="tbl stickfirst"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   // This set gridFilter.act, but matchesFilters iterates GRID_COLS where the key is "action" — so
   // nothing read it and clicking a cell silently did nothing, while the filter badge counted it as
   // an active filter. Set the key the filter actually uses, and re-render so the dropdown shows it.
@@ -1969,7 +2075,12 @@ async function analytics(el){
     ${card("Geography", "by headquarters country", `<div class="chart" id="anGeo"></div>`)}
     ${vdurCard()}
     ${card("Valuation & profitability", "trailing, from the latest screen", `<div class="table-wrap">` + tbl(["Holding","ROIC","Gross mgn","FCF mgn","FCF/EV","ND/EBITDA","Fwd rev","Fwd EPS","Beta","Mkt cap"],
-      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pct(h.roic,0,false), pct(h.gm,0,false), pct(h.fcfm,0,false), pct(h.fcfev,1,false), num(h.nde,1), pct(h.fwd_rev,0), pct(h.fwd_eps,0), num(h.beta), h.mcap ? "$"+(h.mcap/1000).toFixed(0)+"B" : "—"])) + `</div>`)}
+      // pct() MULTIPLIES BY 100, and every one of these is already PERCENT (db/025: roic, the three
+      // margins and fcf_yield are PERCENT on company_market_data). So this rendered AEM's ROIC as
+      // 1921% and its gross margin as 7458%, for every holding, since the card was written. mcap is
+      // RAW DOLLARS and was divided by 1000 and labelled "B", giving "$95019360B". pctRaw() is the
+      // helper for an already-percent value; usdB() formats a raw-dollar cap.
+      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pctRaw(h.roic,0), pctRaw(h.gm,0), pctRaw(h.fcfm,0), pctRaw(h.fcfev,1), num(h.nde,1), pctRaw(h.fwd_rev,0), pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`)}
   </div>
   <div style="margin-top:16px">${card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
     tbl(["Date","Holding","Headline","Why it matters"], news.map(n => [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`)}</div>`;
@@ -2955,6 +3066,97 @@ function performance(el){
 
 /* ═══ UNIVERSE ═══════════════════════════════════════════════════════════ */
 let uFilter = "all";
+// ONE predicate for the scatter, the table and their counts, so the two cannot disagree about who is in.
+const uKeep = u => uFilter==="all" || (uFilter==="held"&&u.held) || (uFilter==="watch"&&u.watch) || (uFilter==="accum"&&u.bucket==="ACCUMULATE");
+const uPlotted = u => u.x!=null && u.y!=null && !!u.quad;      // what the scatter can draw
+
+/* ── Universe table: every tracked name, sortable by size and by the six factors ──────────────
+   Sits below the scatter. Size and factors come from site_universe (LIVE.suniv); the rest of each row is
+   the nightly payload the scatter already uses. Blanks sink on every key, in either direction. */
+let uSort = {k:"mcap", d:1}, uQuery = "";                      // smallest first: the question that prompted it
+const U_COLS = [
+  {k:"tk",     label:"Ticker",         str:true},
+  {k:"sector", label:"Sector",         str:true},
+  {k:"mcap",   label:"Mkt cap",        tip:"Market capitalisation. Click once for largest first, again for smallest first", cls:"fac fb0"},
+  ...FACTORS.map(f => ({k:"f_" + f.k, label:f.label, tip:f.label + " percentile, 0-100 · " + f.tip, cls:"fac"})),
+  {k:"profile",label:"Factor profile", str:true, tip:"The one or two factors the name loads at +1 sigma or more"},
+  {k:"quad",   label:"Quad",           str:true},
+  {k:"comp",   label:"Composite"},
+  {k:"align",  label:"Alignment"},
+];
+// The size/factor row for a name: the live table, else (if it failed to load) a market-cap-only row built
+// from the payload, so the table degrades to dashes with a stated reason instead of failing.
+function uSu(u){
+  const L = typeof LIVE !== "undefined" ? LIVE : null;
+  return (L && L.suniv && L.suniv[u.tk]) || (u.mcap != null ? sunivNorm({market_cap: u.mcap}) : null);
+}
+function uVal(u, k){
+  if(k === "tk") return u.tk;
+  if(k === "sector") return u.sector || null;
+  if(k === "quad") return u.quad || null;
+  if(k === "comp") return u.comp;
+  if(k === "align") return u.align;
+  const su = uSu(u);
+  if(!su) return null;
+  if(k === "mcap") return su.market_cap;
+  if(k === "profile") return su.factor_profile || null;
+  return su[k.slice(2) + "_pct"];                                // f_<factor>
+}
+function drawUniverseTable(){
+  const t = document.getElementById("uTbl"); if(!t) return;
+  try{
+    const U = D.universe, q = uQuery.trim().toLowerCase();
+    const kept = U.filter(uKeep);
+    const rows = kept.filter(u => !q || u.tk.toLowerCase().includes(q) || (u.name||"").toLowerCase().includes(q));
+    rows.sort((a, b) => {
+      const x = uVal(a, uSort.k), y = uVal(b, uSort.k);
+      if(x == null && y == null) return a.tk.localeCompare(b.tk);
+      if(x == null) return 1;                                    // blanks sink whichever way it is sorted
+      if(y == null) return -1;
+      const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+      return c ? c * uSort.d : a.tk.localeCompare(b.tk);
+    });
+    t.innerHTML = `<thead><tr>${U_COLS.map(c => {
+      const on = uSort.k === c.k;
+      return `<th data-k="${c.k}" class="${(c.cls||"")}${on?" sorted":""}" style="cursor:pointer;white-space:nowrap"
+        title="${esc(c.tip || "Sort by " + c.label)}">${c.label}${on ? (uSort.d > 0 ? " ↑" : " ↓") : ""}</th>`; }).join("")}</tr></thead><tbody>` +
+      rows.map(u => { const su = uSu(u); return `<tr data-open="${esc(u.tk)}" style="cursor:pointer">
+        <td style="white-space:nowrap"><div class="tk">${esc(u.tk)}${u.held ? ' <span class="pill">held</span>' : ""}</div><div class="nm">${esc(u.name)}</div></td>
+        <td class="muted">${esc(u.sector || "—")}</td>
+        <td class="fac fb0">${capCell(su, null)}</td>
+        ${FACTORS.map(f => `<td class="fac">${facCell(su, f, null)}</td>`).join("")}
+        <td class="muted" style="font-size:12px"${su && su.mcap_bad != null ? ` title="${esc("Profile withheld: it was scored using a market cap that is a units defect")}"` : ""}>${esc((su && su.factor_profile) || "—")}</td>
+        <td>${qchip(u.quad)}</td>
+        <td class="mono ${u.comp!=null&&u.comp<6.5?'neg':''}">${num(u.comp)}</td>
+        <td style="white-space:nowrap">${alignBar(u.align)}</td></tr>`; }).join("") +
+      (rows.length ? "" : `<tr><td colspan="${U_COLS.length}" class="muted">No names match.</td></tr>`) + "</tbody>";
+    // The scatter can only draw a name with both axes and a quad. Say how many of the table's names that leaves
+    // off, so "N names here, M dots there" is explained on the page rather than discovered.
+    const off = kept.filter(u => !uPlotted(u)).length;
+    const sub = document.getElementById("uTblSub");
+    if(sub) sub.textContent = rows.length + (q ? " of " + kept.length : "") + " names"
+      + (off ? ` · ${off} ${off === 1 ? "has" : "have"} no quad, so ${off === 1 ? "is" : "are"} not on the map` : "")
+      + " · click a header to sort, a row for the chart";
+    t.querySelectorAll("th[data-k]").forEach(th => th.onclick = () => {
+      const k = th.dataset.k, c = U_COLS.find(x => x.k === k);
+      // a new numeric column opens highest-first; text opens A-Z; a repeat click flips
+      uSort = {k, d: uSort.k === k ? -uSort.d : (c.str ? 1 : -1)};
+      drawUniverseTable();
+    });
+    t.querySelectorAll("tr[data-open]").forEach(tr => tr.onclick = async () => {
+      const tk = tr.dataset.open;
+      // the drawer reads LIVE.matrix for grade / quad / guidance, and only the Grid tab loads it
+      if(typeof LIVE !== "undefined" && !LIVE.matrix && typeof qAll === "function"){
+        try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){}
+      }
+      if(typeof openName === "function") openName(tk);
+      else if(D.holdings.some(h => h.tk === tk)) location.hash = "#holdings/" + tk;
+    });
+  }catch(e){
+    console.error("universe table", e);
+    t.innerHTML = `<tbody><tr><td class="muted">The table could not be drawn: ${esc(e.message || e)}</td></tr></tbody>`;
+  }
+}
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} tracked names</span>`) +
@@ -2975,9 +3177,19 @@ function universe(el){
       <option value="14">top 14</option><option value="25">top 25</option><option value="99">all</option></select>
       <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="uIndQ1"> sort by Q1 share</label>`,
       `<div class="chart" id="uInd" style="height:520px"></div>`)}
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-h" style="flex-wrap:wrap"><div><h3>Every name, by size and factor</h3><div class="sub" id="uTblSub"></div></div>
+      <input class="search" id="uq" placeholder="Search ticker or name" value="${esc(uQuery)}"></div>
+    <div class="note" style="margin-bottom:8px">Factor columns are percentiles, 0 to 100, across the active universe, signed so that high means more of the
+      factor. <b>Smallness</b> is the size factor, so high means <b>small</b>; <b>Low vol</b> high means calm. Sort <b>Mkt cap</b> for literal size.
+      The Holdings / Watchlist / Accumulate buttons above filter this table too.</div>
+    <div class="table-wrap" style="max-height:72vh"><table class="tbl stickfirst" id="uTbl"></table></div>
   </div>`;
+  document.getElementById("uq").oninput = e => { uQuery = e.target.value; drawUniverseTable(); };
+  drawUniverseTable();
   document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f; clearCharts(); universe(el); });
-  const keep = u => uFilter==="all" || (uFilter==="held"&&u.held) || (uFilter==="watch"&&u.watch) || (uFilter==="accum"&&u.bucket==="ACCUMULATE");
+  const keep = uKeep;
   const clip = v => Math.max(-30, Math.min(30, v));
   const pts = U.filter(u=>u.x!=null&&u.y!=null&&u.quad);
   mk(document.getElementById("uMap"), {
