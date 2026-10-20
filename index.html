@@ -256,7 +256,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-16 19:26 · c201924</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 17:13 · 688950a</div>
   </div>
 </section>
 
@@ -286,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-16 19:26 · c201924</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 17:13 · 688950a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2139,15 +2139,25 @@ const PAPER_NOTES = {
        (long duration) and short low ones. In this universe the two measures disagree, so the books hold the same side of the same names. ${same}</div>
        <div style="margin-top:6px"><b>Modelled</b> = the DCF split of each price into visible cash flows and terminal value; <b>Measured</b> = each name's observed
        beta to TLT with SPY held constant. Why they disagree: terminal share rises with implied growth, and the largest block of the high-implied-growth names is Information
-       Technology (30 of 77), which tends to move against long bonds once the market is taken out. Measured 2026-10-16: rank correlation of terminal share with rate beta &minus;0.27, mean TLT beta
-       &minus;0.014 for the terminal-heavy fifth against +0.328 for the visible-heavy fifth. On the same date the Measured short-duration leg is also the thinly measured one:
-       66 of its 82 names have |t| &lt; 2, against 70 of 82 significant on the long side. Each book is a fifth of the core universe, equal weight; the L/S books run
-       100% long / 50% short. These books were first locked 2026-10-16 and are forward-only: no proxy or back-filled history.</div>`;
+       Technology (30 of 77), which tends to move against long bonds once the market is taken out. Measured across 12 monthly vintages, the rank correlation of terminal share with rate beta is &minus;0.20 to +0.07 &mdash;
+       <b>orthogonal, not opposed</b>. (A single date, 2026-10-16, read &minus;0.27 and was quoted here as the headline; it is not representative.) The two are not rival
+       duration measures: the DCF split discounts every name at one rate and fades to one terminal growth, so its only cross-sectional variation is base FCF/EV, and
+       <b>spearman(floor share, implied growth) is &minus;1.000000 on all 27 vintages</b> &mdash; the Modelled L/S is a value spread wearing a duration label.
+       The Measured short leg is mostly noise: <b>80&ndash;88% of it has |t| &lt; 2</b>, no measurable rate beta at all. Each book is a fifth of the core universe,
+       equal weight; the L/S books run 100% long / 50% short.
+       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded.</b> These books were first locked 2026-10-16; earlier marks were rebuilt
+       from point-in-time sources on 2026-10-17. The panel is today&rsquo;s universe looking backwards, so every long-only book is flattered by survivorship &mdash;
+       <code>ic_price_history</code> holds no delisted name at all. An adversarial review on 2026-10-20 rated most of these books DO-NOT-USE; read
+       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code> before quoting any figure here.</div></div>`;
   },
   factor: () => `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
        An <b>L/S</b> holds that fifth long against the bottom fifth short (100% long / 50% short, drawn dashed in the tint of its tilt's colour), which takes the market out
        and asks whether the factor premium itself is being paid. Size is oriented so that high means small: the Small-cap books are long the smallest names.
-       These books were first locked 2026-10-16 and are forward-only: no proxy or back-filled history, so read the day counts before the returns.`
+       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded</b>, and the honest start differs by factor: Value, Low-vol and Growth
+       begin late June 2026 because <code>pe_forward</code> and <code>beta</code> have no point-in-time source at all. Momentum, Quality and Size were rebuilt further
+       back, but the <code>companies</code> table itself only begins 2026-06-04, so <b>2026-07-01 is the first lock struck on a universe the model actually held</b>.
+       Survivorship flatters every long-only book. An adversarial review on 2026-10-20 rated most of these DO-NOT-USE &mdash; see
+       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code>.</div>`
 };
 async function paperCard(el){
   const rows = await qAll("site_paper_nav", r => r.order("nav_date").order("strategy"));   // (nav_date, strategy) is unique: with only nav_date, ties let a page boundary drop or repeat rows
@@ -2205,7 +2215,8 @@ async function paperCard(el){
     const gbtn = g => `<button class="lock" data-group="${g.id}"${paperGroup===g.id?' style="border-color:var(--brand);color:var(--text)"':""}>${esc(g.name)}</button>`;
     const span = grp.id === "model"
       ? `since ${start_} · ${days.length} trading days · <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${liveDays} days since`
-      : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"} · forward-locked only`;
+      : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"}`
+          + (start_ < "2026-10-16" ? " · reconstructed before 2026-10-16" : " · forward-locked");
     const noteHtml = grp.id === "other"
       ? `<b style="color:var(--text)">${unlabelled.length} strateg${unlabelled.length === 1 ? "y has" : "ies have"} no label registered in this page</b> (${unlabelled.map(esc).join(", ")}) and
          ${unlabelled.length === 1 ? "is" : "are"} shown by key. Add ${unlabelled.length === 1 ? "it" : "them"} to PAPER_LABEL, PAPER_COL and PAPER_GROUPS in build_live.py.`
