@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:31 · 9ad6c7a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:43 · 7d9ba5e</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:31 · 9ad6c7a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:43 · 7d9ba5e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -426,6 +426,14 @@ async function enter(){
       const tr = await qAll("site_trades", r => r.order("trade_date", {ascending:false}));
       if(tr && tr.length) D.trades = tr.map(t => ({...t, date: t.trade_date}));
     }catch(e){}
+    // The model of models. Until this existed the site showed only the EQUITY sleeve, so the thing
+    // a client actually holds — 60/40 or 80/20 — appeared nowhere and the book's 26.7% volatility
+    // read as though it were the portfolio's.
+    try{
+      LIVE.models = await qAll("site_model_portfolios", r => r.order("as_of"));
+      LIVE.mstats = Object.fromEntries((await qAll("site_model_stats")).map(m => [m.model, m]));
+      LIVE.modelsOk = LIVE.models.length > 0;
+    }catch(e){ LIVE.models = []; LIVE.mstats = {}; LIVE.modelsOk = false; }
     // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
     // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
     // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
@@ -925,6 +933,13 @@ function slugCard(){
 }
 async function performanceAll(el){
   performance(el);
+  // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
+  // inserted: performance() sets innerHTML, so anything written before it is wiped, and every other
+  // section on this page appends — DOM surgery here would be the one place doing something else.
+  const mbox = document.createElement("div");
+  el.appendChild(mbox);
+  mbox.innerHTML = sectionHead("The model of models", `<span class="muted">what a client actually holds</span>`) + modelsCard();
+  drawModels();
   const slug = document.createElement("div"); slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard(); el.appendChild(slug);
   const riskBox = document.createElement("div"); el.appendChild(riskBox);
   try{ await risk(riskBox); }catch(e){ riskBox.innerHTML = sectionHead("Risk") + `<div class="note">Risk data unavailable: ${esc(e.message||e)}</div>`; }
@@ -2202,6 +2217,31 @@ function sizingCard(){
       <br><br><b>Where the money goes.</b> ${esc(A.brake_destination || "")}
       ${A.rejected ? `<br><br><b>What was tried and rejected:</b> ${esc(A.rejected)}` : ""}</div>`);
 }
+function drawModels(){
+  const rows = (typeof LIVE !== "undefined" && LIVE.models) || [];
+  if(!rows.length) return;
+  const by = {};
+  rows.forEach(r => (by[r.model] ||= []).push(r));
+  const days = [...new Set(rows.map(r => r.as_of))].sort();
+  const series = Object.entries(by).map(([n, rs]) => {
+    const m = Object.fromEntries(rs.map(r => [r.as_of, (+r.nav - 1) * 100]));
+    return {name: n.replace(" Compounders",""), type: "line", showSymbol: false,
+            lineStyle: {color: MODEL_C[n], width: n === modelSel ? 2.4 : 1.2},
+            itemStyle: {color: MODEL_C[n]},
+            data: days.map(d => m[d] ?? null)};
+  });
+  mk(document.getElementById("mChart"), {
+    legend:{bottom:0, textStyle:{color:C.muted}},
+    tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : (v>0?"+":"") + (+v).toFixed(2) + "%"},
+    grid:{left:50,right:16,top:16,bottom:40},
+    xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
+    yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v => (v>0?"+":"") + v + "%"},
+           splitLine:{lineStyle:{color:C.line}}},
+    series});
+  const seg = document.getElementById("mSeg");
+  if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+    modelSel = b.dataset.m; clearCharts(); performanceAll(document.getElementById("view")); });
+}
 function fragilityCard(){
   const F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
   if(!F.length) return card("Portfolio fragility", "unavailable", `<div class="note">No fragility rows.
@@ -2387,10 +2427,70 @@ async function section(el, title, fn, right=""){
   catch(e){ box.innerHTML = `<div class="note">${esc(title)} unavailable: ${esc(e.message||e)}</div>`; }
   return box;
 }
+/* ═══ THE MODEL OF MODELS ════════════════════════════════════════════════
+   Integrity Compounders is the EQUITY input to two client portfolios; the rest is Defensive Core
+   (CSHI 30 / QDSIX 20 / BDMIX 20 / LCTIX 20 / cash 10). Every statistic here is on the DRIFTED
+   book: there were no rebalances, so the weights shown are what the sleeves became, not what was
+   set, and rebalancing them monthly would be a different portfolio with a different return. */
+let modelSel = "Focused Compounders";
+const MODEL_ORDER = ["Focused Compounders","Balanced Compounders","Integrity Compounders","Defensive Core"];
+const MODEL_C = {"Focused Compounders": C.accent, "Balanced Compounders": C.gold,
+                 "Integrity Compounders": C.green, "Defensive Core": C.muted};
+const MSTAT = [["total_return_pct","Total","pct"],["cagr_pct","CAGR","pct"],["vol_pct","Volatility","pct"],
+               ["sharpe","Sharpe","num"],["max_drawdown_pct","Max drawdown","pct"],
+               ["beta_vs_spy","Beta vs SPY","num"],["alpha_ann_pct","Alpha / yr","pct"],
+               ["best_month_pct","Best month","pct"],["worst_month_pct","Worst month","pct"]];
+function modelsCard(){
+  const M = (typeof LIVE !== "undefined" && LIVE.mstats) || {};
+  const names = MODEL_ORDER.filter(n => M[n]);
+  if(!names.length) return card("Models", "unavailable", `<div class="note">The model engine has not
+    run. ${(typeof LIVE !== "undefined" && LIVE.modelsOk === false) ? "The view did not answer — db/037 may not be applied." : ""}</div>`);
+  const sel = M[modelSel] ? modelSel : names[0];
+  const A = M[sel].assumptions || {}, S = M[sel].stats || {};
+  const fmt = (v, kind) => v == null ? "—" : kind === "pct" ? `${(+v).toFixed(2)}%` : (+v).toFixed(2);
+  const seg = `<span class="seg" id="mSeg">${names.map(n =>
+      `<button data-m="${esc(n)}" class="${n===sel?"on":""}">${esc(n.replace(" Compounders",""))}</button>`).join("")}</span>`;
+  const dc = A.defensive_core, dcd = A.defensive_core_drifted;
+  return card("Models",
+    `${seg} <span class="muted">anchored ${esc(A.anchor || "—")} · no rebalancing, weights drift</span>`,
+    `<div class="kvs">
+      ${A.set_equity_pct != null ? `<div class="kv"><span class="muted">Set</span><b>${(+A.set_equity_pct).toFixed(0)}% equity / ${(100-+A.set_equity_pct).toFixed(0)}% Defensive Core</b></div>` : ""}
+      <div class="kv"><span class="muted">Total return</span><b class="${+S.total_return_pct>=0?"pos":"neg"}">${fmt(S.total_return_pct,"pct")}</b></div>
+      <div class="kv"><span class="muted">Volatility</span><b>${fmt(S.vol_pct,"pct")}</b></div>
+      <div class="kv"><span class="muted">Max drawdown</span><b class="neg">${fmt(S.max_drawdown_pct,"pct")}</b></div>
+      <div class="kv"><span class="muted">Sharpe</span><b>${fmt(S.sharpe,"num")}</b></div>
+     </div>
+     <div class="chart" id="mChart"></div>
+     ${tbl(["", ...names.map(n => n.replace(" Compounders",""))],
+        MSTAT.map(([k,label,kind]) => [label, ...names.map(n => {
+          const v = (M[n].stats||{})[k];
+          const hot = n === sel;
+          return `<span style="${hot?`color:${MODEL_C[n]};font-weight:600`:""}">${fmt(v,kind)}</span>`; })]))}
+     <div class="note" style="margin-top:10px">
+      <b>Drift is real, not an approximation.</b> ${dc ? `Defensive Core was set at
+      ${Object.entries(dc).map(([k,v])=>`${esc(k)} ${(v*100).toFixed(0)}%`).join(" · ")}` : ""}${dcd ? `
+      and has drifted to ${Object.entries(dcd).map(([k,v])=>`${esc(k)} ${(v*100).toFixed(1)}%`).join(" · ")}` : ""}.
+      There were no mass rebalances, so each sleeve compounded independently from the anchor and the
+      model's daily return is value-weighted on the PREVIOUS day's values. Rebalancing monthly
+      instead would be a different portfolio with a different return.
+      <br><br><b>Cash earns the 13-week bill</b>, not zero — at 4-5% that is roughly 0.45% a year on
+      the Defensive Core, and assuming zero would understate both models. The equity leg is the live
+      book series, not a proxy, which is why these begin ${esc(A.anchor||"")} rather than in January.
+      <br><br><b>Read the alpha against the beta.</b> Both client models carry more market risk than
+      SPY, so matching SPY's return is not a neutral outcome — it is the same return for more risk,
+      which is what a negative alpha here is saying. One year is not long enough to judge that.</div>`);
+}
 // HOW HAVE WE DONE. Returns against SPY over every window, what the record looks like trade by
 // trade, whether any of it is skill, and what the book pays.
 async function performanceAll(el){
   performance(el);
+  // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
+  // inserted: performance() sets innerHTML, so anything written before it is wiped, and every other
+  // section on this page appends — DOM surgery here would be the one place doing something else.
+  const mbox = document.createElement("div");
+  el.appendChild(mbox);
+  mbox.innerHTML = sectionHead("The model of models", `<span class="muted">what a client actually holds</span>`) + modelsCard();
+  drawModels();
   const slug = document.createElement("div");
   slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard();
   el.appendChild(slug);
