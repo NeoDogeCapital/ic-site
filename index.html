@@ -57,6 +57,7 @@ nav.tabs{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:n
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;font-size:13px;white-space:nowrap;transition:all .15s}
 nav.tabs a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.navgrp{align-self:center;margin:0 2px 0 10px;padding-left:10px;border-left:1px solid var(--line);color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap;user-select:none}
 nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 0 0 1px rgba(175,100,82,.4)}
 /* The tab strip scrolls horizontally with a hidden scrollbar, so on a narrow window the tabs
    past the fold were unreachable with no affordance that they existed. The menu lists every
@@ -71,6 +72,7 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 .menupanel a{display:block;padding:8px 11px;border-radius:7px;color:var(--muted);text-decoration:none;
   font-size:13px;font-weight:500;white-space:nowrap}
 .menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
+.mgrp{padding:9px 11px 3px;color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase}
 .menupanel a.on{color:var(--text);background:rgba(106,166,248,.15);box-shadow:inset 0 0 0 1px rgba(106,166,248,.28)}
 @media(max-width:1150px){nav.tabs{display:none}}
 @media(min-width:1151px){.menubtn .mlabel{display:none}}
@@ -265,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 16:57 · ae475cc</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 17:45 · ce8bcb4</div>
   </div>
 </section>
 
@@ -279,23 +281,21 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
     <nav class="tabs" id="tabs">
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#holdings" data-v="holdings">Holdings</a>
-      <a href="#memo" data-v="memo">Memo</a>
       <a href="#performance" data-v="performance">Performance</a>
-      <a href="#analytics" data-v="analytics">Analytics</a>
+      <a href="#risk" data-v="risk">Risk</a>
+      <span class="navgrp">Universe</span>
       <a href="#universe" data-v="universe">Universe</a>
-      <a href="#grid" data-v="grid">Grid</a>
-      <a href="#proposal" data-v="proposal">Proposal</a>
-      <a href="#theses" data-v="theses">Theses</a>
       <a href="#signals" data-v="signals">Signals</a>
-      <a href="#history" data-v="history">History</a>
-      <a href="#about" data-v="about">About</a>
+      <span class="navgrp">Process</span>
+      <a href="#memo" data-v="memo">Memo</a>
+      <a href="#research" data-v="research">Research</a>
     </nav>
     <div class="menuwrap">
       <button class="lock menubtn" id="menubtn" aria-haspopup="true" aria-expanded="false"
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 16:57 · ae475cc</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 17:45 · ce8bcb4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1665,34 +1665,6 @@ function vdurBlock(tk){
   return `<div class="sec" id="vdurBlock" data-tk="${esc(tk)}"><h4>Valuation duration</h4>
     ${vdurSplit(LIVE.vdur[tk] || null, h, tk)}${rateBetaBlock(b, tk)}${vdurFxRefused(tk) ? "" : vdurHistory(h)}${rateHistory(rh, b)}</div>`;
 }
-/* ═══ UNIVERSE MORNING NOTE (Grid + Universe tabs) ════════════════════════ */
-// The book notes live on Holdings. This one is about the bench — what happened across all ~453
-// tracked names — so it belongs where the universe is looked at, not where the positions are.
-function universeNote(){
-  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
-  const u = B.find(x => x.kind === "universe");
-  if(!u || !u.payload) return "";
-  const b = u.payload;
-  const moving = (b.whats_moving||[]).map(x =>
-    `<li><a href="#grid/${x.ticker}" class="tk" style="text-decoration:none">${x.ticker}</a> — ${esc(x.note)}</li>`).join("");
-  const movers = (b.movers||[]).map(x =>
-    `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
-  const chg = (b.model_changes||[]).map(x =>
-    `<li><span class="tk">${x.ticker}</span> — ${esc(x.note)}</li>`).join("");
-  return `<div class="card brief universe">
-    <div class="bhead"><div><div class="caps">Universe morning note · ${esc(u.as_of)}</div>
-      <h3>${esc(b.headline||"")}</h3></div></div>
-    ${b.themes ? `<p class="blede">${esc(b.themes)}</p>` : ""}
-    <div class="bgrid">
-      ${moving ? `<div><h4>What's moving</h4><ul class="blist">${moving}</ul></div>` : ""}
-      ${movers ? `<div><h4>Overnight movers</h4><ul class="blist">${movers}</ul></div>` : ""}
-      ${chg ? `<div><h4>Model changed its read</h4><ul class="blist">${chg}</ul></div>` : ""}
-    </div>
-    <div class="note" style="margin-top:12px">All ~453 tracked names, not the book — the holdings notes
-      are on the Holdings tab. Built from one market-wide news pull filtered to the universe, plus the
-      grid's own grades and any change since the previous run.</div>
-  </div>`;
-}
 /* ═══ VALUATION DURATION (Kao bond floor vs growth option) ════════════════ */
 // implied_fcf_cagr is the FCF growth the current price requires over the horizon — "what you'd have
 // to believe". value_gap is that minus the consensus forward REVENUE CAGR, so it is directional
@@ -1747,6 +1719,13 @@ const GRID_COLS = [
   ["sector","Sector","txt"],
   // Size and the six factor percentiles, as one block. Derived from FAC_KEYS / FACTORS in the template, so the
   // header list and facCells() below cannot disagree about how many columns there are.
+  // Alignment and the factor profile come from the UNIVERSE table, which used to live on its own tab
+  // with its own 13-column table of the same names. Collapsing the two tabs into one meant either
+  // keeping two tables of the same population side by side — the duplication the merge existed to
+  // remove — or carrying these two columns across. They are the only two the other table had that
+  // this one did not; everything else was already here.
+  ["alignment","Alignment","num","alignment_score_v3, 0-100. ACCUMULATE 65+, DISTRIBUTE under 35"],
+  ["f_profile","Factor profile","txt","The dominant factor tilt from the per-name factor scores"],
   ["mcap","Mkt cap","num","Market capitalisation. First click is largest first; click again for smallest first"],
   ...FACTORS.map(f => ["f_" + f.k, f.label, "num", f.label + " percentile, 0-100 · " + f.tip]),
   ["grade_reason","Why","txt"],
@@ -1779,7 +1758,7 @@ function facCells(r){
   return `<td class="fac fb0">${capCell(u, tag)}</td>` + FACTORS.map(f => `<td class="fac">${facCell(u, f, tag)}</td>`).join("");
 }
 async function grid(el){
-  el.innerHTML = head("Process", "Decision grid", `<span class="muted">loading…</span>`);
+  el.innerHTML = `<div class="muted">loading…</div>`;
   if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
   const M = LIVE.matrix, grades = ["A","B","C","D"], techs = ["STRONG_BUY","BUY","NEUTRAL","SELL","STRONG_SELL"];
   const cell = (g,t) => M.filter(r => r.grade===g && r.tech_rating===t);
@@ -1811,7 +1790,8 @@ async function grid(el){
       <td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
       <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
-      <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
+      <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>
+      <td>${num(r.alignment, 0)}</td><td class="muted" style="font-size:12px">${esc(profileLabel((LIVE.suniv[r.ticker]||{}).factor_profile))}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     // Header and row are built from two lists and had drifted before (a cell added without its header
     // renders every column to its right under the wrong name). Say so loudly if it happens again.
     { const first = document.querySelector("#gridRows tr");
@@ -1854,8 +1834,8 @@ async function grid(el){
     if(sc) sc.onclick = ev => { ev.preventDefault(); gridSort = [gridSort[0]]; draw(); };
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
-  el.innerHTML = head("Process", "Decision grid", `<span class="muted">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</span>`) +
-    universeNote() +
+  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</div>` +
+    memoPointer("universe morning note") +
     card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${t.replace("_"," ")}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
@@ -1961,12 +1941,12 @@ function tbl(h, rows){ return `<div class="table-wrap"><table class="tbl"><thead
 
 /* ═══ PROPOSAL (live) ═══════════════════════════════════════════════════════ */
 async function proposal(el){
-  el.innerHTML = head("Process", "Proposed portfolio", `<span class="muted">loading…</span>`);
+  el.innerHTML = `<div class="muted">loading…</div>`;
   if(!LIVE.proposal) LIVE.proposal = await qAll("site_proposal");
   const P = LIVE.proposal, by = s => P.filter(r => r.status===s);
   const sect = (s, sub) => card(`${s} (${by(s).length})`, sub, tbl(["Ticker","Grade","Action","Technical","Composite","Sector","Reason"],
     by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc((r.action||"").replaceAll("_"," ")), esc((r.tech_rating||"—").replace("_"," ")), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
-  el.innerHTML = head("Process", "Proposed portfolio", `<span class="muted">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</span>`) +
+  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</div>` +
     sect("KEEP", "held and supported by the grid") + `<div style="margin-top:16px">${sect("ADD","ranked on fundamentals, within sector and correlation limits")}</div>` +
     `<div style="margin-top:16px">${sect("EXIT","grid no longer supports ownership, or a limit forces it out")}</div>`;
   await paperCard(el);
@@ -2209,12 +2189,22 @@ function fragilityCard(){
       against a 60-day cap it is arithmetically dead at this book's size, and a leg pinned at zero would be a standing
       discount on every reading rather than a conservative input.` : ""}</div>`);
 }
-async function analytics(el){
-  el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">loading…</span>`);
+/* ═══ THE BOOK'S CARDS, GROUPED BY QUESTION ══════════════════════════════
+   These were one "Analytics" tab, which was never a question — it was a drawer. Three tabs all
+   called head("Portfolio", …) while "risk" lived in three places: stress and breaches on
+   Performance, volatility and duration here, and the regime dashboard wherever it last landed.
+   Meanwhile "Skill vs benchmark" — alpha, beta, t(alpha), tracking error, information ratio — sat
+   here and is the most performance-ish card in the system, and Performance quietly held factor
+   exposure, which is a risk measure.
+
+   So the cards are now grouped by what they answer: HOW HAVE WE DONE (performance) against WHAT
+   COULD HURT US (risk). anLoad() is the shared prelude both need; nothing is fetched twice because
+   every result is cached on LIVE. */
+async function anLoad(){
   if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
   // The rate-beta median is over the decision grid's stocks (a guard: ic_rate_beta held ETFs until
-  // 2026-10-16 and no longer does); if this fetch fails the median reads "—" rather than the whole tab
-  // failing for a supplementary figure.
+  // 2026-10-16 and no longer does); if this fetch fails the median reads "—" rather than the whole
+  // tab failing for a supplementary figure.
   if(!LIVE.matrix){ try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){} }
   const HA = LIVE.hanal, B = HA.book || {}, P = D.perf;
   if(!LIVE.benchPx){
@@ -2225,84 +2215,178 @@ async function analytics(el){
   const pairs = (b) => { const y=[], x=[]; P.daily_p.forEach((v,i) => { if(v!=null && b[i]!=null){ y.push(v); x.push(b[i]); } }); return {y, x}; };
   const benches = {SPY: P.daily_b, QQQ: retOn(LIVE.benchPx.QQQ||{}), IWM: retOn(LIVE.benchPx.IWM||{})};
   const stats = Object.fromEntries(Object.entries(benches).map(([k,b]) => { const {y,x} = pairs(b); return [k, regress(y,x)]; }));
-
-  const H = D.holdings.slice(), movers = H.filter(h => h.day!=null).sort((a,b) => b.day-a.day);
+  const H = D.holdings.slice();
+  return {HA, B, P, benches, stats, pairs, H,
+    movers: H.filter(h => h.day!=null).sort((a,b) => b.day-a.day),
+    inc: Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.income||{})})).filter(r => r.fwd_rate > 0).sort((a,b)=>b.annual_income-a.annual_income),
+    vols: Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.vol||{})})).filter(r => r.regime),
+    news: H.flatMap(h => ((h.research||{}).news||[]).map(n => ({...n, tk:h.tk}))).sort((a,b) => (b.date||"").localeCompare(a.date||"")).slice(0,60)};
+}
+const VOL_C = {LOW:C.green, NORMAL:C.muted, ELEVATED:C.amber, EXTREME:C.red};
+function anMoversCard(X){
   const mv = h => [`<b>${esc(h.tk)}</b>`, `<span class="${cls(h.day)}">${pct(h.day,2)}</span>`, usd(h.value - h.value/(1+h.day))];
-  const inc = Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.income||{})})).filter(r => r.fwd_rate > 0).sort((a,b)=>b.annual_income-a.annual_income);
-  const vols = Object.entries(HA.holdings||{}).map(([tk,h]) => ({tk, ...(h.vol||{})})).filter(r => r.regime);
-  const RC = {LOW:C.green, NORMAL:C.muted, ELEVATED:C.amber, EXTREME:C.red};
-  const news = H.flatMap(h => ((h.research||{}).news||[]).map(n => ({...n, tk:h.tk}))).sort((a,b) => (b.date||"").localeCompare(a.date||"")).slice(0,60);
-
-  el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">prices live · income & volatility as of ${HA.as_of||"—"}</span>`) +
-  `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>
-  <div class="grid g2" style="margin-top:16px">
-    ${card("Today's movers", `book ${(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)>=0)?"up":"down"} ${usd(Math.abs(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)))} today`,
-      `<div class="grid g2">${tbl(["Top","Day","$"], movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], movers.slice(-5).reverse().map(mv))}</div>`)}
-    ${card("Skill vs benchmark", "daily returns since inception · alpha = return not explained by beta",
-      tbl(["Benchmark","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"], Object.entries(stats).filter(([,s])=>s).map(([k,s]) =>
-        [k, pct(s.cum), pct(s.bench_cum), num(s.beta), `<span class="${cls(s.alpha_ann)}">${pct(s.alpha_ann)}</span>`, num(s.t_alpha), pct(s.te,1,false), num(s.ir)])) +
-      `<div class="chart" id="anScatter"></div><div class="note">|t| ≥ 2 is the usual bar for alpha distinguishable from luck.</div>`)}
-  </div>
-  <div class="grid g2" style="margin-top:16px">
-    ${card("Volatility regimes", `book: <b style="color:${RC[(B.vol||{}).regime]||C.muted}">${(B.vol||{}).regime||"—"}</b> · conditional vol ${pct((B.vol||{}).cond_vol,1,false)} vs long-run ${pct((B.vol||{}).long_run_vol,1,false)} · GARCH(1,1)`,
-      `<div class="chart" id="anVol"></div>` + tbl(["Holding","Regime","Cond. vol","Long-run","20d realized","Pctile"], vols.sort((a,b)=>b.vol_percentile-a.vol_percentile).map(v =>
-        [`<b>${v.tk}</b>`, `<span style="color:${RC[v.regime]}">${v.regime}</span>`, pct(v.cond_vol,0,false), pct(v.long_run_vol,0,false), pct(v.realized_20d,0,false), pct(v.vol_percentile,0,false)])))}
-    ${card("Income", `${usd((B.income||{}).annual_income)}/yr · yield ${pct((B.income||{}).yield,2,false)} · yield on cost ${pct((B.income||{}).yield_on_cost,2,false)} · ${(B.income||{}).payers||0}/${(B.income||{}).names||0} pay`,
-      tbl(["Holding","Annual $","Rate","Yield","YoC","Ex-date","Last paid"], inc.map(r => [`<b>${r.tk}</b>`, usd(r.annual_income), usd(r.fwd_rate,2), pct(r.yield,2,false), pct(r.yield_on_cost,2,false), esc(r.ex_date||"—"), r.last_payment ? `${r.last_payment.date} · ${usd(r.last_payment.amount,2)}` : "—"])))}
-  </div>
-  <div class="grid g-1-2" style="margin-top:16px">
-    ${card("Geography", "by headquarters country", `<div class="chart" id="anGeo"></div>`)}
-    ${vdurCard()}
-    ${card("Valuation & profitability", "trailing, from the latest screen", `<div class="table-wrap">` + tbl(["Holding","ROIC","Gross mgn","FCF mgn","FCF/EV","ND/EBITDA","Fwd rev","Fwd EPS","Beta","Mkt cap"],
-      // pct() MULTIPLIES BY 100, and every one of these is already PERCENT (db/025: roic, the three
-      // margins and fcf_yield are PERCENT on company_market_data). So this rendered AEM's ROIC as
-      // 1921% and its gross margin as 7458%, for every holding, since the card was written. mcap is
-      // RAW DOLLARS and was divided by 1000 and labelled "B", giving "$95019360B". pctRaw() is the
-      // helper for an already-percent value; usdB() formats a raw-dollar cap.
-      // SCALES DIFFER WITHIN THIS ONE ROW, which is how both the original bug and my first fix for it
-      // went in. Measured on the live payload: roic 53.95, gm 48.65, fcfm 29.28, fwd_rev 12.70 and
-      // fwd_eps 12.20 are PERCENT, while fcfev is a DECIMAL (AAPL 0.0282). The original applied pct()
-      // — which multiplies by 100 — to all of them, so ROIC read 5395% and gross margin 4865%; the
-      // first repair swung the other way and sent fcfev through pctRaw(), which rendered AEM's 4.9%
-      // as "+0.0%". Percent fields take pctFlat (no sign: a margin is not a change), the forward
-      // CAGRs take pctRaw (signed, they can be negative), and fcfev alone takes pct().
-      H.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pctFlat(h.roic,0), pctFlat(h.gm,0), pctFlat(h.fcfm,0), pct(h.fcfev,1,false), num(h.nde,1), pctRaw(h.fwd_rev,0), pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`)}
-  </div>
-  <div style="margin-top:16px">${card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
-    tbl(["Date","Holding","Headline","Why it matters"], news.map(n => [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`)}</div>`;
-
-  const sp = pairs(benches.SPY);
+  const dayPl = D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0);
+  return card("Today's movers", `book ${dayPl>=0?"up":"down"} ${usd(Math.abs(dayPl))} today`,
+    `<div class="grid g2">${tbl(["Top","Day","$"], X.movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], X.movers.slice(-5).reverse().map(mv))}</div>`);
+}
+function anSkillCard(X){
+  return card("Skill vs benchmark", "daily returns since inception · alpha = return not explained by beta",
+    tbl(["Benchmark","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"],
+      Object.entries(X.stats).filter(([,st])=>st).map(([k,st]) =>
+        [k, pct(st.cum), pct(st.bench_cum), num(st.beta), `<span class="${cls(st.alpha_ann)}">${pct(st.alpha_ann)}</span>`,
+         num(st.t_alpha), pct(st.te,1,false), num(st.ir)])) +
+    `<div class="chart" id="anScatter"></div><div class="note">|t| ≥ 2 is the usual bar for alpha distinguishable from luck.</div>`);
+}
+function anIncomeCard(X){
+  const I = X.B.income || {};
+  return card("Income", `${usd(I.annual_income)}/yr · yield ${pct(I.yield,2,false)} · yield on cost ${pct(I.yield_on_cost,2,false)} · ${I.payers||0}/${I.names||0} pay`,
+    tbl(["Holding","Annual $","Rate","Yield","YoC","Ex-date","Last paid"], X.inc.map(r =>
+      [`<b>${r.tk}</b>`, usd(r.annual_income), usd(r.fwd_rate,2), pct(r.yield,2,false), pct(r.yield_on_cost,2,false),
+       esc(r.ex_date||"—"), r.last_payment ? `${r.last_payment.date} · ${usd(r.last_payment.amount,2)}` : "—"])));
+}
+function anVolCard(X){
+  const V = X.B.vol || {};
+  return card("Volatility regimes", `book: <b style="color:${VOL_C[V.regime]||C.muted}">${V.regime||"—"}</b> · conditional vol ${pct(V.cond_vol,1,false)} vs long-run ${pct(V.long_run_vol,1,false)} · GARCH(1,1)`,
+    `<div class="chart" id="anVol"></div>` + tbl(["Holding","Regime","Cond. vol","Long-run","20d realized","Pctile"],
+      X.vols.sort((a,b)=>b.vol_percentile-a.vol_percentile).map(v =>
+        [`<b>${v.tk}</b>`, `<span style="color:${VOL_C[v.regime]}">${v.regime}</span>`, pct(v.cond_vol,0,false),
+         pct(v.long_run_vol,0,false), pct(v.realized_20d,0,false), pct(v.vol_percentile,0,false)])));
+}
+const anGeoCard = () => card("Geography", "by headquarters country · a concentration read", `<div class="chart" id="anGeo"></div>`);
+function anValuationCard(X){
+  // SCALES DIFFER WITHIN THIS ONE ROW, which is how both the original bug and my first fix for it
+  // went in. Measured on the live payload: roic 53.95, gm 48.65, fcfm 29.28, fwd_rev 12.70 and
+  // fwd_eps 12.20 are PERCENT, while fcfev is a DECIMAL (AAPL 0.0282). The original applied pct()
+  // — which multiplies by 100 — to all of them, so ROIC read 5395% and gross margin 4865%; the
+  // first repair swung the other way and sent fcfev through pctRaw(), which rendered AEM's 4.9%
+  // as "+0.0%". Percent fields take pctFlat (no sign: a margin is not a change), the forward
+  // CAGRs take pctRaw (signed, they can be negative), and fcfev alone takes pct(). mcap is RAW
+  // DOLLARS and was once divided by 1000 and labelled "B", giving "$95019360B"; fmtCap owns it.
+  return card("Valuation & profitability", "trailing, from the latest screen", `<div class="table-wrap">` +
+    tbl(["Holding","ROIC","Gross mgn","FCF mgn","FCF/EV","ND/EBITDA","Fwd rev","Fwd EPS","Beta","Mkt cap"],
+      X.H.slice().sort((a,b)=>(b.weight||0)-(a.weight||0)).map(h => [`<b>${h.tk}</b>`, pctFlat(h.roic,0),
+        pctFlat(h.gm,0), pctFlat(h.fcfm,0), pct(h.fcfev,1,false), num(h.nde,1), pctRaw(h.fwd_rev,0),
+        pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`);
+}
+function anNewsCard(X){
+  return card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
+    tbl(["Date","Holding","Headline","Why it matters"], X.news.map(n =>
+      [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`);
+}
+function anDrawSkill(X){
+  const sp = X.pairs(X.benches.SPY), st = X.stats.SPY;
   mk(document.getElementById("anScatter"), {tooltip:{trigger:"item", formatter:p => `SPY ${(p.value[0]*100).toFixed(2)}% · book ${(p.value[1]*100).toFixed(2)}%`},
     grid:{left:48,right:16,top:16,bottom:30}, xAxis:{type:"value", name:"SPY day", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
     yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
     series:[{type:"scatter", symbolSize:4, itemStyle:{color:C.accent, opacity:.55}, data:sp.x.map((v,i)=>[v, sp.y[i]])},
-      ...(stats.SPY ? [{type:"line", showSymbol:false, lineStyle:{color:C.gold,width:2}, data:[-0.05,0.05].map(v => [v, stats.SPY.alpha_ann/252 + stats.SPY.beta*v])},
-                       {type:"line", showSymbol:false, lineStyle:{color:C.dim,type:"dashed"}, data:[[-0.05,-0.05],[0.05,0.05]]}] : [])]});
-  const bh = (B.vol||{}).history || [];
+      ...(st ? [{type:"line", showSymbol:false, lineStyle:{color:C.gold,width:2}, data:[-0.05,0.05].map(v => [v, st.alpha_ann/252 + st.beta*v])},
+                {type:"line", showSymbol:false, lineStyle:{color:C.dim,type:"dashed"}, data:[[-0.05,-0.05],[0.05,0.05]]}] : [])]});
+}
+function anDrawVol(X){
+  const bh = (X.B.vol||{}).history || [];
   mk(document.getElementById("anVol"), {grid:{left:48,right:16,top:16,bottom:30}, xAxis:{type:"category", data:bh.map(x=>x[0]), axisLabel:{color:C.muted}},
     yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
     series:[{type:"line", showSymbol:false, areaStyle:{opacity:.12}, lineStyle:{color:C.accent}, data:bh.map(x=>x[1])}]});
-  // The regime chart carries its own threshold lines, because the number means nothing without them:
-  // 40 and 65 are where the state changes, and the DEFENSIVE band is the only one measured to matter.
-  const RH = LIVE.regime || [];
-  if(RH.length){
-    const SC2 = REGIME_C();
-    mk(document.getElementById("mfiHist"), {
-      tooltip:{trigger:"axis", formatter:ps => { const i = ps[0].dataIndex, x = RH[i];
-        return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cover ${x.cost_state||"—"}`; }},
-      grid:{left:34,right:14,top:14,bottom:26},
-      xAxis:{type:"category", data:RH.map(x=>x.as_of), axisLabel:{color:C.muted}},
-      yAxis:{type:"value", min:0, max:100, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
-      series:[{type:"line", showSymbol:false, lineStyle:{color:C.accent, width:2}, areaStyle:{opacity:.10},
-        data:RH.map(x=>+x.mfi),
-        markLine:{silent:true, symbol:"none", label:{color:C.dim, fontSize:10, position:"insideStartTop"},
-          data:[{yAxis:65, lineStyle:{color:C.red, type:"dashed"}, label:{formatter:"DEFENSIVE 65"}},
-                {yAxis:40, lineStyle:{color:C.amber, type:"dashed"}, label:{formatter:"DETERIORATING 40"}}]},
-        markArea:{silent:true, itemStyle:{color:"rgba(239,83,80,.07)"}, data:[[{yAxis:65},{yAxis:100}]]}}]});
-  }
-  const geo = Object.entries(B.geography||{});
+}
+function anDrawGeo(X){
+  const geo = Object.entries(X.B.geography||{});
   mk(document.getElementById("anGeo"), {tooltip:{trigger:"item", formatter:p => `${p.name}: ${(p.value*100).toFixed(1)}%`},
     series:[{type:"pie", radius:["45%","72%"], label:{color:C.muted, formatter:p => `${p.name} ${(p.value*100).toFixed(0)}%`}, data:geo.map(([k,v]) => ({name:k, value:v}))}]});
+}
+// The regime chart carries its own threshold lines, because the number means nothing without them:
+// 40 and 65 are where the state changes, and the DEFENSIVE band is the only one measured to matter.
+function anDrawRegime(){
+  const RH = LIVE.regime || [];
+  if(!RH.length) return;
+  mk(document.getElementById("mfiHist"), {
+    tooltip:{trigger:"axis", formatter:ps => { const i = ps[0].dataIndex, x = RH[i];
+      return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cover ${x.cost_state||"—"}`; }},
+    grid:{left:34,right:14,top:14,bottom:26},
+    xAxis:{type:"category", data:RH.map(x=>x.as_of), axisLabel:{color:C.muted}},
+    yAxis:{type:"value", min:0, max:100, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+    series:[{type:"line", showSymbol:false, lineStyle:{color:C.accent, width:2}, areaStyle:{opacity:.10},
+      data:RH.map(x=>+x.mfi),
+      markLine:{silent:true, symbol:"none", label:{color:C.dim, fontSize:10, position:"insideStartTop"},
+        data:[{yAxis:65, lineStyle:{color:C.red, type:"dashed"}, label:{formatter:"DEFENSIVE 65"}},
+              {yAxis:40, lineStyle:{color:C.amber, type:"dashed"}, label:{formatter:"DETERIORATING 40"}}]},
+      markArea:{silent:true, itemStyle:{color:"rgba(239,83,80,.07)"}, data:[[{yAxis:65},{yAxis:100}]]}}]});
+}
+/* ═══ COMPOSED TABS ══════════════════════════════════════════════════════
+   A section is just another view rendered into an appended div. Every one is wrapped so a single
+   failing section degrades to a named message instead of taking the tab with it — the sections
+   read different Supabase views and any one of them can be the thing that is missing. */
+async function section(el, title, fn, right=""){
+  // THE BOX IS APPENDED BEFORE fn RUNS, and fn writes into it directly. Building the HTML in a
+  // detached div and copying innerHTML across looks equivalent and is not: every one of these views
+  // sets innerHTML and then calls mk() to draw its charts by element id, so the chart would bind to
+  // a node that never reaches the document and the card would render as an empty box. The header is
+  // its own sibling element because fn overwrites whatever is in its own.
+  const h = document.createElement("div"); h.innerHTML = sectionHead(title, right); el.appendChild(h);
+  const box = document.createElement("div"); el.appendChild(box);
+  try{ await fn(box); }
+  catch(e){ box.innerHTML = `<div class="note">${esc(title)} unavailable: ${esc(e.message||e)}</div>`; }
+  return box;
+}
+// HOW HAVE WE DONE. Returns against SPY over every window, what the record looks like trade by
+// trade, whether any of it is skill, and what the book pays.
+async function performanceAll(el){
+  performance(el);
+  const slug = document.createElement("div");
+  slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard();
+  el.appendChild(slug);
+  let X = null;
+  try{ X = await anLoad(); }catch(e){}
+  if(X){
+    const box = document.createElement("div"); el.appendChild(box);
+    box.innerHTML = sectionHead("Against the benchmarks", `<span class="muted">prices live · as of ${X.HA.as_of||"—"}</span>`) +
+      `<div class="grid g2">${anSkillCard(X)}${anMoversCard(X)}</div>
+       <div style="margin-top:16px">${anIncomeCard(X)}</div>`;
+    anDrawSkill(X);
+  }
+}
+// WHAT COULD HURT US. The regime and the book's own fragility lead, because they are the frame the
+// rest is read in; then the engine's stress and breaches, the factor exposure that used to sit on
+// Performance, and the volatility, duration and geography reads that used to sit on Analytics.
+async function riskAll(el){
+  el.innerHTML = head("Portfolio", "Risk", `<span class="muted">market regime · book fragility · stress · exposure</span>`) +
+    `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>`;
+  anDrawRegime();
+  await section(el, "Risk engine", b => risk(b));
+  await section(el, "Factor exposure & concentration", b => factors(b));
+  let X = null;
+  try{ X = await anLoad(); }catch(e){}
+  if(X){
+    const box = document.createElement("div"); el.appendChild(box);
+    box.innerHTML = sectionHead("Volatility, duration & concentration") +
+      `<div class="grid g2">${anVolCard(X)}${anGeoCard()}</div>
+       <div style="margin-top:16px">${vdurCard()}</div>`;
+    anDrawVol(X); anDrawGeo(X);
+  }
+}
+// WHAT DO I OWN. The positions, their fundamentals, and the same book through time.
+async function holdingsAll(el){
+  holdings(el);
+  let X = null;
+  try{ X = await anLoad(); }catch(e){}
+  if(X){
+    const box = document.createElement("div"); el.appendChild(box);
+    box.innerHTML = sectionHead("Valuation & profitability") + anValuationCard(X);
+  }
+  await section(el, "The book through time", b => history(b));
+}
+// WHAT IS OUT THERE. Grid and Universe were the same ~454 names with two overlapping tables on two
+// tabs — the quad scatter and the grade x technical matrix are two views of one population, and
+// nobody should have to hold a ticker in their head while switching tabs to see its other columns.
+// The heavier table goes last.
+async function universeAll(el){
+  universe(el);
+  await section(el, "Decision grid", b => grid(b));
+}
+// WHY DO WE OWN IT. Both process documents, in one place: the locked record per name, and the book
+// the model would build if it were starting today.
+async function research(el){
+  await theses(el);
+  await section(el, "Proposed portfolio", b => proposal(b));
 }
 /* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
 function plainBlock(t, badge){
@@ -2597,7 +2681,7 @@ function memoLongerTerm(notes){
 function memoMorning(row){
   if(!row || !row.payload) return "";
   return `<div class="card brief morning">
-    <div class="bhead"><div><div class="caps">Morning note · looking ahead · ${esc(row.as_of)}</div>
+    <div class="bhead"><div><div class="caps">Morning note · looking ahead · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
       <h3>${esc(row.payload.headline||"")}</h3></div></div>
     ${briefBody(row.payload)}
   </div>`;
@@ -2624,7 +2708,7 @@ function memoEvening(row, anchor){
   if(!row || !row.payload) return "";
   const stale = row.as_of !== anchor;
   return `<div class="card brief">
-    <div class="bhead"><div><div class="caps">Close note · how the day went · ${esc(row.as_of)}</div>
+    <div class="bhead"><div><div class="caps">Close note · how the day went · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
       <h3>${esc(row.payload.headline||"")}</h3></div></div>
     ${stale ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} close. The note for
       ${esc(anchor)} is written after the bell.</div>` : ""}
@@ -2669,7 +2753,7 @@ async function memo(el){
 }
 
 
-const VIEWS = {overview, holdings, memo, performance: performanceAll, analytics, universe, grid, proposal, theses, signals: signalsV2, history, about, risk: performanceAll, factors: performanceAll};
+const VIEWS = {overview, holdings: holdingsAll, memo, performance: performanceAll, risk: riskAll, universe: universeAll, signals: signalsV2, research, about, grid: universeAll, analytics: riskAll, proposal: research, theses: research, history: holdingsAll, factors: riskAll};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
@@ -2700,8 +2784,10 @@ function route(){
 function buildMenu(){
   const panel = document.getElementById("menupanel");
   if(!panel) return;
-  panel.innerHTML = [...document.querySelectorAll("#tabs a")]
-    .map(a => `<a href="${a.getAttribute("href")}" data-v="${a.dataset.v}">${a.textContent}</a>`).join("");
+  panel.innerHTML = [...document.getElementById("tabs").children].map(n => n.tagName === "SPAN"
+    ? `<div class="mgrp">${n.textContent}</div>`
+    : `<a href="${n.getAttribute("href")}" data-v="${n.dataset.v}">${n.textContent}</a>`).join("")
+    + `<div class="mgrp">Reference</div><a href="#about" data-v="about">About the model</a>`;
   panel.querySelectorAll("a").forEach(a => a.onclick = () => setMenu(false));
 }
 function setMenu(open){
@@ -2936,7 +3022,7 @@ function holdings(el){
     </select></label>`;
   const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
-    morningCard() + briefCard() +
+    memoPointer("morning and close notes") +
     `<div class="filters" style="margin-top:16px">
       ${sel("hQuad","Quad",hFilter.quad,uniq("quad"))}
       ${sel("hTrend","Trend",hFilter.trend,uniq("trend"))}
@@ -2957,7 +3043,6 @@ function holdings(el){
   const hc = document.getElementById("hClear");
   if(hc) hc.onclick = () => { hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
     hQuery = ""; clearCharts(); holdings(el); };
-  wireBrief();
   drawHoldings();
 }
 function drawHoldings(){
@@ -3031,7 +3116,6 @@ function drawHoldings(){
 
 
 /* ═══ DAILY BRIEF (Holdings tab) ══════════════════════════════════════════ */
-let briefIdx = 0;
 /* Both book notes share one shape (daily_brief.SHAPE, imported by premarket_brief), so they share
    one renderer. The note is a set of LENSES — the book, its factor exposure, the market, the names'
    news, risks, catalysts, what's next — rather than a narrative, and it is capped hard: the evening
@@ -3070,6 +3154,9 @@ function briefShape(b){
     watching: b.watching || b.week_ahead || b.watch_at_open || "",
   });
 }
+const memoPointer = what => `<div class="note" style="margin:12px 0 0">The ${what} now lives on
+  <a href="#memo">Memo</a>, with all three notes for a day on one screen. It used to be repeated on
+  several tabs, which meant three places to keep in sync and no single place to read a day in sequence.</div>`;
 function briefBody(b){
   b = briefShape(b);
   const sec = (label, inner) => inner ? `<div><h4>${label}</h4><ul class="blist">${inner}</ul></div>` : "";
@@ -3089,42 +3176,6 @@ function briefBody(b){
       ${sec("Longer term", obsList(b.longer_term))}
     </div>
     ${b.watching ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.watching)}</p></div>` : ""}`;
-}
-function morningCard(){
-  // The morning note is a different question from the evening one — what you are walking into, not
-  // how the day went — so it sits above rather than replacing it, and only for the latest day.
-  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
-  const m = B.find(x => x.kind === "premarket");
-  if(!m || !m.payload) return "";
-  const evenings = B.filter(x => (x.kind || "evening") === "evening");
-  if(evenings.length && evenings[0].as_of > m.as_of) return "";   // superseded by a newer close
-  const b = m.payload;
-  return `<div class="card brief morning">
-    <div class="bhead"><div><div class="caps">Morning note · ${esc(m.as_of)} ${writtenAt(m)}</div>
-      <h3>${esc(b.headline||"")}</h3></div></div>
-    ${briefBody(b)}
-  </div>`;
-}
-function briefCard(){
-  const B = ((typeof LIVE !== "undefined" && LIVE.briefs) || []).filter(x => (x.kind || "evening") === "evening");
-  if(!B.length) return "";
-  briefIdx = Math.min(briefIdx, B.length - 1);
-  const row = B[briefIdx], b = row.payload || {};
-  const nav = `<span class="bnav">
-      <button class="bbtn" data-bd="1" ${briefIdx>=B.length-1?"disabled":""} title="Earlier">←</button>
-      <span class="mono muted" style="font-size:12px">${row.as_of}</span>
-      <button class="bbtn" data-bd="-1" ${briefIdx<=0?"disabled":""} title="Later">→</button></span>`;
-  return `<div class="card brief">
-    <div class="bhead"><div><div class="caps">Close note ${writtenAt(row)}</div><h3>${esc(b.headline||"")}</h3></div>${nav}</div>
-    ${briefBody(b)}
-    <div class="note" style="margin-top:12px">Observations on what the model is showing — returns, risk
-      engine, decision grid, factor and sector rotation, earnings calendar and the day's headlines, all
-      computed before the note is written. Not advice and not a forecast.</div>
-  </div>`;
-}
-function wireBrief(){
-  document.querySelectorAll(".bbtn").forEach(btn => btn.onclick = () => {
-    briefIdx += Number(btn.dataset.bd); clearCharts(); holdings(document.getElementById("view")); });
 }
 /* ═══ HOLDING DRAWER ═════════════════════════════════════════════════════ */
 function closeDrawer(silent){ document.getElementById("drawer").classList.remove("on"); document.getElementById("scrim").classList.remove("on");
@@ -3390,7 +3441,7 @@ function drawUniverseTable(){
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} tracked names</span>`) +
-    (typeof universeNote === "function" ? universeNote() : "") +
+    memoPointer("universe morning note") +
   `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
       `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
@@ -3408,16 +3459,9 @@ function universe(el){
       <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="uIndQ1"> sort by Q1 share</label>`,
       `<div class="chart" id="uInd" style="height:520px"></div>`)}
   </div>
-  <div class="card" style="margin-top:16px">
-    <div class="card-h" style="flex-wrap:wrap"><div><h3>Every name, by size and factor</h3><div class="sub" id="uTblSub"></div></div>
-      <input class="search" id="uq" placeholder="Search ticker or name" value="${esc(uQuery)}"></div>
-    <div class="note" style="margin-bottom:8px">Factor columns are percentiles, 0 to 100, across the active universe, signed so that high means more of the
-      factor. <b>Smallness</b> is the size factor, so high means <b>small</b>; <b>Low vol</b> high means calm. Sort <b>Mkt cap</b> for literal size.
-      The Holdings / Watchlist / Accumulate buttons above filter this table too.</div>
-    <div class="table-wrap" style="max-height:72vh"><table class="tbl stickfirst" id="uTbl"></table></div>
-  </div>`;
-  document.getElementById("uq").oninput = e => { uQuery = e.target.value; drawUniverseTable(); };
-  drawUniverseTable();
+  <div class="note" style="margin-top:16px">Every name, with its grade, timing, risk range, factors and
+    size, is in the <b>decision grid</b> below — one table instead of the two these tabs used to carry
+    between them, filterable on every column and sortable on several at once.</div>`;
   document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f; clearCharts(); universe(el); });
   const keep = uKeep;
   const clip = v => Math.max(-30, Math.min(30, v));
@@ -3578,7 +3622,7 @@ function history(el){
   const names = [...new Set(HH.map(x=>x.tk))];
   const lastW = {}; HH.forEach(x=>{ lastW[x.tk] = x.d; });
   names.sort((a,b)=> (lastW[b]||"").localeCompare(lastW[a]||"") || a.localeCompare(b));
-  el.innerHTML = head("Portfolio record", "History", `<span class="muted">${dates.length} allocation snapshots · ${names.length} names ever held</span>`) +
+  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">${dates.length} allocation snapshots · ${names.length} names ever held</div>` +
   `${card("Holdings through time", "each cell = weight at that allocation snapshot", `<div class="scroll"><div class="chart" id="hHeat" style="height:${Math.max(420,names.length*17+80)}px;min-width:${Math.max(700,dates.length*44+140)}px"></div></div>`)}
   <div class="grid g-2-1" style="margin-top:16px">
     ${card("Trade log", "most recent 60", `<div class="scroll" style="max-height:560px;overflow-y:auto"><table class="t" id="hT"></table></div>`)}
