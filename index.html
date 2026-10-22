@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:22 · ce8bcb4</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:29 · 9ad6c7a</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:22 · ce8bcb4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:29 · 9ad6c7a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -406,6 +406,26 @@ async function enter(){
       LIVE.pfrag = await qAll("site_portfolio_fragility", r => r.order("as_of"));
       LIVE.pfragOk = LIVE.pfrag.length > 0;
     }catch(e){ LIVE.pfrag = []; LIVE.pfragOk = false; }
+    // The consumer of the two above: what the regime implies for exposure. Its own try, so the Risk
+    // tab still renders the indices if the bridge has not run.
+    try{
+      LIVE.bridge = (await qAll("site_sizing_bridge"))[0] || null;
+      LIVE.bridgeOk = !!LIVE.bridge;
+    }catch(e){ LIVE.bridge = null; LIVE.bridgeOk = false; }
+    // CASH AND TRADES COME FROM LIVE VIEWS, NOT THE NIGHTLY PAYLOAD. Both change the moment a trade
+    // is logged, and the payload is a snapshot: on 2026-10-22 four exits at 17:30 left the site
+    // showing 29 holdings, 33 trades and $29,318 against a book of 25, 37 and $212,243 until the
+    // next post-close. Holdings themselves stay on the payload — they carry sparklines, factor data
+    // and a 12-month price series that would be far heavier to serve live — so the book can still
+    // lag a same-day trade; cash and the trade log no longer do, and the cash row says its own date.
+    try{
+      const cr = (await qAll("site_cash"))[0];
+      if(cr) D.cash = {as_of: cr.as_of, amount: +cr.amount, note: cr.note};
+    }catch(e){}
+    try{
+      const tr = await qAll("site_trades", r => r.order("trade_date", {ascending:false}));
+      if(tr && tr.length) D.trades = tr.map(t => ({...t, date: t.trade_date}));
+    }catch(e){}
     // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
     // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
     // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
@@ -2094,6 +2114,11 @@ function regimeStrip(){
   if(r) bits.push(cell("Market", `${(+r.mfi).toFixed(1)} · ${esc(r.state)}`, SC[r.state] || C.text),
                   cell("Protection budget", pct(+r.protection_budget_pct,1,false), SC[r.state] || C.text),
                   cell("Cover", esc(r.cost_state||"—"), r.cost_state==="CHEAP"?C.green:r.cost_state==="EXPENSIVE"?C.red:C.text));
+  const bg = (typeof LIVE !== "undefined" && LIVE.bridge) || null;
+  // Only shown when it is not 1.00: a multiplier of one is not news and would just be noise on a
+  // strip whose job is to be glanceable.
+  if(bg && +bg.exposure_multiplier !== 1)
+    bits.push(cell("Equity exposure", "×" + (+bg.exposure_multiplier).toFixed(2), C.amber));
   if(f) bits.push(cell("Book fragility", (+f.pfi).toFixed(1), fragC(+f.pfi)),
                   cell("Effective bets by risk", (f.diagnostics||{}).effective_n_risk == null ? "—" : num(+f.diagnostics.effective_n_risk,1)));
   return `<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;margin:0 0 16px;padding:11px 14px;
@@ -2141,6 +2166,41 @@ function regimeCard(){
       expanding history to that date. The two move opposite each other on trend, breadth and credit, by design.
       Two inputs are shown but carry <b>no weight</b>: credit earns nothing as a rate of change (it had the wrong
       sign) and the volatility term structure is the cost axis, not a fragility input.</div>`);
+}
+// WHAT THE REGIME IMPLIES FOR SIZE. The two cards above are observations; this is the sentence
+// that follows them. It PROPOSES — the rulebook is explicit that nothing in this system trims a
+// position for getting large, so every number here is a target and a gap, never an instruction.
+function sizingCard(){
+  const B = (typeof LIVE !== "undefined" && LIVE.bridge) || null;
+  if(!B) return card("Sizing", "unavailable", `<div class="note">The sizing bridge has not run.
+    ${(typeof LIVE !== "undefined" && LIVE.bridgeOk === false) ? "The view did not answer — db/033 may not be applied." : ""}</div>`);
+  const mult = +B.exposure_multiplier, SC = REGIME_C();
+  const P = (B.positions || []).slice().sort((a, b) => (+b.gap_pct) - (+a.gap_pct));
+  const mand = Object.entries(B.mandates || {});
+  const over = P.filter(p => +p.gap_pct > 0.5).length;
+  const A = B.assumptions || {};
+  return card("Sizing",
+    `<b style="color:${SC[B.state] || C.text}">${esc(B.state)}</b> → equity exposure
+     <b>×${mult.toFixed(2)}</b>${mult === 1 ? " · no change" : ""} · as of ${esc(String(B.as_of))}`,
+    `<div class="kvs">
+      ${mand.map(([n, m]) => `<div class="kv"><span class="muted">${esc(n)}</span>
+        <b${m.target_equity_pct < m.base_equity_pct ? ` style="color:${C.amber}"` : ""}>${(+m.target_equity_pct).toFixed(0)}% equity</b>
+        <span class="muted" style="font-size:11px">${(+m.defensive_core_pct).toFixed(0)}% Defensive Core</span></div>`).join("")}
+     </div>
+     ${tbl(["Holding","Now","Tier","Target","Gap","Model flags"], P.map(p => [
+        `<b>${esc(p.ticker)}</b>`, `${(+p.weight_now_pct).toFixed(2)}%`, `${(+p.tier_pct).toFixed(0)}%`,
+        `${(+p.target_pct).toFixed(2)}%`,
+        `<span class="${+p.gap_pct >= 0 ? "" : "muted"}">${(+p.gap_pct >= 0 ? "+" : "")}${(+p.gap_pct).toFixed(2)}%</span>`,
+        `<span class="muted" style="font-size:11px">${(p.flags || []).map(esc).join(" · ")}</span>`]))}
+     <div class="note" style="margin-top:10px">
+      <b>These are targets, not instructions.</b> ${over} position${over === 1 ? " is" : "s are"} more than
+      0.5pp above target, and that is allowed by design: 6% bounds what we choose to BUY, not what a
+      position may become, drift above it is how winners are left to run, and a reduction is always a
+      human decision that gets journalled. The <b>tier</b> is recorded conviction and does not move —
+      only the exposure scalar does, so in DEFENSIVE a 4% position targets 2.4% while remaining a 4% name.
+      <br><br><b>Why only one state moves the dial.</b> ${esc(A.ladder_basis || "")}
+      <br><br><b>Where the money goes.</b> ${esc(A.brake_destination || "")}
+      ${A.rejected ? `<br><br><b>What was tried and rejected:</b> ${esc(A.rejected)}` : ""}</div>`);
 }
 function fragilityCard(){
   const F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
@@ -2348,8 +2408,9 @@ async function performanceAll(el){
 // rest is read in; then the engine's stress and breaches, the factor exposure that used to sit on
 // Performance, and the volatility, duration and geography reads that used to sit on Analytics.
 async function riskAll(el){
-  el.innerHTML = head("Portfolio", "Risk", `<span class="muted">market regime · book fragility · stress · exposure</span>`) +
-    `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>`;
+  el.innerHTML = head("Portfolio", "Risk", `<span class="muted">market regime · book fragility · what it implies for size</span>`) +
+    `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>
+     <div style="margin-top:16px">${sizingCard()}</div>`;
   anDrawRegime();
   await section(el, "Risk engine", b => risk(b));
   await section(el, "Factor exposure & concentration", b => factors(b));
@@ -3045,6 +3106,23 @@ function holdings(el){
     hQuery = ""; clearCharts(); holdings(el); };
   drawHoldings();
 }
+// CASH AS A ROW, pinned below the positions and never sorted into them (Niko, 2026-10-22).
+// It is not a holding and it is not on the same basis: every Weight above it is a share of INVESTED
+// capital, which is what the whole performance record means, while cash only has a meaning against
+// the TOTAL. So the row states its own basis rather than quietly joining a column that means
+// something else — the same two-bases split the sector weights carry since cash entered the cap test.
+function cashRow(ncols){
+  const c = (typeof D !== "undefined" && D.cash) || null;
+  const amt = c && +c.amount;
+  if(!amt) return "";
+  const invested = D.holdings.reduce((a, h) => a + (h.value || 0), 0);
+  const pctOfTotal = amt / (invested + amt) * 100;
+  return `<tr class="cashrow" style="border-top:2px solid var(--line);background:rgba(106,166,248,.04)">
+    <td><div class="tk">Cash</div><div class="nm">${esc(c.as_of || "")}</div></td>
+    <td class="r mono" title="Share of the TOTAL portfolio. The weights above are shares of invested capital.">${pctOfTotal.toFixed(1)}%<span class="muted" style="font-size:10px"> of total</span></td>
+    <td class="r mono muted">${usd(amt)}</td>
+    <td colspan="${ncols - 3}" class="muted" style="font-size:11px">${esc(c.note || "")}</td></tr>`;
+}
 function drawHoldings(){
   // 14 headers against 13 cells until 2026-10-16: the Timing header had no <td>, so every column
   // from Implied growth rightward rendered one place to the LEFT of its own heading. What read as
@@ -3106,7 +3184,7 @@ function drawHoldings(){
       <td class="mono muted" style="font-size:12px">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
       ${facCells({ticker: h.tk, universe_tag: null})}
       <td class="mono muted" style="font-size:12px">${h.next_er||"—"}</td>
-      <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + "</tbody>";
+      <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + cashRow(cols.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
     hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
   t.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; });
