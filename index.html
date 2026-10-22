@@ -265,7 +265,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-20 19:36 · 7bcac59</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 16:57 · ae475cc</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-20 19:36 · 7bcac59</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 16:57 · ae475cc</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -394,6 +394,18 @@ async function enter(){
       LIVE.rgaps = Object.fromEntries((await qAll("site_rate_beta_gaps")).map(r => [r.ticker, r]));
       LIVE.rgapsOk = true;
     }catch(e){ LIVE.rgaps = {}; LIVE.rgapsOk = false; }
+    // The regime dashboard (db/032). Two sources, deliberately NOT blended: the market index asks what
+    // the market is doing and carries a protection budget, the portfolio index asks which of our own
+    // holdings can fail together. Each in its own try — the dashboard says "unavailable" rather than
+    // taking the Analytics tab down with it, and a page build can reach a database without db/032.
+    try{
+      LIVE.regime = await qAll("site_market_regime", r => r.order("as_of"));
+      LIVE.regimeOk = LIVE.regime.length > 0;
+    }catch(e){ LIVE.regime = []; LIVE.regimeOk = false; }
+    try{
+      LIVE.pfrag = await qAll("site_portfolio_fragility", r => r.order("as_of"));
+      LIVE.pfragOk = LIVE.pfrag.length > 0;
+    }catch(e){ LIVE.pfrag = []; LIVE.pfragOk = false; }
     // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
     // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
     // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
@@ -2056,6 +2068,147 @@ function vdurCard(){
       zero. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so for a
       single name it appears only beside its cross-sectional percentile (Grid, name drawer).</div>${rb}`);
 }
+/* ═══ REGIME DASHBOARD — how much protection, and against what ═══════════
+   Two indices side by side because they answer different questions and are measured to be
+   independent. Neither is a forecast and neither places a trade: MFI carries a PROTECTION BUDGET
+   (what share of the book to spend on downside cover) and PFI flags a security-and-weight review.
+   The honest limits of each are printed on its own card rather than kept in a journal. */
+const REGIME_C = () => ({ACCELERATE:C.green, DETERIORATING:C.amber, DEFENSIVE:C.red, RECOVERY:C.accent});
+// Fragility percentile -> colour. Deliberately one-directional: these scores only mean "more
+// fragile", so a low reading is never painted green as though it were a buy signal.
+const fragC = p => p == null ? C.muted : p >= 80 ? C.red : p >= 60 ? C.amber : C.text;
+// EVERY REGIME INPUT IS STORED SIGN-ORIENTED so that a higher number always means more fragile —
+// market_regime.py negates trend, universe_breadth, credit and vix_term for exactly that reason. The
+// stored raw is therefore NOT the readable fact: `universe_breadth: -0.578` is 57.8% of our names above
+// their 200-day, and printing the raw would put a minus sign in front of a share. So each input
+// declares how to read it back: [flip, kind]. The fragility PERCENTILE beside it is already oriented
+// and needs none of this.
+const REGIME_FMT = {
+  trend:[true,"pct"], universe_breadth:[true,"pct"], credit:[true,"ratio"], vix_term:[true,"ratio"],
+  vix:[false,"level"], bondvol:[false,"level"], dnvol:[false,"pct"]};
+const regimeLevel = (k, raw) => {
+  if(raw == null || isNaN(raw)) return "—";
+  const [flip, kind] = REGIME_FMT[k] || [false,"level"];
+  const v = flip ? -raw : +raw;
+  return kind === "pct" ? pct(v, 1, k === "trend") : kind === "ratio" ? num(v, 3) : num(v, 1);
+};
+const LEG_WHAT = {
+  trend:"SPY against its own 200-day mean", bondvol:"MOVE — Treasury volatility",
+  vix:"VIX — equity volatility", universe_breadth:"our 410 names above their 200-day",
+  dnvol:"downside-only realised volatility", credit:"high yield against investment grade",
+  vix_term:"3-month VIX against spot",
+  concentration:"risk-based effective N and the largest sector", factor:"PC1 share of the book's own correlations",
+  event:"weight in names the model already flags", valuation:"growth the book's prices require",
+  liquidity:"days to exit at 20% of median volume"};
+// The one-line version for Overview. The dashboard lives on Analytics, but the decision it supports —
+// am I adding or cutting downside cover — should not need a tab change to notice. Returns "" when
+// either index is missing so Overview never breaks for a supplementary reading.
+function regimeStrip(){
+  const R = (typeof LIVE !== "undefined" && LIVE.regime) || [], F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
+  if(!R.length && !F.length) return "";
+  const r = R[R.length-1], f = F[F.length-1], SC = REGIME_C();
+  const cell = (lbl, val, col) => `<span style="display:inline-flex;gap:6px;align-items:baseline">
+    <span class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase">${lbl}</span>
+    <b style="${col ? `color:${col}` : ""}">${val}</b></span>`;
+  const bits = [];
+  if(r) bits.push(cell("Market", `${(+r.mfi).toFixed(1)} · ${esc(r.state)}`, SC[r.state] || C.text),
+                  cell("Protection budget", pct(+r.protection_budget_pct,1,false), SC[r.state] || C.text),
+                  cell("Cover", esc(r.cost_state||"—"), r.cost_state==="CHEAP"?C.green:r.cost_state==="EXPENSIVE"?C.red:C.text));
+  if(f) bits.push(cell("Book fragility", (+f.pfi).toFixed(1), fragC(+f.pfi)),
+                  cell("Effective bets by risk", (f.diagnostics||{}).effective_n_risk == null ? "—" : num(+f.diagnostics.effective_n_risk,1)));
+  return `<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;margin:0 0 16px;padding:11px 14px;
+    border:1px solid var(--line);border-radius:10px;background:rgba(106,166,248,.05)">
+    ${bits.join("")}
+    <a href="#analytics" class="muted" style="font-size:11px;margin-left:auto;align-self:center">Regime dashboard →</a>
+   </div>`;
+}
+function regimeCard(){
+  const R = (typeof LIVE !== "undefined" && LIVE.regime) || [];
+  if(!R.length) return card("Market fragility", "unavailable", `<div class="note">No regime rows.
+    ${(typeof LIVE !== "undefined" && LIVE.regimeOk === false) ? "The view did not answer — db/032 may not be applied to this database." : "scripts/market_regime.py has not run."}</div>`);
+  const r = R[R.length-1], prev = R[R.length-2], SC = REGIME_C();
+  const legs = Object.entries(r.inputs || {});
+  const weighted = legs.filter(([,v]) => +(v.weight||0) > 0).sort((a,b) => +b[1].percentile - +a[1].percentile);
+  const shown = legs.filter(([,v]) => !(+(v.weight||0) > 0));
+  const row = ([k,v]) => [LEG_WHAT[k] ? `<b>${esc(k.replace(/_/g," "))}</b><br><span class="muted" style="font-size:11px">${LEG_WHAT[k]}</span>` : `<b>${esc(k)}</b>`,
+    regimeLevel(k, v.raw),
+    v.percentile == null ? "—" : `<span style="color:${fragC(+v.percentile)}">${(+v.percentile).toFixed(0)}</span>`,
+    +(v.weight||0) > 0 ? pct(+v.weight,1,false) : `<span class="muted">shown</span>`];
+  const dmove = prev ? +r.mfi - +prev.mfi : null;
+  return card("Market fragility",
+    `MFI <b style="color:${SC[r.state]||C.muted}">${(+r.mfi).toFixed(1)}</b> · <b style="color:${SC[r.state]||C.muted}">${esc(r.state)}</b>` +
+    (dmove == null ? "" : ` · ${dmove >= 0 ? "+" : "−"}${Math.abs(dmove).toFixed(1)} on the day`) + ` · as of ${esc(String(r.as_of))}`,
+    `<div class="kvs">
+      <div class="kv"><span class="muted">Protection budget</span><b style="color:${SC[r.state]||C.text}">${pct(+r.protection_budget_pct,1,false)}</b></div>
+      <div class="kv"><span class="muted">Cost of protection</span><b style="color:${r.cost_state==="CHEAP"?C.green:r.cost_state==="EXPENSIVE"?C.red:C.text}">${esc(r.cost_state||"—")}</b></div>
+      <div class="kv"><span class="muted">3-month VIX / spot</span><b>${r.cost_gauge == null ? "—" : num(+r.cost_gauge,4)}</b></div>
+      <div class="kv"><span class="muted">Previous state</span><b>${esc(r.state_prev||"—")}</b></div>
+     </div>
+     <div class="chart" id="mfiHist"></div>
+     ${tbl(["Input","Reads","Fragility pctile","Weight"], weighted.concat(shown).map(row))}
+     <div class="note" style="margin-top:10px"><b>This is the budget, not the trade.</b> It says what share of the
+      book is worth spending on downside cover in this regime — the instrument and the entry are still a decision.
+      <b>Read the two readings together:</b> a high MFI with CHEAP cover is the whole point of the exercise, and a high
+      MFI with EXPENSIVE cover means the move has already been paid for. Cost is kept out of the composite on purpose,
+      so fragility never gets talked down by its own price.
+      <br><br><b>What it can and cannot do.</b> Every weight above was fitted to FORWARD 3-month SPY drawdown over 33
+      years, not to how volatile the market was at the time. Measured: the three benign states are indistinguishable
+      (−5.7% to −6.1% average forward drawdown) and only <b>DEFENSIVE separates, at −10.1%</b>. So treat this as a
+      two-state instrument — in DEFENSIVE or not — and ignore moves between the other three. In 2022 it reached
+      DEFENSIVE on 1 April at 78.9 while cover was still CHEAP, ahead of the bulk of the fall.
+      <b>Reads</b> is the input the normal way round (SPY above its 200-day, the share of our names above theirs);
+      <b>fragility percentile</b> is the same input oriented so high always means more fragile, against its own
+      expanding history to that date. The two move opposite each other on trend, breadth and credit, by design.
+      Two inputs are shown but carry <b>no weight</b>: credit earns nothing as a rate of change (it had the wrong
+      sign) and the volatility term structure is the cost axis, not a fragility input.</div>`);
+}
+function fragilityCard(){
+  const F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
+  if(!F.length) return card("Portfolio fragility", "unavailable", `<div class="note">No fragility rows.
+    ${(typeof LIVE !== "undefined" && LIVE.pfragOk === false) ? "The view did not answer — db/032 may not be applied to this database." : "scripts/portfolio_fragility.py has not run."}</div>`);
+  const f = F[F.length-1], g = f.diagnostics || {}, A = f.assumptions || {};
+  const legs = Object.entries(f.legs || {});
+  const weighted = legs.filter(([,v]) => v.in_composite !== false && +(v.weight||0) > 0)
+                       .sort((a,b) => (+b[1].percentile * +b[1].weight) - (+a[1].percentile * +a[1].weight));
+  const shown = legs.filter(([,v]) => !(+(v.weight||0) > 0));
+  const row = ([k,v]) => [`<b>${esc(k)}</b><br><span class="muted" style="font-size:11px">${LEG_WHAT[k]||""}</span>`,
+    v.raw == null ? "—" : num(+v.raw,3),
+    v.percentile == null ? "—" : `<span style="color:${fragC(+v.percentile)}">${(+v.percentile).toFixed(0)}</span>`,
+    +(v.weight||0) > 0 ? pct(+v.weight,1,false) : `<span class="muted">shown</span>`,
+    +(v.weight||0) > 0 ? num(+v.percentile * +v.weight, 1) : "—"];
+  const br = (f.breaches||[]);
+  const worst = weighted[0];
+  return card("Portfolio fragility",
+    `PFI <b style="color:${fragC(+f.pfi)}">${(+f.pfi).toFixed(1)}</b> · ${g.effective_n_risk ? `${num(+g.effective_n_risk,1)} effective bets by risk` : ""} · as of ${esc(String(f.as_of))}`,
+    `<div class="kvs">
+      <div class="kv"><span class="muted">Effective bets — equal weight</span><b>${g.effective_n_arithmetic == null ? "—" : num(+g.effective_n_arithmetic,1)}</b></div>
+      <div class="kv"><span class="muted">Effective bets — by risk</span><b style="color:${C.amber}">${g.effective_n_risk == null ? "—" : num(+g.effective_n_risk,1)}</b></div>
+      <div class="kv"><span class="muted">One factor explains</span><b style="color:${fragC(100*(+g.pc1_share||0)/0.4)}">${g.pc1_share == null ? "—" : pct(+g.pc1_share,1,false)}</b></div>
+      <div class="kv"><span class="muted">Largest single-name risk</span><b>${g.max_name_risk_share == null ? "—" : `${esc(g.max_name_risk_ticker||"")} ${pct(+g.max_name_risk_share,1,false)}`}</b></div>
+     </div>
+     ${br.length ? `<div class="note" style="margin-top:12px;border-left:2px solid ${C.red};padding-left:10px">
+        <b>Guardrails breached</b><ul style="margin:6px 0 0 14px">${br.map(b => `<li>${esc(b)}</li>`).join("")}</ul></div>` : ""}
+     ${tbl(["Leg","Raw","Fragility pctile","Weight","Contribution"], weighted.concat(shown).map(row))}
+     <div class="note" style="margin-top:10px">
+      ${worst ? `<b>Where the fragility actually is: ${esc(worst[0])}.</b> ` : ""}The two effective-bet counts are the
+      point of the first row — ${g.effective_n_arithmetic && g.effective_n_risk ? `this book holds ${num(+g.effective_n_arithmetic,1)} positions by weight but only
+      <b>${num(+g.effective_n_risk,1)} by risk</b>, because risk is not spread the way money is` : "equal-weight diversification and risk diversification are not the same number"}.
+      <br><br><b>It is a diagnostic, not a forecast, and that is a limit rather than a hedge.</b> The market index
+      above was fitted to 33 years of forward drawdown; this one cannot be — the holdings record is only a handful of
+      snapshots deep, so there is nothing to validate against yet. ${A.status ? "" : ""}A breach belongs in a
+      security-and-weight review, including when the market regime reads ACCELERATE.
+      <br><br>What <i>was</i> tested is that these are five separate readings and not one number in five hats: across
+      ${A.reference ? esc(String(A.reference).replace(/,.*/, "")) : "800 synthetic books"} the strongest pair
+      correlates 0.34 and the first principal component explains 31%. Concentration and factor crowding measure 0.13
+      apart — a sector breach and a crowded factor are <b>separate problems needing separate fixes</b>.
+      <br><br><b>Read the percentiles with care.</b> They compare this book to random draws from our own universe, and
+      a random 29-name draw across eleven sectors is more diversified than any deliberate conviction book — so a
+      concentrated book reads high on concentration and factor <i>by construction</i>. Compare the legs to each other
+      and to this book's own history as it builds; a 100th percentile here does not mean worse than other managers.
+      ${(f.legs||{}).liquidity ? `<br><br>Liquidity is computed and shown but carries no weight: at ${num(+(f.legs.liquidity.raw||0),3)} days to exit
+      against a 60-day cap it is arithmetically dead at this book's size, and a leg pinned at zero would be a standing
+      discount on every reading rather than a conservative input.` : ""}</div>`);
+}
 async function analytics(el){
   el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">loading…</span>`);
   if(!LIVE.hanal) LIVE.hanal = (await q("site_holding_analytics"))[0]?.payload || {holdings:{}, book:{}};
@@ -2081,7 +2234,8 @@ async function analytics(el){
   const news = H.flatMap(h => ((h.research||{}).news||[]).map(n => ({...n, tk:h.tk}))).sort((a,b) => (b.date||"").localeCompare(a.date||"")).slice(0,60);
 
   el.innerHTML = head("Portfolio", "Analytics", `<span class="muted">prices live · income & volatility as of ${HA.as_of||"—"}</span>`) +
-  `<div class="grid g2">
+  `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>
+  <div class="grid g2" style="margin-top:16px">
     ${card("Today's movers", `book ${(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)>=0)?"up":"down"} ${usd(Math.abs(D.holdings.reduce((a,h)=>a+(h.day!=null?h.value-h.value/(1+h.day):0),0)))} today`,
       `<div class="grid g2">${tbl(["Top","Day","$"], movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], movers.slice(-5).reverse().map(mv))}</div>`)}
     ${card("Skill vs benchmark", "daily returns since inception · alpha = return not explained by beta",
@@ -2128,6 +2282,24 @@ async function analytics(el){
   mk(document.getElementById("anVol"), {grid:{left:48,right:16,top:16,bottom:30}, xAxis:{type:"category", data:bh.map(x=>x[0]), axisLabel:{color:C.muted}},
     yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v=>(v*100).toFixed(0)+"%"}, splitLine:{lineStyle:{color:C.line}}},
     series:[{type:"line", showSymbol:false, areaStyle:{opacity:.12}, lineStyle:{color:C.accent}, data:bh.map(x=>x[1])}]});
+  // The regime chart carries its own threshold lines, because the number means nothing without them:
+  // 40 and 65 are where the state changes, and the DEFENSIVE band is the only one measured to matter.
+  const RH = LIVE.regime || [];
+  if(RH.length){
+    const SC2 = REGIME_C();
+    mk(document.getElementById("mfiHist"), {
+      tooltip:{trigger:"axis", formatter:ps => { const i = ps[0].dataIndex, x = RH[i];
+        return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cover ${x.cost_state||"—"}`; }},
+      grid:{left:34,right:14,top:14,bottom:26},
+      xAxis:{type:"category", data:RH.map(x=>x.as_of), axisLabel:{color:C.muted}},
+      yAxis:{type:"value", min:0, max:100, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+      series:[{type:"line", showSymbol:false, lineStyle:{color:C.accent, width:2}, areaStyle:{opacity:.10},
+        data:RH.map(x=>+x.mfi),
+        markLine:{silent:true, symbol:"none", label:{color:C.dim, fontSize:10, position:"insideStartTop"},
+          data:[{yAxis:65, lineStyle:{color:C.red, type:"dashed"}, label:{formatter:"DEFENSIVE 65"}},
+                {yAxis:40, lineStyle:{color:C.amber, type:"dashed"}, label:{formatter:"DETERIORATING 40"}}]},
+        markArea:{silent:true, itemStyle:{color:"rgba(239,83,80,.07)"}, data:[[{yAxis:65},{yAxis:100}]]}}]});
+  }
   const geo = Object.entries(B.geography||{});
   mk(document.getElementById("anGeo"), {tooltip:{trigger:"item", formatter:p => `${p.name}: ${(p.value*100).toFixed(1)}%`},
     series:[{type:"pie", radius:["45%","72%"], label:{color:C.muted, formatter:p => `${p.name} ${(p.value*100).toFixed(0)}%`}, data:geo.map(([k,v]) => ({name:k, value:v}))}]});
@@ -2667,7 +2839,7 @@ function overview(el){
   const toggle = `<span class="seg" id="ovSeg">${PERIODS.map(([k,l]) =>
       `<button data-p="${k}" class="${k===S.key?"on":""}" ${periodStats(k)?"":"disabled"}>${l}</button>`).join("")}</span>`;
   el.innerHTML = head("Portfolio", "Overview", `<span class="muted">${H.length} holdings · book ${usd(D.book_value)}</span>${toggle}`) +
-  todayBlock(H) +
+  todayBlock(H) + regimeStrip() +
   `<div class="kpis">
     ${kpi(`${pl} return`, pct(S.port), `SPY ${pct(S.spy)}`, cls(S.port))}
     ${kpi(`${pl} vs SPY`, pct(S.excess), `${S.from} → ${S.to}`, cls(S.excess))}
