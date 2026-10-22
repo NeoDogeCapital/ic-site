@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:43 · 7d9ba5e</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-22 18:50 · 6fe4ec7</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:43 · 7d9ba5e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-22 18:50 · 6fe4ec7</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -434,6 +434,9 @@ async function enter(){
       LIVE.mstats = Object.fromEntries((await qAll("site_model_stats")).map(m => [m.model, m]));
       LIVE.modelsOk = LIVE.models.length > 0;
     }catch(e){ LIVE.models = []; LIVE.mstats = {}; LIVE.modelsOk = false; }
+    try{
+      LIVE.mrisk = Object.fromEntries((await qAll("site_model_risk")).map(m => [m.model, m]));
+    }catch(e){ LIVE.mrisk = {}; }
     // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
     // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
     // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
@@ -2217,14 +2220,62 @@ function sizingCard(){
       <br><br><b>Where the money goes.</b> ${esc(A.brake_destination || "")}
       ${A.rejected ? `<br><br><b>What was tried and rejected:</b> ${esc(A.rejected)}` : ""}</div>`);
 }
+// RISK AT THE LEVEL A CLIENT HOLDS. The risk engine runs on holdings, so it could only ever
+// describe the equity sleeve; these two models are 38% and 19% something else with a beta of 0.10.
+function modelRiskCard(){
+  const M = (typeof LIVE !== "undefined" && LIVE.mrisk) || {};
+  const names = MODEL_ORDER.filter(n => M[n]);
+  if(!names.length) return card("Model risk", "unavailable",
+    `<div class="note">scripts/model_risk.py has not run, or db/038 is not applied.</div>`);
+  const sel = M[modelSel] ? modelSel : names[0];
+  const m = M[sel], R = m.risk || {}, Cb = m.contributions || {}, A = m.assumptions || {};
+  const sleeves = Object.keys(Cb);
+  const sc = m.scenarios || [];
+  const eqShare = (Cb.EQUITY || {}).risk_share_pct;
+  return card(`Model risk · ${esc(sel.replace(" Compounders",""))}`,
+    `drifted weights · ${R.sessions || "—"} sessions in-sample`,
+    `<div class="kvs">
+      <div class="kv"><span class="muted">Volatility</span><b>${(+R.vol_pct).toFixed(2)}%</b></div>
+      <div class="kv"><span class="muted">1-day VaR 95</span><b class="neg">${(+R.var95_1d_pct).toFixed(2)}%</b></div>
+      <div class="kv"><span class="muted">1-day ES 95</span><b class="neg">${(+R.es95_1d_pct).toFixed(2)}%</b></div>
+      <div class="kv"><span class="muted">Effective bets</span><b style="color:${+R.effective_bets < 1.5 ? C.red : C.text}">${(+R.effective_bets).toFixed(2)}</b></div>
+     </div>
+     ${tbl(["Sleeve","Weight","Risk share","Vol","Corr to equity"], sleeves.map(k => {
+        const c = Cb[k];
+        return [`<b>${esc(k)}</b>`, `${(+c.weight).toFixed(1)}%`,
+          `<span style="color:${+c.risk_share_pct > 50 ? C.red : C.text}">${(+c.risk_share_pct).toFixed(1)}%</span>`,
+          `${(+c.vol_pct).toFixed(2)}%`, (+c.corr_to_equity).toFixed(3)]; }))}
+     <h4 style="margin:14px 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">If it happened again</h4>
+     ${tbl(["Scenario","Return","Drawdown","Coverage"], sc.map(x => [
+        `<b>${esc(x.scenario)}</b><br><span class="muted" style="font-size:11px">${esc(x.from)} → ${esc(x.to)}</span>`,
+        `<span class="neg">${(+x.return_pct).toFixed(1)}%</span>`,
+        `<span class="neg">${(+x.max_drawdown_pct).toFixed(1)}%</span>`,
+        +x.coverage_pct >= 99.5 ? `<span class="muted">full</span>`
+          : `<span style="color:${C.amber}" title="${esc((x.missing||[]).join(", "))} held flat — no data in this window">${(+x.coverage_pct).toFixed(0)}%</span>`]))}
+     <div class="note" style="margin-top:10px">
+      <b>${eqShare != null ? `The equity sleeve is ${(+Cb.EQUITY.weight).toFixed(0)}% of this model by weight and
+      ${(+eqShare).toFixed(0)}% of it by RISK.` : ""}</b> That is what ${(+R.effective_bets).toFixed(2)} effective
+      bets means: the defensive sleeve makes the portfolio hold LESS of one risk, not two risks. Variance
+      scales with the square of volatility, so a sleeve at 26.7% vol swamps sleeves at 0.8-6.9% however
+      the money is split — and those sleeves correlate 0.23 to 0.45 to equity, so they are ballast, not hedges.
+      <br><br><b>Scenarios are floors, not estimates, wherever coverage is under 100%.</b>
+      ${esc(A.scenario_basis || "")} ${esc(A.coverage_caveat || "")}</div>`);
+}
 function drawModels(){
   const rows = (typeof LIVE !== "undefined" && LIVE.models) || [];
   if(!rows.length) return;
   const by = {};
   rows.forEach(r => (by[r.model] ||= []).push(r));
-  const days = [...new Set(rows.map(r => r.as_of))].sort();
+  let days = [...new Set(rows.map(r => r.as_of))].sort();
+  // The chart follows the window, and is re-based to it: a YTD line that starts at the
+  // since-inception NAV would show a return the window did not produce.
+  const sdef = ((LIVE.mstats||{})[modelSel]||{}).stats || {};
+  const from = (sdef.periods && sdef.periods[modelPeriod] || {}).from;
+  if(from) days = days.filter(d => d >= from);
   const series = Object.entries(by).map(([n, rs]) => {
-    const m = Object.fromEntries(rs.map(r => [r.as_of, (+r.nav - 1) * 100]));
+    const nv = Object.fromEntries(rs.map(r => [r.as_of, +r.nav]));
+    const base = nv[days[0]] || 1;
+    const m = Object.fromEntries(days.map(d => [d, nv[d] == null ? null : (nv[d] / base - 1) * 100]));
     return {name: n.replace(" Compounders",""), type: "line", showSymbol: false,
             lineStyle: {color: MODEL_C[n], width: n === modelSel ? 2.4 : 1.2},
             itemStyle: {color: MODEL_C[n]},
@@ -2238,9 +2289,11 @@ function drawModels(){
     yAxis:{type:"value", axisLabel:{color:C.muted, formatter:v => (v>0?"+":"") + v + "%"},
            splitLine:{lineStyle:{color:C.line}}},
     series});
+  const redraw = () => { clearCharts(); performanceAll(document.getElementById("view")); };
   const seg = document.getElementById("mSeg");
-  if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => {
-    modelSel = b.dataset.m; clearCharts(); performanceAll(document.getElementById("view")); });
+  if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => { modelSel = b.dataset.m; redraw(); });
+  const per = document.getElementById("mPer");
+  if(per) per.querySelectorAll("button").forEach(b => b.onclick = () => { modelPeriod = b.dataset.p; redraw(); });
 }
 function fragilityCard(){
   const F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
@@ -2433,6 +2486,11 @@ async function section(el, title, fn, right=""){
    book: there were no rebalances, so the weights shown are what the sleeves became, not what was
    set, and rebalancing them monthly would be a different portfolio with a different return. */
 let modelSel = "Focused Compounders";
+// Since inception is the default because it is the whole record: the book's first daily return is
+// 2025-10-13 and nothing in this system predates it, so "inception" and "the entire history" are
+// the same window. The toggle exists so the page never shows a number without naming its window.
+let modelPeriod = "since_inception";
+const MPERIODS = [["since_inception","Since inception"],["ytd","YTD"],["qtd","QTD"],["mtd","MTD"]];
 const MODEL_ORDER = ["Focused Compounders","Balanced Compounders","Integrity Compounders","Defensive Core"];
 const MODEL_C = {"Focused Compounders": C.accent, "Balanced Compounders": C.gold,
                  "Integrity Compounders": C.green, "Defensive Core": C.muted};
@@ -2446,13 +2504,18 @@ function modelsCard(){
   if(!names.length) return card("Models", "unavailable", `<div class="note">The model engine has not
     run. ${(typeof LIVE !== "undefined" && LIVE.modelsOk === false) ? "The view did not answer — db/037 may not be applied." : ""}</div>`);
   const sel = M[modelSel] ? modelSel : names[0];
-  const A = M[sel].assumptions || {}, S = M[sel].stats || {};
+  const A = M[sel].assumptions || {};
+  const pick = (n) => { const st = M[n].stats || {};
+    return (st.periods && st.periods[modelPeriod]) || st; };
+  const S = pick(sel);
   const fmt = (v, kind) => v == null ? "—" : kind === "pct" ? `${(+v).toFixed(2)}%` : (+v).toFixed(2);
   const seg = `<span class="seg" id="mSeg">${names.map(n =>
       `<button data-m="${esc(n)}" class="${n===sel?"on":""}">${esc(n.replace(" Compounders",""))}</button>`).join("")}</span>`;
+  const pseg = `<span class="seg" id="mPer">${MPERIODS.filter(([k]) => (M[sel].stats||{}).periods?.[k]).map(([k,l]) =>
+      `<button data-p="${k}" class="${k===modelPeriod?"on":""}">${esc(l)}</button>`).join("")}</span>`;
   const dc = A.defensive_core, dcd = A.defensive_core_drifted;
   return card("Models",
-    `${seg} <span class="muted">anchored ${esc(A.anchor || "—")} · no rebalancing, weights drift</span>`,
+    `${seg} ${pseg} <span class="muted">from ${esc(S.from || A.anchor || "—")} · ${S.sessions || "—"} sessions · no rebalancing, weights drift</span>`,
     `<div class="kvs">
       ${A.set_equity_pct != null ? `<div class="kv"><span class="muted">Set</span><b>${(+A.set_equity_pct).toFixed(0)}% equity / ${(100-+A.set_equity_pct).toFixed(0)}% Defensive Core</b></div>` : ""}
       <div class="kv"><span class="muted">Total return</span><b class="${+S.total_return_pct>=0?"pos":"neg"}">${fmt(S.total_return_pct,"pct")}</b></div>
@@ -2463,7 +2526,7 @@ function modelsCard(){
      <div class="chart" id="mChart"></div>
      ${tbl(["", ...names.map(n => n.replace(" Compounders",""))],
         MSTAT.map(([k,label,kind]) => [label, ...names.map(n => {
-          const v = (M[n].stats||{})[k];
+          const v = pick(n)[k];
           const hot = n === sel;
           return `<span style="${hot?`color:${MODEL_C[n]};font-weight:600`:""}">${fmt(v,kind)}</span>`; })]))}
      <div class="note" style="margin-top:10px">
@@ -2512,7 +2575,13 @@ async function riskAll(el){
     `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>
      <div style="margin-top:16px">${sizingCard()}</div>`;
   anDrawRegime();
-  await section(el, "Risk engine", b => risk(b));
+  // Model-level first: the engine below it runs on HOLDINGS and therefore describes the equity
+  // sleeve alone, which is 62% and 81% of what these two models actually are.
+  const mrb = document.createElement("div"); el.appendChild(mrb);
+  mrb.innerHTML = sectionHead("Risk by model", `<span class="muted">what a client holds</span>`) +
+    `<div class="grid g2">${MODEL_ORDER.filter(n => (LIVE.mrisk||{})[n]).map(n => {
+        const was = modelSel; modelSel = n; const h = modelRiskCard(); modelSel = was; return h; }).join("")}</div>`;
+  await section(el, "Risk engine — equity sleeve only", b => risk(b));
   await section(el, "Factor exposure & concentration", b => factors(b));
   let X = null;
   try{ X = await anLoad(); }catch(e){}
