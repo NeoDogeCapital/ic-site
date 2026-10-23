@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-23 12:00 · 1166e13</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-23 13:42 · 803f92b</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-23 12:00 · 1166e13</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-23 13:42 · 803f92b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -437,6 +437,12 @@ async function enter(){
     try{
       LIVE.mrisk = Object.fromEntries((await qAll("site_model_risk")).map(m => [m.model, m]));
     }catch(e){ LIVE.mrisk = {}; }
+    // What applying the regime's multiplier would have cost and bought. Both proxies, because the
+    // equity leg is the whole argument and the two baskets share only 8 of 25 names.
+    try{
+      LIVE.brake = Object.fromEntries((await qAll("site_brake_comparison")).map(b => [b.proxy, b]));
+      LIVE.brakeOk = Object.keys(LIVE.brake).length > 0;
+    }catch(e){ LIVE.brake = {}; LIVE.brakeOk = false; }
     // Market cap and the six factor percentiles for the active names (site_universe, 412 rows — one page).
     // Its own try: the Grid and Universe size/factor columns degrade to dashes with a stated reason, and
     // the rest of the page boots regardless. sunivNorm blanks a stored cap that cannot be a company.
@@ -2261,6 +2267,52 @@ function modelRiskCard(){
       <br><br><b>Scenarios are floors, not estimates, wherever coverage is under 100%.</b>
       ${esc(A.scenario_basis || "")} ${esc(A.coverage_caveat || "")}</div>`);
 }
+// WOULD THE BRAKE HAVE BEEN WORTH IT. The regime card says the state, the fragility card says how
+// exposed the book is, the sizing card says what exposure the state implies — this says what that
+// implication would have cost. It shows BOTH equity proxies rather than a blend: the two baskets
+// share only 8 of 25 names, so the spread between them IS the uncertainty, and one number would be
+// hiding the only honest error bar available.
+function brakeCard(){
+  const B = (typeof LIVE !== "undefined" && LIVE.brake) || {};
+  const keys = ["earliest", "latest"].filter(k => B[k]);
+  if(!keys.length) return card("Would the brake have paid?", "unavailable",
+    `<div class="note">scripts/brake_comparison.py has not run, or db/039 is not applied.</div>`);
+  const A = B[keys[0]].assumptions || {};
+  const pp = v => v == null ? "—" : `${(+v).toFixed(2)}%`;
+  const rows = [];
+  for(const name of Object.keys(B[keys[0]].models || {})){
+    rows.push([`<b>${esc(name.replace(" Compounders",""))}</b>`,
+      ...keys.flatMap(k => { const m = B[k].models[name];
+        return [`${pp(m.static.cagr_pct)} <span class="muted">→</span> ${pp(m.braked.cagr_pct)}`,
+                `<span class="muted">${(+m.static.max_drawdown_pct).toFixed(1)}%</span> → <b>${(+m.braked.max_drawdown_pct).toFixed(1)}%</b>`,
+                `<span style="color:${C.accent}">${m.cost_per_point == null ? "—" : (+m.cost_per_point).toFixed(2)}</span>`]; })]);
+  }
+  const sens = B[keys[keys.length-1]].sensitivity || [];
+  return card("Would the brake have paid?",
+    `${esc(A.window || "")} · ${A.sessions || "—"} sessions, ${A.defensive_sessions || 0} of them DEFENSIVE`,
+    `<div class="note" style="margin-bottom:10px">Equity proxied by the model's own rule — top 25 by
+      QGS within Q1/Q2, equal weight, rebalanced monthly — taken from the ${keys.length === 2 ? "earliest and latest" : "available"}
+      archived screens. ${keys.map(k => `<b>${esc(B[k].basket.screen_date)}</b>: ${(+B[k].equity_leg.cagr_pct).toFixed(1)}% CAGR,
+      ${(+B[k].equity_leg.max_drawdown_pct).toFixed(1)}% drawdown`).join(" · ")}. They share 8 of 25 names.</div>
+     ${tbl(["Model", ...keys.flatMap(k => [`CAGR · ${esc(B[k].basket.screen_date)}`, "Max drawdown", "Cost/pt"])], rows)}
+     <h4 style="margin:14px 0 7px;font-size:11px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">How hard to brake · Balanced, ${esc(B[keys[keys.length-1]].basket.screen_date)} basket</h4>
+     ${tbl(["Equity in DEFENSIVE","CAGR","Sharpe","Max drawdown","Given up","Saved","Cost/pt"],
+        sens.map(x => [`${(+x.multiplier*100).toFixed(0)}%${Math.abs(+x.multiplier - 0.60) < 1e-9 ? ' <span class="chip">current</span>' : ""}`,
+          pp(x.cagr_pct), (+x.sharpe).toFixed(2), `${(+x.max_drawdown_pct).toFixed(1)}%`,
+          `${(+x.return_given_up_pp).toFixed(2)}pp`, `${(+x.drawdown_saved_pp).toFixed(1)}pp`,
+          x.cost_per_point == null ? "—" : (+x.cost_per_point).toFixed(2)]))}
+     <div class="note" style="margin-top:10px">
+      <b>The conclusion holds on both proxies; the magnitude does not.</b> Independently, the brake
+      costs 3-5pp of annual return, buys 10-16 points of drawdown, and raises Sharpe. Cost per point
+      is 0.35-0.37 on the two baskets. ${A.superseded ? esc(A.superseded) : ""}
+      <br><br><b>Sensitivity is flat</b> from 80% down to 20% equity in DEFENSIVE, peaking around
+      60-40%. The setting is not perched on a spike, which is what you want from a number nobody
+      optimised.
+      <br><br><b>Two biases, pulling opposite ways, neither removable.</b>
+      ${A.hindsight ? esc(A.hindsight) : ""} And ${A.survivorship ? esc(A.survivorship) : ""}
+      <br><br>Window bound by ${esc(A.window_bound_by || "fund inception")}. It contains 2015-16,
+      2018, 2020 and 2022 — but no 2008, which no honest proxy reaches.</div>`);
+}
 function drawModels(){
   const rows = (typeof LIVE !== "undefined" && LIVE.models) || [];
   if(!rows.length) return;
@@ -2581,6 +2633,8 @@ async function riskAll(el){
   mrb.innerHTML = sectionHead("Risk by model", `<span class="muted">what a client holds</span>`) +
     `<div class="grid g2">${MODEL_ORDER.filter(n => (LIVE.mrisk||{})[n]).map(n => {
         const was = modelSel; modelSel = n; const h = modelRiskCard(); modelSel = was; return h; }).join("")}</div>`;
+  const bkb = document.createElement("div"); el.appendChild(bkb);
+  bkb.innerHTML = sectionHead("The brake, tested", `<span class="muted">what applying the multiplier would have done</span>`) + brakeCard();
   await section(el, "Risk engine — equity sleeve only", b => risk(b));
   await section(el, "Factor exposure & concentration", b => factors(b));
   let X = null;
