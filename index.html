@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-27 16:00 · 0567cb9</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-27 16:48 · 1a5384b</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-27 16:00 · 0567cb9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-27 16:48 · 1a5384b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3186,8 +3186,16 @@ function todayBlock(H){
     : "";
 
   // Book-level rules that no single name owns. Sector breach is the live one.
+  //
+  // THE CAP IS CASH-INCLUSIVE (Niko, 2026-10-22) and this chip was not, which put two numbers for
+  // one hard rule in the same product: Overview read IT at 40.6% while the Risk tab, the sizing
+  // card and factor_exposure all read 33.2%. Worse, this very chip row already showed cash as a
+  // share of TOTAL next to sector weights of INVESTED — two bases, side by side, unlabelled.
+  // h.weight is a fraction of invested, so diluting by the cash fraction converts it, which is
+  // what engines/book.py::dilute_for_cash does for everything server-side.
+  const cashFrac = (invested + cashAmt) > 0 ? cashAmt / (invested + cashAmt) : 0;
   const bySec = {};
-  H.forEach(h => { if(h.sector) bySec[h.sector] = (bySec[h.sector] || 0) + (h.weight || 0); });
+  H.forEach(h => { if(h.sector) bySec[h.sector] = (bySec[h.sector] || 0) + (h.weight || 0) * (1 - cashFrac); });
   const breach = Object.entries(bySec).filter(([, w]) => w > 0.28)
     .sort((a, b) => b[1] - a[1])
     .map(([sec, w]) => `<span class="chip bad">${esc(sec)} ${pct(w, 1, false)} &gt; 28%</span>`).join(" ");
