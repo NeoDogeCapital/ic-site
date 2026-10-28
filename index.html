@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-27 22:00 · 8a1f84a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-10-28 11:08 · d689398</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-27 22:00 · 8a1f84a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-10-28 11:08 · d689398</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1963,7 +1963,16 @@ async function risk(el){
     ${kpi("Daily VaR 95", pct(m.var95_daily), `Sharpe ${num(m.sharpe)} · today's weights, 1y`)}
   </div>
   <div class="grid g2">
-    ${card("Limit breaches", `${(co.breaches||[]).length} flagged`, `<ul class="list">${(co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||"<li class='muted'>None</li>"}</ul>`)}
+    ${/* THE AS-OF IS ON THE CARD, not just the section head above it. This card quotes the sector
+          cap — "Information Technology 33.9% > 28%" — and the fragility card a few hundred pixels
+          up quotes the same rule at 33.2%. Both are cash-inclusive and both are right: one is
+          priced when the risk engine ran, the other from the holdings snapshot, and Overview's
+          live-quote version reads 34.0%. One basis, three timestamps. Without a date on the card a
+          reader has no way to tell that, and the obvious inference — that the number is unreliable
+          — is exactly the wrong one. */""}
+    ${card("Limit breaches",
+      `${(co.breaches||[]).length} flagged · weights include cash · priced ${esc(R.as_of)}`,
+      `<ul class="list">${(co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||"<li class='muted'>None</li>"}</ul>`)}
     ${card("Risk concentration", "weight vs share of risk", `<ul class="list">${(rc.callouts||[]).map(b=>`<li>${esc(b)}</li>`).join("")}</ul><div class="chart" id="rkRc"></div>`)}
   </div>
   <div class="grid g2" style="margin-top:16px">
