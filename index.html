@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-04 22:00 · 414d069</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-05 02:47 · 30646c2</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-04 22:00 · 414d069</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-05 02:47 · 30646c2</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1111,6 +1111,7 @@ async function openName(tk){
       <div><span class="caps">Guidance</span><b style="font-size:13px">${esc(m.guidance||"—")}</b></div>
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
+    ${pillarBlock(m)}
     <div class="card" style="padding:12px"><div class="chart" id="nmChart" style="height:360px"></div></div>
     ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${cardBlock(tk)}${thesisBlock(tk, true)}
     ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
@@ -1361,6 +1362,51 @@ async function loadFundaHist(tk){
   const el = document.getElementById("fundaBlock");
   if(el) el.outerHTML = fundaBlock(tk);
   return LIVE.fundaHist[tk];
+}
+// THE PILLARS, WITH WHAT THEY ARE MADE OF (Niko, 2026-11-04).
+// The drawer showed a bare Composite and nothing underneath it, so the one number that decides
+// eligibility arrived with no way to ask why. This shows the three pillars at their real weights,
+// P1 broken into the three anchors it is the average of, and the two hard floors as floors rather
+// than as numbers you have to remember the rule for.
+//
+// Valuation is deliberately absent and the note says so: CLAUDE.md removed it from every pillar in
+// V12 — it lives in QGS and FCF/EV only. Someone reading three pillars and no valuation should be
+// told that is the design, not left to assume it is missing data.
+function pillarBlock(m){
+  if(m == null || (m.composite == null && m.p1 == null && m.p2 == null && m.p3 == null))
+    return `<div class="sec"><h4>Pillars</h4><p class="muted">No pillar score for this name yet — it
+      grades C on that basis alone, since the three hard rules cannot be checked without one.</p></div>`;
+  const cell = (v, floor) => {
+    const n = v == null ? null : +v;
+    const breach = floor && n != null && n < 6.0;
+    return `<b style="color:${breach ? C.red : C.text}">${n == null ? "—" : n.toFixed(2)}</b>`;
+  };
+  const note = (v, floor) => {
+    const n = v == null ? null : +v;
+    if(n == null) return '<span class="muted">not scored</span>';
+    if(!floor) return '<span class="muted">no hard floor</span>';
+    return n < 6.0 ? `<span style="color:${C.red}">below the 6.0 floor — cannot be initiated</span>`
+                   : '<span class="muted">clears the 6.0 floor</span>';
+  };
+  const comp = m.composite == null ? null : +m.composite;
+  const tier = comp == null ? "" : comp >= 8 ? "TIER_1" : comp >= 6.5 ? "TIER_2"
+             : comp >= 5 ? "WATCHLIST — under the 6.5 line" : "DNQ — under 5.0";
+  const anchors = [["Moat durability", m.p1_moat], ["Economics (ROIC level)", m.p1_economics],
+                   ["Reinvestment quality", m.p1_reinvestment]].filter(([,v]) => v != null);
+  return `<div class="sec"><h4>Pillars${m.score_tier ? ` <span class="chip">${esc(m.score_tier)}</span>` : ""}</h4>
+    ${tbl(["Pillar","Weight","Score","Floor"], [
+      ["<b>P1</b> Business quality", "40%", cell(m.p1, false), note(m.p1, false)],
+      ["<b>P2</b> Management",       "35%", cell(m.p2, true),  note(m.p2, true)],
+      ["<b>P3</b> Financial strength","25%", cell(m.p3, true), note(m.p3, true)],
+      ["<b>Composite</b>", "P1×.40 + P2×.35 + P3×.25", cell(m.composite, false),
+       `<span class="muted">${esc(tier)}</span>`],
+    ])}
+    ${anchors.length ? `<div class="muted" style="font-size:12px;margin-top:8px">
+      <b>P1 is the average of these three anchors:</b>
+      ${anchors.map(([l,v]) => esc(l) + " <b>" + (+v).toFixed(1) + "</b>").join(" · ")}</div>` : ""}
+    <div class="muted" style="font-size:12px;margin-top:6px">
+      Valuation sits in none of the pillars by design — V12 removed it, and it lives in the quality
+      score and FCF/EV only.${m.score_date ? " Scored " + esc(m.score_date) + "." : ""}</div></div>`;
 }
 function fundaBlock(tk){
   const f = ((typeof LIVE !== "undefined" && LIVE.funda) || {})[tk];
@@ -1758,7 +1804,15 @@ const GRID_COLS = [
   ["ticker","Ticker","txt"], ["grade","Grade","ord"], ["tech_rating","Technical","ord"], ["action","Action","ord"],
   ["timing","Timing","ord"], ["range_pos","Risk range","num"], ["guidance","Guidance","txt"],
   ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
-  ["composite","Composite","num"], ["implied_cagr","Implied growth","num"], ["vis_pct","Visible %","num"],
+  ["composite","Composite","num"],
+  // THE THREE PILLARS, screenable (Niko, 2026-11-04). Composite alone cannot separate "strong
+  // business, weak management" from the reverse, and those are different decisions: P2 and P3
+  // carry HARD FLOORS at 6.0 while P1 carries the largest weight (40%) and no floor at all, so a
+  // name can look investable on the composite with a thin moat. Hover P1 for its three anchors.
+  ["p1","P1 Quality","num","Business quality, 40% of the composite. Moat durability, economics (ROIC level) and reinvestment quality, averaged. NO hard floor — hover a cell for the three anchors"],
+  ["p2","P2 Mgmt","num","Management & capital allocation, 35%. HARD FLOOR 6.0: below it a name cannot be initiated"],
+  ["p3","P3 Financial","num","Financial strength, 25%. HARD FLOOR 6.0: below it a name cannot be initiated"],
+  ["implied_cagr","Implied growth","num"], ["vis_pct","Visible %","num"],
   ["rate_beta","Rate beta","num"], ["trend","Trend","txt"],
   ["sector","Sector","txt"],
   // Size and the six factor percentiles, as one block. Derived from FAC_KEYS / FACTORS in the template, so the
@@ -1775,13 +1829,31 @@ const GRID_COLS = [
   ["grade_reason","Why","txt"],
 ];
 const QGS_ORD = {RARE_ELITE:0, EXCEPTIONAL:1, GOOD_COMPOUNDER:2, AVERAGE:3, LOW_QUALITY:4};
+// One pillar cell. P2 and P3 are coloured when they are through their 6.0 hard floor, because that
+// is a gate and not a shade of grey — a name below it cannot be initiated at all. P1 has no floor,
+// so it is never coloured; its tooltip carries the three anchors it is the average of, which is
+// where "why is P1 5.2" gets answered (FCX: moat 6.5, economics 4.0, reinvestment 5.0).
+function pillarCell(r, k){
+  const v = r[k];
+  if(v == null) return '<span class="muted" title="no pillar score for this name">—</span>';
+  const n = +v;
+  if(k === "p1"){
+    const a = [["moat", r.p1_moat], ["economics", r.p1_economics], ["reinvestment", r.p1_reinvestment]]
+      .filter(([,x]) => x != null).map(([l,x]) => l + " " + (+x).toFixed(1)).join(" · ");
+    const dated = r.score_date ? " · scored " + r.score_date : "";
+    return `<span title="${esc(a || "anchors not recorded")}${esc(dated)}" style="border-bottom:1px dotted ${C.muted}">${num(n)}</span>`;
+  }
+  const breach = n < 6.0;
+  return `<span style="color:${breach ? C.red : C.text}"${breach ? ' title="through the 6.0 hard floor — cannot be initiated"' : ""}>${num(n)}</span>`;
+}
 function gridKey(r, k){
   if(k === "grade") return GRADE_ORD[r.grade] ?? 9;
   if(k === "tech_rating") return TECH_ORD[r.tech_rating] ?? 9;
   if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
   if(k === "action") return ACTION_ORD[r.action] ?? 99;
   if(k === "qgs_tier") return QGS_ORD[r.qgs_tier] ?? 9;
-  if(k === "composite" || k === "range_pos") return r[k] == null ? null : +r[k];
+  if(k === "composite" || k === "range_pos" || k === "p1" || k === "p2" || k === "p3")
+    return r[k] == null ? null : +r[k];
   // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
   if(k === "implied_cagr"){
     const v = (LIVE.vdur[r.ticker]||{}).implied_fcf_cagr; return v == null ? null : +v; }
@@ -1833,6 +1905,7 @@ async function grid(el){
       <td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>
       <td>${esc(r.guidance||"")}</td>
       <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
+      <td>${pillarCell(r, "p1")}</td><td>${pillarCell(r, "p2")}</td><td>${pillarCell(r, "p3")}</td>
       <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>
       <td>${num(r.alignment, 0)}</td><td class="muted" style="font-size:12px">${esc(profileLabel((LIVE.suniv[r.ticker]||{}).factor_profile))}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
@@ -2182,6 +2255,7 @@ function regimeCard(){
       <div class="kv"><span class="muted">3-month VIX / spot</span><b>${r.cost_gauge == null ? "—" : num(+r.cost_gauge,4)}</b></div>
       <div class="kv"><span class="muted">Previous state</span><b>${esc(r.state_prev||"—")}</b></div>
      </div>
+     <div id="mfiRangeBar" style="margin:4px 0 8px"></div>
      <div class="chart" id="mfiHist"></div>
      ${tbl(["Input","Reads","Fragility pctile","Weight"], weighted.concat(shown).map(row))}
      <div class="note" style="margin-top:10px"><b>This is the budget, not the trade.</b> It says what share of the
@@ -2380,6 +2454,8 @@ function fragilityCard(){
       <div class="kv"><span class="muted">One factor explains</span><b style="color:${fragC(100*(+g.pc1_share||0)/0.4)}">${g.pc1_share == null ? "—" : pct(+g.pc1_share,1,false)}</b></div>
       <div class="kv"><span class="muted">Largest single-name risk</span><b>${g.max_name_risk_share == null ? "—" : `${esc(g.max_name_risk_ticker||"")} ${pct(+g.max_name_risk_share,1,false)}`}</b></div>
      </div>
+     <div id="pfiRangeBar" style="margin:10px 0 8px"></div>
+     <div class="chart" id="pfiHist"></div>
      ${br.length ? `<div class="note" style="margin-top:12px;border-left:2px solid ${C.red};padding-left:10px">
         <b>Guardrails breached</b><ul style="margin:6px 0 0 14px">${br.map(b => `<li>${esc(b)}</li>`).join("")}</ul></div>` : ""}
      ${tbl(["Leg","Raw","Fragility pctile","Weight","Contribution"], weighted.concat(shown).map(row))}
@@ -2507,12 +2583,62 @@ function anDrawGeo(X){
   mk(document.getElementById("anGeo"), {tooltip:{trigger:"item", formatter:p => `${p.name}: ${(p.value*100).toFixed(1)}%`},
     series:[{type:"pie", radius:["45%","72%"], label:{color:C.muted, formatter:p => `${p.name} ${(p.value*100).toFixed(0)}%`}, data:geo.map(([k,v]) => ({name:k, value:v}))}]});
 }
+// RANGE TOGGLES ON BOTH FRAGILITY CHARTS (Niko, 2026-11-04).
+//
+// The cutoff is derived from the LAST DATE IN THE SERIES, never from the clock — the same rule the
+// paper-trading toggle uses. These series are written by post-close, so on any morning before it
+// runs the newest row is yesterday's; a clock-derived "QTD" on 1 October would start the window
+// after every row and draw nothing.
+//
+// Each chart keeps its OWN selection rather than sharing one control, because the two series have
+// nothing like the same depth: ic_market_regime holds 1,404 rows back to 2021-04-06, while
+// ic_portfolio_fragility holds 9, from 2026-10-22. One shared window would make whichever chart it
+// did not suit useless.
+let mfiRange = "qtd", pfiRange = "qtd";
+const FRAG_RANGES = [["1m","1M"], ["qtd","QTD"], ["ytd","YTD"], ["all","All"]];
+function fragCutoff(lastDate, key){
+  if(!lastDate) return "0000-01-01";
+  // UTC setters, not local ones. `new Date("2026-11-04")` parses as UTC midnight while setMonth()
+  // reads and writes LOCAL components, so west of Greenwich the date is already the 3rd before the
+  // month is decremented and a "1M" window from 2026-11-04 came out at 2026-10-03. Immaterial to a
+  // chart, wrong by a day in a figure someone might read back.
+  if(key === "1m"){ const d = new Date(lastDate + "T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0,10); }
+  if(key === "qtd"){
+    const m = +lastDate.slice(5,7);
+    return `${lastDate.slice(0,4)}-${String(3 * Math.floor((m - 1) / 3) + 1).padStart(2,"0")}-01`;
+  }
+  if(key === "ytd") return lastDate.slice(0,4) + "-01-01";
+  return "0000-01-01";
+}
+// The buttons, plus an honest note about what the window is actually showing. Three buttons that
+// all draw the same nine points would read as a broken toggle rather than as a short history, so
+// the note says when a window is showing the entire series.
+const LIVE_FRAG_TOTAL = {}, LIVE_FRAG_FIRST = {};
+function fragBtns(sel, attr, shown, lastDate){
+  const btns = FRAG_RANGES.map(([k,l]) =>
+    `<button class="lock" data-${attr}="${k}"${sel===k?' style="border-color:var(--brand);color:var(--text)"':""}>${l}</button>`).join(" ");
+  const full = LIVE_FRAG_TOTAL[attr] || shown, first = LIVE_FRAG_FIRST[attr] || "";
+  const note = (shown >= full)
+    ? `the whole series — ${full} point${full===1?"":"s"}${first ? " from " + esc(first) : ""}`
+    : `${shown} of ${full} points`;
+  return `${btns} <span class="muted" style="margin-left:8px">· ${note}, to ${esc(String(lastDate))}</span>`;
+}
+
 // The regime chart carries its own threshold lines, because the number means nothing without them:
 // 40 and 65 are where the state changes, and the DEFENSIVE band is the only one measured to matter.
 function anDrawRegime(){
-  const RH = LIVE.regime || [];
-  if(!RH.length) return;
-  mk(document.getElementById("mfiHist"), {
+  const ALL = LIVE.regime || [];
+  if(!ALL.length) return;
+  const last = String(ALL[ALL.length-1].as_of).slice(0,10);
+  LIVE_FRAG_TOTAL["mfirange"] = ALL.length; LIVE_FRAG_FIRST["mfirange"] = String(ALL[0].as_of).slice(0,10);
+  const from = fragCutoff(last, mfiRange);
+  // Never draw an empty chart: if the window lands past every row, fall back to the whole series
+  // rather than rendering a blank box the user cannot tell from a failure.
+  const RH = ALL.filter(x => String(x.as_of).slice(0,10) >= from).length ? ALL.filter(x => String(x.as_of).slice(0,10) >= from) : ALL;
+  const host = document.getElementById("mfiHist");
+  if(host && host.previousElementSibling && host.previousElementSibling.id === "mfiRangeBar")
+    host.previousElementSibling.innerHTML = fragBtns(mfiRange, "mfirange", RH.length, last);
+  mk(host, {
     tooltip:{trigger:"axis", formatter:ps => { const i = ps[0].dataIndex, x = RH[i];
       return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cover ${x.cost_state||"—"}`; }},
     grid:{left:34,right:14,top:14,bottom:26},
@@ -2524,7 +2650,46 @@ function anDrawRegime(){
         data:[{yAxis:65, lineStyle:{color:C.red, type:"dashed"}, label:{formatter:"DEFENSIVE 65"}},
               {yAxis:40, lineStyle:{color:C.amber, type:"dashed"}, label:{formatter:"DETERIORATING 40"}}]},
       markArea:{silent:true, itemStyle:{color:"rgba(239,83,80,.07)"}, data:[[{yAxis:65},{yAxis:100}]]}}]});
+  document.querySelectorAll("button[data-mfirange]").forEach(b =>
+    b.onclick = () => { mfiRange = b.dataset.mfirange; anDrawRegime(); });
 }
+// The PFI history chart. There was none at all until 2026-11-04 — the card showed a single number
+// and its legs, so a reader could not tell a book that had just become more concentrated from one
+// that had been sitting there for weeks.
+//
+// NO THRESHOLD LINES, deliberately, where the MFI chart carries two. MFI's 40 and 65 are measured
+// state boundaries; PFI is a percentile against 800 synthetic books and its own assumptions call it
+// DIAGNOSTIC — "a breach prompts a review, not a trade". Drawing a line at 65 here would invent a
+// level the index does not have. The legs table underneath is where the level gets its meaning.
+function anDrawFragility(){
+  const ALL = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
+  if(!ALL.length) return;
+  const last = String(ALL[ALL.length-1].as_of).slice(0,10);
+  LIVE_FRAG_TOTAL["pfirange"] = ALL.length; LIVE_FRAG_FIRST["pfirange"] = String(ALL[0].as_of).slice(0,10);
+  const from = fragCutoff(last, pfiRange);
+  const win = ALL.filter(x => String(x.as_of).slice(0,10) >= from);
+  const F = win.length ? win : ALL;
+  const host = document.getElementById("pfiHist");
+  if(!host) return;
+  const bar = document.getElementById("pfiRangeBar");
+  if(bar) bar.innerHTML = fragBtns(pfiRange, "pfirange", F.length, last);
+  mk(host, {
+    tooltip:{trigger:"axis", formatter:ps => { const x = F[ps[0].dataIndex];
+      const g = x.diagnostics || {};
+      return `${String(x.as_of).slice(0,10)}<br><b>PFI ${(+x.pfi).toFixed(1)}</b>`
+        + (g.effective_n_risk == null ? "" : `<br>${(+g.effective_n_risk).toFixed(1)} effective bets by risk`)
+        + (g.pc1_share == null ? "" : `<br>one factor ${(100*+g.pc1_share).toFixed(0)}%`); }},
+    grid:{left:34,right:14,top:14,bottom:26},
+    xAxis:{type:"category", data:F.map(x=>String(x.as_of).slice(0,10)), axisLabel:{color:C.muted}},
+    yAxis:{type:"value", min:0, max:100, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
+    // Symbols shown on a short series: nine points drawn as a bare line read as a trend, and this
+    // one is two weeks old.
+    series:[{type:"line", showSymbol:F.length < 40, symbolSize:6,
+      lineStyle:{color:C.amber, width:2}, areaStyle:{opacity:.10}, data:F.map(x=>+x.pfi)}]});
+  document.querySelectorAll("button[data-pfirange]").forEach(b =>
+    b.onclick = () => { pfiRange = b.dataset.pfirange; anDrawFragility(); });
+}
+
 /* ═══ COMPOSED TABS ══════════════════════════════════════════════════════
    A section is just another view rendered into an appended div. Every one is wrapped so a single
    failing section degrades to a named message instead of taking the tab with it — the sections
@@ -2636,6 +2801,7 @@ async function riskAll(el){
     `<div class="grid g2">${regimeCard()}${fragilityCard()}</div>
      <div style="margin-top:16px">${sizingCard()}</div>`;
   anDrawRegime();
+  anDrawFragility();      // the PFI history chart, drawn after its card is in the document
   // Model-level first: the engine below it runs on HOLDINGS and therefore describes the equity
   // sleeve alone, which is 62% and 81% of what these two models actually are.
   const mrb = document.createElement("div"); el.appendChild(mrb);
