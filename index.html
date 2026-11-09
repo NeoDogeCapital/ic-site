@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-09 18:00 · 902dd47</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-09 18:48 · bb21113</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-09 18:00 · 902dd47</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-09 18:48 · bb21113</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -341,12 +341,37 @@ function renderPipeline(){
   let v; try{ v = typeof h.value === "string" ? JSON.parse(h.value) : h.value; }catch(e){ return; }
   if(!v) return;
   const age = Math.round((Date.now() - new Date(h.updated_at)) / 36e5);
-  const bad = v.failed > 0, stale = age > 30;
+  // `checks` counts every RESULT — warnings and skips included — so "N checks ok" claimed a pass
+  // for checks that asserted nothing. The one that cannot run on a cloud box (no local
+  // portfolio.csv, which is gitignored) put a free pass in that number every single night, which
+  // is the defect this system keeps producing: a value that should read absent resolving into a
+  // reassuring one. `passed` counts only OK, and a skip is now named rather than absorbed.
+  // Verdicts written before 2026-11-06 carry no `passed`/`skipped`, so fall back to the old
+  // wording instead of printing "undefined checks ok" — a missing number must look missing.
+  const graded = v.passed != null;
+  const pass = graded ? v.passed : v.checks;
+  const skipped = v.skipped || 0, errs = v.errors || 0;
+  // A run that CRASHED still records a verdict — health_check writes it in a `finally` precisely
+  // so the page cannot show silence as health — and the checks it never reached asserted nothing.
+  // "0 failing" out of a run that died at check 12 is not a clean bill, so it is red on its own.
+  const bad = v.failed > 0 || !!v.crashed, stale = age > 30;
   const col = bad ? C.red : stale ? C.amber : C.green;
-  const txt = bad ? `${v.failed} check${v.failed > 1 ? "s" : ""} failing`
-            : stale ? `checks ${age}h old` : `${v.checks} checks ok${v.warnings ? ` · ${v.warnings} warn` : ""}`;
-  const detail = [...(v.failing || []), ...(v.warning || [])].join(", ");
-  el.innerHTML = `<span class="caps" style="font-size:9px;color:${col}" title="${esc(detail || "all checks passed")}">● ${esc(txt)}</span>`;
+  const txt = v.crashed ? `health run crashed · ${v.ran || 0}/${v.registered || 0} checks ran`
+            : bad ? `${v.failed} check${v.failed > 1 ? "s" : ""} failing${errs ? ` · ${errs} errored` : ""}`
+            : stale ? `checks ${age}h old`
+            : `${pass} check${pass === 1 ? "" : "s"} ok${v.warnings ? ` · ${v.warnings} warn` : ""}`
+              + `${skipped ? ` · ${skipped} skipped` : ""}`;
+  // An ERROR is a check that raised, so it belongs in the tooltip beside the failures rather than
+  // nowhere; a SKIP belongs there too, because "which check did not run" is the question a reader
+  // of this badge actually has.
+  const detail = [...(v.failing || []), ...(v.erroring || []), ...(v.warning || []),
+                  ...(v.skipping || [])].join(", ");
+  // NOT `detail || "all checks passed"`: on a crashed run `detail` is empty, so the badge would
+  // have carried a clean bill of health as its tooltip while saying the run died in its label.
+  const title = v.crashed ? `the health run did not complete: ${v.crash || "reason not recorded"}`
+                            + (detail ? ` · ${detail}` : "")
+              : detail || (graded ? "all checks passed" : "no per-check breakdown recorded");
+  el.innerHTML = `<span class="caps" style="font-size:9px;color:${col}" title="${esc(title)}">● ${esc(txt)}</span>`;
 }
 function applyQuotes(){
   if(!D) return;
