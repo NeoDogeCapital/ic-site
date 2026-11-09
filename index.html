@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-09 16:44 · 760fa75</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-09 17:52 · a61664f</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-09 16:44 · 760fa75</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-09 17:52 · a61664f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3938,7 +3938,7 @@ function universe(el){
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
       `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
   </div>
-  <div class="card"><div class="card-h"><div><h3>Revenue momentum vs earnings momentum</h3><div class="sub">x = forward minus trailing revenue growth · y = capped forward minus trailing EPS growth · size = alignment · rings = holdings</div></div>
+  <div class="card"><div class="card-h"><div><h3>Revenue momentum vs earnings momentum</h3><div class="sub">x = forward minus trailing revenue growth · y = forward minus trailing EPS growth · size = alignment · rings = holdings</div></div>
     <div class="filters" id="uf">${[["all","All"],["held","Holdings"],["watch","Watchlist"],["accum","Accumulate"]].map(([k,l])=>`<button class="fbtn ${uFilter===k?'on':''}" data-f="${k}">${l}</button>`).join("")}</div></div>
     <div class="chart" id="uMap" style="height:560px"></div></div>
   <div class="grid g2" style="margin-top:16px">
