@@ -189,7 +189,10 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 /* An indicator that is OFF must read as off at a glance, not merely un-highlighted -- the chip row
    is the only place that says what is on the chart. */
 .indchip:not(.on){opacity:.55}
-.lwcchips{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px}
+.lwcchips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.lwcgrp{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.lwcglab{font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+.lwcsep{display:inline-block;width:1px;height:16px;background:var(--line2);margin:0 5px;vertical-align:middle}
 .lwclegend{font:500 12px var(--mono);color:var(--text);min-height:17px;margin-bottom:4px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 /* The caption carries each indicator's `basis` from the registry -- what a series actually IS when
@@ -286,7 +289,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:28 · a96a623</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:41 · 544fbde</div>
   </div>
 </section>
 
@@ -314,7 +317,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:28 · a96a623</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:41 · 544fbde</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1230,9 +1233,25 @@ function earningsAvwap(bars, anchor){
     pv += (b.h + b.l + b.c) / 3 * (b.v || 0); vv += (b.v || 0); return vv > 0 ? pv / vv : null; });
 }
 
-/* ── plain helpers for registry entries, so an entry stays one line where it can ─────────── */
+/* ── plain helpers for registry entries, so an entry stays one line where it can ─────────────
+ * ⚠ THESE RECOMPUTE ON THE BARS ON SCREEN, WHICH IS THE POINT AND ALSO THE CAVEAT.
+ * ic_technicals already stores a nightly sma20/ema35/macd/atr_pct/bb_width/hv20/obv_slope_20 per
+ * name — but those are DAILY values, and this chart offers 2-day and weekly bars. A stored daily
+ * MACD plotted against weekly candles is simply the wrong series. So the library recomputes, with
+ * the same construction technical_engine.py uses (:95-158), and the trade is that a chart value
+ * will not always equal the stored one: different window, and on D the chart's window is whatever
+ * the timeframe fetched rather than the engine's full history. Every entry below says so.        */
 const _sma = (arr, w) => arr.map((_, i) => i < w-1 ? null
   : arr.slice(i-w+1, i+1).reduce((a,b)=>a+b, 0) / w);
+const _ema = (arr, span) => { const k = 2/(span+1); const o = [];
+  arr.forEach((v, i) => o.push(i ? o[i-1] + k*(v - o[i-1]) : v)); return o; };
+const _std = (arr, w) => arr.map((_, i) => { if(i < w-1) return null;
+  const s = arr.slice(i-w+1, i+1), m = s.reduce((a,b)=>a+b,0)/w;
+  return Math.sqrt(s.reduce((a,b)=>a+(b-m)*(b-m),0)/w); });
+const _roc = (arr, w) => arr.map((v, i) => i < w || !arr[i-w] ? null : v/arr[i-w] - 1);
+const _ON_SCREEN = "recomputed from the bars on screen — same construction as technical_engine, "
+                 + "but a different window from the nightly daily value, and necessarily so: a "
+                 + "stored daily figure cannot be plotted against 2-day or weekly bars.";
 
 /* ── THE REGISTRY ───────────────────────────────────────────────────────────────────────────
  * pane   : "price" overlays the candles · any other key opens its own pane, created on demand
@@ -1247,29 +1266,38 @@ const _sma = (arr, w) => arr.map((_, i) => i < w-1 ? null
  *          Rendered into the chart's caption. See the header.                               */
 const INDICATORS = {
   sma50: {
+    group: "Price",
     label: "SMA 50", pane: "price", type: "line", color: "#6aa6f8", width: 1.2, on: true,
     compute: (bars) => _sma(bars.map(b=>b.c), 50),
   },
   sma200: {
+    group: "Price",
     label: "SMA 200", pane: "price", type: "line", color: "#8b95a1", width: 1.2, on: true,
     compute: (bars) => _sma(bars.map(b=>b.c), 200),
   },
   trackline: {
+    group: "Price",
     label: "Track line", pane: "price", type: "line", color: "#26a69a", width: 2.0, on: true,
     compute: (bars, S) => S.line,
-    basis: "EMA-26 that flips after two closes beyond ±1.5 ATR — the site's own construction, "
-         + "not an exchange or vendor definition. technical_v2's backtest (2026-09-15) found it "
-         + "does NOT separate drawdown risk; it is a trend state, never a sell trigger.",
+    basis: "EMA-26 that flips after two closes beyond ±1.5 ATR. ⚠ It is a FITTED APPROXIMATION "
+         + "of a third-party indicator — technical_v2 tuned it to the 'Alpha Trend VIP' line on "
+         + "the SPX / NVDA / MA reference charts (2026-09-15), catching every colour change with "
+         + "0-3 weeks lag. Not an exchange or vendor definition, and not the open-source "
+         + "AlphaTrend, which is a separate toggle. technical_v2's own backtest found it does "
+         + "NOT separate drawdown risk: a trend state, never a sell trigger.",
   },
   avwap52: {
+    group: "Price",
     label: "52w-low VWAP", pane: "price", type: "line", color: "#b39ddb", width: 1.2, on: true,
     compute: (bars, S) => S.avwap,
   },
   rsi14: {
+    group: "Momentum",
     label: "RSI 14", pane: "rsi", type: "line", color: "#d4b45a", width: 1.2, on: true,
     compute: (bars, S) => S.rsi, scale: {min: 0, max: 100}, guides: [30, 70],
   },
   volume: {
+    group: "Volume",
     label: "Volume", pane: "vol", type: "histogram", on: true,
     compute: (bars) => bars.map(b => b.v || 0),
   },
@@ -1277,25 +1305,185 @@ const INDICATORS = {
   // a band is not a thing anyone wants on screen. technical_v2 computes the stored version; these
   // are recomputed here from the bars on screen by the same construction.
   trade_band: {
+    group: "Price",
     label: "Trade range (1w)", pane: "price", type: "line", multi: true, on: true,
     compute: (bars, S) => [
       {vals: S.trade.lo, color: "rgba(106,166,248,.55)", width: 1, dash: true},
       {vals: S.trade.hi, color: "rgba(106,166,248,.55)", width: 1, dash: true}],
   },
   trend_band: {
+    group: "Price",
     label: "Trend range (1m)", pane: "price", type: "line", multi: true, on: false,
     compute: (bars, S) => [
       {vals: S.trend.lo, color: "rgba(240,169,74,.45)", width: 1, dash: true},
       {vals: S.trend.hi, color: "rgba(240,169,74,.45)", width: 1, dash: true}],
   },
   avwap_earn: {
+    group: "Price",
     label: "Earnings VWAP", pane: "price", type: "line", color: "#d4b45a", width: 1.4,
     dash: true, on: true,
     compute: (bars, S, ctx) => earningsAvwap(bars, ctx && ctx.v2 && ctx.v2.earnings_anchor),
     basis: "anchored at the last earnings date technical_v2 recorded — absent, and the series "
          + "with it, when that name has no anchor stored.",
   },
+  // ── AlphaTrend ────────────────────────────────────────────────────────────────────────────
+  // A faithful JS port of scripts/technical_v2.py::alpha_trend(), which has been in the repo
+  // since 883d6e9 and has never been drawn: v2 kept it "for reference" and shipped the fitted
+  // track line instead. Put back on the chart 2026-11-16 at Niko's request.
+  //
+  // ⚠ TWO DIFFERENT THINGS CALLED MFI, AND THEY ARE NOT RELATED.
+  // AlphaTrend's direction comes from the MONEY FLOW INDEX — (h+l+c)/3 × volume, split into up
+  // and down flow over 14 bars. This system's MFI is the MARKET FRAGILITY INDEX
+  // (scripts/market_regime.py, 0-100, five weighted legs, a protection budget). One is a
+  // per-name oscillator inside this indicator; the other is a market-wide regime read. Nothing
+  // below touches the fragility index, and nothing in market_regime touches this.
+  //
+  // ATR here is a simple rolling MEAN of true range, not Wilder smoothing — matching
+  // technical_v2's atr() and the published AlphaTrend, which both use an SMA.
+  alphatrend: {
+    group: "Price",
+    label: "AlphaTrend", pane: "price", type: "line", multi: true, on: false,
+    compute: (bars) => {
+      const n = 14, coeff = 1, N = bars.length;
+      const H = bars.map(b=>b.h), L = bars.map(b=>b.l), Cc = bars.map(b=>b.c), V = bars.map(b=>b.v||0);
+      const tr = Cc.map((_, i) => i ? Math.max(H[i]-L[i], Math.abs(H[i]-Cc[i-1]), Math.abs(L[i]-Cc[i-1]))
+                                    : H[i]-L[i]);
+      const a = _sma(tr, n);
+      // Money Flow Index, or RSI when the series carries no volume — the same fallback
+      // alpha_trend() makes, because an index has no volume and MFI would be undefined.
+      const tp = bars.map(b => (b.h + b.l + b.c) / 3);
+      const hasVol = V.reduce((x,y)=>x+y, 0) > 0;
+      let flow;
+      if(hasVol){
+        const mf = tp.map((t,i) => t * V[i]);
+        flow = tp.map((_, i) => { if(i < n) return null;
+          let pos = 0, neg = 0;
+          for(let j = i-n+1; j <= i; j++){ if(!j) continue;
+            if(tp[j] > tp[j-1]) pos += mf[j]; else if(tp[j] < tp[j-1]) neg += mf[j]; }
+          return neg === 0 ? 100 : 100 - 100/(1 + pos/neg); });
+      } else {
+        let up = 0, dn = 0;
+        flow = Cc.map((v, i) => { const d = i ? v - Cc[i-1] : 0;
+          up = i ? up + ((d>0?d:0) - up)/n : 0; dn = i ? dn + ((d<0?-d:0) - dn)/n : 0;
+          return i < n || dn === 0 ? null : 100 - 100/(1 + up/dn); });
+      }
+      const at = new Array(N).fill(null);
+      for(let i = 0; i < N; i++){
+        if(a[i] == null || flow[i] == null) continue;
+        const up = L[i] - a[i]*coeff, dn = H[i] + a[i]*coeff;
+        const prev = i && at[i-1] != null ? at[i-1] : (flow[i] >= 50 ? up : dn);
+        at[i] = flow[i] >= 50 ? Math.max(up, prev) : Math.min(dn, prev);
+      }
+      // bull = the line is above where it was two bars ago, as in alpha_trend()
+      const bull = at.map((v, i) => v != null && i >= 2 && at[i-2] != null ? v > at[i-2] : null);
+      return [
+        {vals: at.map((v,i)=> bull[i] === true  ? v : null), color: "#26a69a", width: 1.8},
+        {vals: at.map((v,i)=> bull[i] === false ? v : null), color: "#ef5350", width: 1.8}];
+    },
+    basis: "the OPEN-SOURCE AlphaTrend (ATR bands steered by Money Flow Index ≥ 50), ported "
+         + "verbatim from technical_v2.alpha_trend(). technical_v2 judged it 'too choppy vs the "
+         + "reference charts' and shipped the fitted track line instead — so the two WILL "
+         + "disagree, and that disagreement is the honest version of the difference. Note: this "
+         + "MFI is Money Flow Index, not the Market Fragility Index.",
+  },
+  sma20: {
+    label: "SMA 20", pane: "price", type: "line", color: "#9aa4b2", width: 1, on: false,
+    group: "Price", compute: (bars) => _sma(bars.map(b=>b.c), 20), basis: _ON_SCREEN,
+  },
+  ema35: {
+    label: "EMA 35", pane: "price", type: "line", color: "#d4b45a", width: 1.3, on: false,
+    group: "Price",
+    // The briefing chart's trend anchor (trade_briefing.py draws it in gold) — same line here so
+    // the DOCX an advisor reads and the screen agree on what the anchor is.
+    compute: (bars) => _ema(bars.map(b=>b.c), 35), basis: _ON_SCREEN,
+  },
+  bb20: {
+    label: "Bollinger 20", pane: "price", type: "line", multi: true, on: false, group: "Volatility",
+    compute: (bars) => { const c = bars.map(b=>b.c), m = _sma(c,20), sd = _std(c,20);
+      return [{vals: m.map((v,i)=> v==null?null:v+2*sd[i]), color:"rgba(167,139,250,.5)", width:1, dash:true},
+              {vals: m, color:"rgba(167,139,250,.35)", width:1},
+              {vals: m.map((v,i)=> v==null?null:v-2*sd[i]), color:"rgba(167,139,250,.5)", width:1, dash:true}]; },
+    basis: _ON_SCREEN + " technical_engine stores bb_width = 4σ/mid rather than the bands.",
+  },
+  macd: {
+    label: "MACD 12/26/9", pane: "macd", type: "line", multi: true, on: false, group: "Momentum",
+    compute: (bars) => { const c = bars.map(b=>b.c);
+      const line = _ema(c,12).map((v,i)=> v - _ema(c,26)[i]);
+      const sig = _ema(line, 9);
+      return [{vals: line, color:"#6aa6f8", width:1.3},
+              {vals: sig,  color:"#f0a94a", width:1.1},
+              {vals: line.map((v,i)=> v - sig[i]), color:"rgba(139,149,161,.5)", width:1}]; },
+    basis: _ON_SCREEN,
+  },
+  roc63: {
+    label: "ROC 63", pane: "roc", type: "line", color: "#3fcf8e", width: 1.2, on: false,
+    group: "Momentum", guides: [0],
+    compute: (bars) => _roc(bars.map(b=>b.c), 63), basis: _ON_SCREEN,
+  },
+  atrpct: {
+    label: "ATR %", pane: "atr", type: "line", color: "#ef6464", width: 1.1, on: false,
+    group: "Volatility",
+    compute: (bars) => { const n = bars.length, tr = [];
+      for(let i=0;i<n;i++){ const b = bars[i];
+        tr.push(i ? Math.max(b.h-b.l, Math.abs(b.h-bars[i-1].c), Math.abs(b.l-bars[i-1].c)) : b.h-b.l); }
+      const a = _sma(tr, 14);
+      return a.map((v,i)=> v==null?null: v/bars[i].c); },
+    basis: _ON_SCREEN,
+  },
+  hv20: {
+    label: "HV 20", pane: "atr", type: "line", color: "#a78bfa", width: 1.1, on: false,
+    group: "Volatility",
+    compute: (bars) => { const c = bars.map(b=>b.c);
+      const r = c.map((v,i)=> i? Math.log(v/c[i-1]) : null);
+      // annualised on the BAR's own frequency — 252 daily, 126 two-day, 52 weekly. Annualising a
+      // weekly series by sqrt(252) would overstate it by more than two times.
+      const per = bars[0] && bars[0].n >= 5 ? 52 : bars[0] && bars[0].n === 2 ? 126 : 252;
+      return _std(r.map(v=>v==null?0:v), 20).map((v,i)=> i<20||v==null?null: v*Math.sqrt(per)); },
+    basis: _ON_SCREEN + " Annualised on the bar's own frequency (252 / 126 / 52).",
+  },
+  obv: {
+    label: "OBV slope", pane: "obv", type: "line", color: "#6aa6f8", width: 1.2, on: false,
+    group: "Volume", guides: [0],
+    compute: (bars) => { const c = bars.map(b=>b.c), v = bars.map(b=>b.v||0);
+      let o = 0; const ob = c.map((x,i)=> { if(i) o += Math.sign(x - c[i-1]) * v[i]; return o; });
+      const va = _sma(v, 50);
+      return ob.map((x,i)=> i<20 || !va[i] ? null : (x - ob[i-20]) / (va[i]*20)); },
+    basis: _ON_SCREEN,
+  },
+  // ── the two fragility indices ─────────────────────────────────────────────────────────────
+  // Both are SERVER-SOURCED and both are 0-100, so they share one pane: MFI against PFI is a
+  // comparison worth being able to make at a glance — the market's fragility against this book's.
+  //
+  // ⚠ NEITHER VARIES WITH THE SYMBOL. They are market-wide and book-wide readings, so the line
+  // is identical on AAPL and on SPY. That is not a bug and it is not a per-name signal; it is
+  // context behind whatever name you happen to be looking at.
+  mfi: {
+    group: "Regime",
+    label: "Market Fragility", pane: "frag", type: "line", color: "#f0a94a", width: 1.4, on: false,
+    source: "server", view: "site_market_regime",
+    guides: [40, 65],           // DETERIORATING and DEFENSIVE, market_regime.py:79
+    compute: (bars, S, ctx) => alignServer(bars, ctx.srv("site_market_regime"), "as_of", "mfi"),
+    basis: "MARKET-WIDE, identical on every chart — the Market Fragility Index from "
+         + "market_regime.py, five weighted legs on 33 years of fitting, read as HOW MUCH "
+         + "PROTECTION TO OWN and never as how much equity to hold (every fragile state measured "
+         + "had HIGHER forward returns). Guides at 40 DETERIORATING / 65 DEFENSIVE. The view "
+         + "serves the last ~500 days, so the line simply stops on a longer window rather than "
+         + "being carried back. Not the Money Flow Index that steers AlphaTrend.",
+  },
+  pfi: {
+    group: "Regime",
+    label: "Portfolio Fragility", pane: "frag", type: "line", color: "#a78bfa", width: 1.4, on: false,
+    source: "server", view: "site_portfolio_fragility",
+    compute: (bars, S, ctx) => alignServer(bars, ctx.srv("site_portfolio_fragility"),
+                                           "as_of", "pfi", r => r.book === "current"),
+    basis: "THIS BOOK's fragility, not the market's, and identical on every chart. ⚠ The series "
+         + "is SHORT: 16 observations beginning 2026-10-22, spanning 63.2-66.1. On any window "
+         + "longer than a month it is a stub at the right edge, and it is far too short to read "
+         + "a trend from — it is drawn because hiding it would be worse, not because there is "
+         + "yet anything to see. `book = current` only; the proposal book is excluded.",
+  },
   rvol50: {
+    group: "Volume",
     label: "RVol 50", pane: "rvol", type: "histogram", on: false,
     // Relative to the trailing 50-bar mean, so 1.0 is an average day. The same quantity
     // ic_technicals.rel_vol stores, recomputed here from the bars on screen rather than read
@@ -1340,17 +1528,78 @@ const INDICATORS = {
 // null means "everything the view holds", which db/069 fixed at 2000-01-01.
 const LWC_TF = [["3M", 63], ["6M", 126], ["YTD", "ytd"], ["1Y", 252], ["3Y", 756], ["5Y", 1260], ["Max", null]];
 
+// Closing the menu is a page-level concern (click anywhere, or Escape). Registered ONCE, not
+// per chart — techChart can run several times for one drawer and a listener per call leaks.
+if(typeof window !== "undefined" && !window.__lwcMenuWired){
+  window.__lwcMenuWired = true;
+  const shut = () => { if(!lwcMenuOpen) return; lwcMenuOpen = false;
+    document.querySelectorAll(".lwcmenu").forEach(m => m.hidden = true);
+    document.querySelectorAll(".lwcmenubtn").forEach(b => b.classList.remove("on")); };
+  document.addEventListener("click", shut);
+  document.addEventListener("keydown", e => { if(e.key === "Escape") shut(); });
+}
+
+/* ── BAR INTERVAL: daily, two-day, weekly ──────────────────────────────────────────────────────
+ * Separate axis from the timeframe buttons: the timeframe says HOW MUCH you see, the interval
+ * says WHAT A BAR IS. Aggregating is not cosmetic — every indicator then computes on the
+ * aggregated series, so a weekly RSI is the RSI of weekly bars and not a daily RSI sampled on
+ * Fridays. That is the whole reason to offer it.
+ *
+ * ⚠ THE LAST BUCKET IS USUALLY PARTIAL, and more often than on daily. A Wednesday sits inside an
+ * unfinished week; a 2-day bucket is half-formed every other session. The caption says so, the
+ * same as it does for today's daily bar, because a half-week candle that looks finished is a
+ * statement about a week that has not happened.
+ */
+const LWC_IV = [["D", 1], ["2D", 2], ["W", "W"]];
+
+// ISO week key (Monday-start), so a bucket is "the week of", not "five bars from wherever the
+// window happened to begin" — a rolling 5-bar group would redraw every day and no two charts
+// would agree on where a week starts.
+function _isoWeek(iso){
+  const d = new Date(iso + "T00:00:00Z");
+  const day = (d.getUTCDay() + 6) % 7;            // Mon=0 … Sun=6
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+
+function aggBars(bars, iv){
+  if(iv === "D" || !bars.length) return bars;
+  const out = [];
+  let key = null, cur = null;
+  bars.forEach((b, i) => {
+    const k = iv === "W" ? _isoWeek(b.d) : Math.floor(i / 2);
+    if(k !== key){
+      if(cur) out.push(cur);
+      key = k;
+      // The bucket's OPEN is the first bar's open, which may be null (db/069 leaves it NULL where
+      // the vendor had none). It stays null rather than falling back to the close — a bucket whose
+      // first session has no open has no open, and inventing one draws a candle body that did not
+      // happen.
+      cur = {d: b.d, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v || 0, sc: b.sc, n: 1};
+    } else {
+      cur.h = Math.max(cur.h, b.h); cur.l = Math.min(cur.l, b.l);
+      cur.c = b.c; cur.sc = b.sc; cur.v += (b.v || 0); cur.n++;
+    }
+  });
+  if(cur) out.push(cur);
+  return out;
+}
+
 // Per-viewer chart preferences. localStorage, wrapped: it can throw in a private window and comes
 // back empty after cleared site data, so the chart must render correctly without it. This is a
 // convenience, never state anything else reads.
 function lwcPrefs(){
-  const d = {tf: "1Y", log: false, total: true,
+  const d = {tf: "1Y", iv: "D", log: false, total: true,
              on: Object.fromEntries(Object.entries(INDICATORS).map(([k, v]) => [k, !!v.on]))};
   try { return Object.assign(d, JSON.parse(localStorage.getItem("ic.chart") || "{}")); }
   catch(e){ return d; }
 }
 function lwcSave(p){ try { localStorage.setItem("ic.chart", JSON.stringify(p)); } catch(e){} }
 let LWCP = lwcPrefs();
+// techChart() rebuilds the whole element on every toggle, so "is the menu open" cannot live in
+// the DOM — it would close the moment you ticked something, which is the one time you want it
+// to stay put. Module-level, not in prefs: it is this session's state, not a preference.
+let lwcMenuOpen = false;
 
 // Earliest date the view holds. db/069 set this floor deliberately — a FIXED date, so "Max" means
 // the same window today and in a year, which a rolling CURRENT_DATE - N never could.
@@ -1405,6 +1654,43 @@ async function loadBars(tk, tf){
   return out;
 }
 
+/* ── SERVER-SOURCED INDICATORS ────────────────────────────────────────────────────────────────
+ * Some series cannot be computed from the bars on screen: the fragility indices are market- and
+ * book-wide, written nightly by their own engines. A registry entry names a site_* view and the
+ * two columns to read; this fetches each view ONCE per session and aligns it to whatever a bar
+ * currently is.
+ *
+ * ⚠ ALIGNMENT NEVER EXTRAPOLATES. Within the series it forward-fills, which is right for a LEVEL
+ * — an MFI of 66 stands until the next reading. Outside it the value is null at BOTH ends: no
+ * back-fill before the first observation, no flat line continuing past the last. A fragility
+ * index that appears to run from 2000 because the chart carried its first value backwards would
+ * be inventing eighteen years of regime history.                                              */
+async function lwcPrefetch(){
+  LIVE.srv ||= {};
+  const views = new Set();
+  for(const [k, cfg] of Object.entries(INDICATORS))
+    if(LWCP.on[k] && cfg.source === "server" && cfg.view) views.add(cfg.view);
+  for(const v of views) if(!LIVE.srv[v]) LIVE.srv[v] = await qAll(v, r => r.order(INDICATORS_DATEKEY[v] || "as_of"));
+}
+// Which column carries the date in each served view — they do not agree (ic_paper_nav uses
+// nav_date), so it is declared rather than guessed.
+const INDICATORS_DATEKEY = {site_market_regime: "as_of", site_portfolio_fragility: "as_of",
+                            site_paper_nav: "nav_date"};
+
+function alignServer(bars, rows, dkey, vkey, filter){
+  if(!rows || !rows.length) return null;
+  const src = (filter ? rows.filter(filter) : rows).slice()
+    .sort((a, b) => a[dkey] < b[dkey] ? -1 : 1);
+  if(!src.length) return null;
+  const first = src[0][dkey], last = src[src.length - 1][dkey];
+  let j = 0, cur = null;
+  return bars.map(b => {
+    while(j < src.length && src[j][dkey] <= b.d){ cur = src[j][vkey]; j++; }
+    if(b.d < first || b.d > last) return null;      // neither end is extended
+    return cur == null ? null : +cur;
+  });
+}
+
 const _lwcTheme = () => ({
   layout: {background: {color: "transparent"}, textColor: C.muted, attributionLogo: true,
            fontFamily: "Inter, system-ui, sans-serif"},
@@ -1422,12 +1708,39 @@ function lwcPartial(bars){
   return bars[bars.length - 1].d === nyToday;
 }
 
+// How tall the canvas needs to be. A fixed 420px squeezed the price pane to a sliver once a few
+// indicator panes were open — with everything on it was 7 panes in 420px and the candles were
+// unreadable. Price keeps a floor and each extra pane adds its own room.
+function lwcHeight(){
+  const panes = new Set(["price"]);
+  for(const [k, cfg] of Object.entries(INDICATORS)) if(LWCP.on[k]) panes.add(cfg.pane);
+  return 300 + Math.max(0, panes.size - 1) * 95;
+}
+
 function lwcChrome(tk, partial, basisLines){
   const tf = LWC_TF.map(([l]) =>
-    `<button class="tfb${l === LWCP.tf ? " on" : ""}" data-tf="${l}">${l}</button>`).join("");
-  const chips = Object.entries(INDICATORS).map(([k, cfg]) =>
-    `<button class="indchip${LWCP.on[k] ? " on" : ""}" data-ind="${k}"
-      title="${esc(cfg.basis || cfg.label)}">${esc(cfg.label)}${cfg.basis ? " ⓘ" : ""}</button>`).join("");
+    `<button class="tfb${l === LWCP.tf ? " on" : ""}" data-tf="${l}">${l}</button>`).join("")
+    + `<span class="lwcsep"></span>`
+    + LWC_IV.map(([l]) => `<button class="tfb${l === LWCP.iv ? " on" : ""}" data-iv="${l}"
+        title="Bar interval — every indicator is recomputed on these bars">${l}</button>`).join("");
+  // The library lives in a MENU, not a permanent row: 18 chips on screen is clutter, and the
+  // count on the button is the thing a reader actually needs ("how many are on"). Same idiom as
+  // the Grid's "Filter columns" panel, deliberately — one gesture to learn, not two.
+  const groups = {};
+  for(const [k, cfg] of Object.entries(INDICATORS)) (groups[cfg.group || "Other"] ||= []).push([k, cfg]);
+  const nOn = Object.values(LWCP.on).filter(Boolean).length;
+  const chips = `<div class="lwcmenuwrap">
+      <button class="tfb lwcmenubtn${lwcMenuOpen ? " on" : ""}" id="lwcIndBtn-${esc(tk)}"
+        title="Choose which indicators the chart draws">Indicators <b>${nOn}</b> ▾</button>
+      <div class="lwcmenu" id="lwcIndMenu-${esc(tk)}"${lwcMenuOpen ? "" : " hidden"}>
+        ${Object.entries(groups).map(([g, items]) =>
+          `<div class="lwcmgrp"><span class="lwcglab">${esc(g)}</span>` + items.map(([k, cfg]) =>
+            `<button class="indchip${LWCP.on[k] ? " on" : ""}" data-ind="${k}"
+              title="${esc(cfg.basis || cfg.label)}">${esc(cfg.label)}${cfg.basis ? " ⓘ" : ""}</button>`).join("")
+          + `</div>`).join("")}
+        <div class="lwcmfoot"><a href="#" data-indreset>Reset to defaults</a>
+          <span class="muted">ⓘ marks an indicator whose basis is stated in the caption</span></div>
+      </div></div>`;
   return `<div class="lwcbar">
       <div class="tfs">${tf}</div>
       <div class="lwcopts">
@@ -1439,17 +1752,24 @@ function lwcChrome(tk, partial, basisLines){
     </div>
     <div class="lwcchips">${chips}</div>
     <div class="lwclegend" id="lwcLegend-${esc(tk)}"></div>
-    <div id="lwcChart-${esc(tk)}" style="height:420px"></div>
+    <div id="lwcChart-${esc(tk)}"></div>
     <div class="lwcfoot">${partial
-      ? `<span class="amber">Today's bar is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
-      : ""}${basisLines.map(b => esc(b)).join(" · ")}</div>`;
+      ? `<span class="amber">The last ${LWCP.iv === "D" ? "bar" : LWCP.iv === "W" ? "week" : "2-day bucket"} is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
+      : ""}${LWCP.iv !== "D" ? `Bars are ${LWCP.iv === "W" ? "weekly (ISO weeks, Monday-start)" : "two sessions"}, and every indicator is computed on them, not on daily bars resampled. ` : ""}${basisLines.map(b => esc(b)).join(" · ")}</div>`;
 }
 
 /* The chart. `el` is the container; chrome and canvas are built inside it. */
-function techChart(el, tk, bars){
-  if(!bars || !bars.length){ el.innerHTML = `<div class="muted">no price history</div>`; return; }
+async function techChart(el, tk, dailyBars){
+  if(!dailyBars || !dailyBars.length){ el.innerHTML = `<div class="muted">no price history</div>`; return; }
+  await lwcPrefetch();            // any server-sourced indicator that is switched on
+  // Aggregate FIRST: techSeries and every registry compute() run on whatever a bar is now.
+  const bars = aggBars(dailyBars, LWCP.iv);
   const S = techSeries(bars);
-  const partial = lwcPartial(bars);
+  // On D the last bar is partial only if it is today's. On 2D/W the last BUCKET is partial
+  // whenever it holds fewer sessions than a full one, which is most of the time.
+  const lastN = bars[bars.length - 1].n || 1;
+  const partial = lwcPartial(dailyBars)
+    || (LWCP.iv === "2D" && lastN < 2) || (LWCP.iv === "W" && lastN < 5);
   // Only the enabled indicators contribute a basis line, so the caption describes what is on
   // screen rather than everything that could be.
   const basis = Object.entries(INDICATORS)
@@ -1458,7 +1778,7 @@ function techChart(el, tk, bars){
 
   const host = document.getElementById(`lwcChart-${tk}`);
   const chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
-    width: host.clientWidth, height: 420,
+    width: host.clientWidth, height: lwcHeight(),
     rightPriceScale: {borderColor: C.line, mode: LWCP.log ? 1 : 0},   // 1 = logarithmic
   }));
 
@@ -1480,7 +1800,7 @@ function techChart(el, tk, bars){
   })));
 
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
-  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {}};
+  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {}, srv: v => (LIVE.srv || {})[v] || []};
   const put = (vals, cfg, p, color, width, dash) => {
     const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
     const s = chart.addSeries(Type, cfg.type === "histogram"
@@ -1493,9 +1813,6 @@ function techChart(el, tk, bars){
   };
   for(const [k, cfg] of Object.entries(INDICATORS)){
     if(!LWCP.on[k]) continue;
-    // A server-sourced indicator needs its own site_* view and is not wired yet. It is SKIPPED
-    // rather than drawn empty, and the chip stays visible so the gap is the reader's to see.
-    if(cfg.source === "server") continue;
     const out = cfg.compute(bars, S, ctx);
     if(!out) continue;
     const p = pane(cfg.pane);
@@ -1567,10 +1884,22 @@ function techChart(el, tk, bars){
     techChart(el, tk, b);
   };
   el.querySelectorAll("[data-tf]").forEach(btn => btn.onclick = () => { LWCP.tf = btn.dataset.tf; redraw(); });
+  el.querySelectorAll("[data-iv]").forEach(btn => btn.onclick = () => { LWCP.iv = btn.dataset.iv; redraw(); });
   el.querySelectorAll("[data-opt]").forEach(btn => btn.onclick = () => {
     LWCP[btn.dataset.opt] = !LWCP[btn.dataset.opt]; redraw(); });
   el.querySelectorAll("[data-ind]").forEach(btn => btn.onclick = () => {
     LWCP.on[btn.dataset.ind] = !LWCP.on[btn.dataset.ind]; redraw(); });
+  const mBtn = document.getElementById(`lwcIndBtn-${tk}`);
+  if(mBtn) mBtn.onclick = (e) => { e.stopPropagation(); lwcMenuOpen = !lwcMenuOpen;
+    const m = document.getElementById(`lwcIndMenu-${tk}`);
+    if(m) m.hidden = !lwcMenuOpen; mBtn.classList.toggle("on", lwcMenuOpen); };
+  const rst = el.querySelector("[data-indreset]");
+  if(rst) rst.onclick = (e) => { e.preventDefault();
+    for(const [k, cfg] of Object.entries(INDICATORS)) LWCP.on[k] = !!cfg.on; redraw(); };
+  // Clicking inside the panel must not close it — a toggle is a click, and closing on every
+  // tick would make choosing three indicators three round trips.
+  const mPanel = document.getElementById(`lwcIndMenu-${tk}`);
+  if(mPanel) mPanel.onclick = e => e.stopPropagation();
 }
 /* ⚠ The two chart containers carry NO fixed height. techChart() renders its own chrome, chip row,
  * legend, a 420px canvas and a caption into whatever element it is given; the 340px and 360px
