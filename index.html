@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <style>
@@ -176,6 +177,24 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .colfilters[hidden]{display:none}
 th.sorted{color:var(--text)}
 sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
+
+/* ── technical chart chrome (chart_lwc.js) ────────────────────────────────────
+   Lightweight Charts draws a canvas and nothing else: every control here is ours. */
+.lwcbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.tfs,.lwcopts{display:flex;gap:3px;flex-wrap:wrap}
+.tfb,.indchip{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--line);
+  border-radius:7px;padding:4px 9px;font:500 11.5px Inter,sans-serif;cursor:pointer;transition:all .13s}
+.tfb:hover,.indchip:hover{color:var(--text);background:rgba(255,255,255,.07)}
+.tfb.on,.indchip.on{color:var(--text);background:var(--brand-soft);border-color:rgba(175,100,82,.45)}
+/* An indicator that is OFF must read as off at a glance, not merely un-highlighted -- the chip row
+   is the only place that says what is on the chart. */
+.indchip:not(.on){opacity:.55}
+.lwcchips{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px}
+.lwclegend{font:500 12px var(--mono);color:var(--text);min-height:17px;margin-bottom:4px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+/* The caption carries each indicator's `basis` from the registry -- what a series actually IS when
+   it is not a plain transform of the bars. It is small, and it is not optional. */
+.lwcfoot{color:var(--dim);font-size:10.5px;line-height:1.55;margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
 @media(max-width:700px){.fsel{width:100%}.fsel select{flex:1;max-width:none}}
 /* period segmented control (Overview) */
 .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.03);margin-left:12px}
@@ -267,7 +286,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:20 · f711ba7</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:28 · a96a623</div>
   </div>
 </section>
 
@@ -295,7 +314,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:20 · f711ba7</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:28 · a96a623</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1097,7 +1116,32 @@ async function performanceAll(el){
   const facBox = document.createElement("div"); el.appendChild(facBox);
   try{ factors(facBox); }catch(e){ facBox.innerHTML = sectionHead("Factors") + `<div class="note">Factor data unavailable: ${esc(e.message||e)}</div>`; }
 }
-/* ═══ technical chart (v2 overlays computed in the browser from daily bars) ═══ */
+/* ═══ indicator registry — what the technical chart may draw, and on what basis ═══
+ *
+ * A REGISTRY, NOT AUTO-DISCOVERY. Same discipline as engines/book.HEDGED_ETFS,
+ * health_check.ANON_READABLE and model_feed.PUBLISHABLE_FIELDS: putting something in front of a
+ * reader should cost a deliberate edit, because a surface that discovers its own contents cannot
+ * be reviewed. Adding an indicator is an entry here.
+ *
+ * TWO SOURCES, ONE INTERFACE.
+ *   compute(bars, S, ctx) → array aligned to bars — runs in the browser, pure, no round trip.
+ *                                                indicators are this; techSeries() below already
+ *                                                computes every overlay the chart has ever drawn.
+ *   source:"server" + view:"site_…"            — for anything fitted, cross-sectional, or needing
+ *                                                data the browser does not hold. Costs a db/0NN
+ *                                                with its ledger row and the REVOKE/GRANT pattern.
+ *
+ * ⚠ `basis` IS NOT DECORATION. Any indicator that is not a plain arithmetic transform of the bars
+ * must say what it actually is, and the chart renders that line from HERE rather than from a
+ * caption somebody maintains separately. This is val_basis / fv_basis / mc_basis applied to a
+ * chart: the caveat travels with the series instead of living in a footer that drifts away from
+ * it. An indicator modelled on a third-party signal states its agreement rate in this field, and
+ * the chart will not draw it without one.
+ */
+
+/* ── the computation, moved verbatim from chart_technical.js ─────────────────────────────────
+ * Unchanged by the Lightweight Charts migration: it was always pure `bars → series` and never
+ * knew which renderer consumed it. Moving the renderer did not touch a line of it.            */
 function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
   const n = bars.length, C_ = bars.map(b=>b.c), H=bars.map(b=>b.h), L=bars.map(b=>b.l), V=bars.map(b=>b.v||0);
   const ema = (arr, span) => { const k=2/(span+1); const o=[]; arr.forEach((v,i)=> o.push(i? o[i-1]+k*(v-o[i-1]) : v)); return o; };
@@ -1166,6 +1210,7 @@ function techSeries(bars){   // bars: [{d, o, h, l, c, v}] ascending
   return {line, bull, trade, trend, avwap, rsi, td:{b:tdB, s:tdS, buy9, sell9, buy13, sell13},
           marks:{T:thin(top), B:thin(bot), R:thin(rev)}};
 }
+
 const MARK = {
   T:      {label:"T", color:"#ffb74d", above:true,  name:"Top"},
   B:      {label:"B", color:"#64b5f6", above:false, name:"Bottom"},
@@ -1175,16 +1220,7 @@ const MARK = {
   sell13: {label:"13", color:"#ef5350", above:true, name:"TD sell 13"},
   buy13:  {label:"13", color:"#26a69a", above:false, name:"TD buy 13"},
 };
-function markerSeries(S, bars){
-  const pick = k => (S.marks[k] || S.td[k] || []);
-  return Object.entries(MARK).map(([k, cfg]) => ({
-    name: cfg.name, type: "scatter", symbolSize: 1, silent: true,
-    data: pick(k).map((on, i) => on ? [i, cfg.above ? bars[i].h * 1.015 : bars[i].l * 0.985] : null).filter(Boolean),
-    label: {show: true, formatter: cfg.label, color: cfg.color, fontWeight: "bold", fontSize: 11,
-            position: cfg.above ? "top" : "bottom"},
-    itemStyle: {color: "transparent"},
-  }));
-}
+
 function earningsAvwap(bars, anchor){
   if(!anchor) return [];
   const i0 = bars.findIndex(b => b.d >= anchor);
@@ -1193,46 +1229,365 @@ function earningsAvwap(bars, anchor){
   return bars.map((b, i) => { if(i < i0) return null;
     pv += (b.h + b.l + b.c) / 3 * (b.v || 0); vv += (b.v || 0); return vv > 0 ? pv / vv : null; });
 }
-async function techChart(el, tk, bars){
-  const S = techSeries(bars), dates = bars.map(b=>b.d), close = bars.map(b=>b.c);
-  const seg = keep => S.line.map((v,i) => S.bull[i]===keep ? v : null);
-  mk(el, {legend:{bottom:0, type:"scroll", textStyle:{color:C.muted},
-      data:["Price","Trend line ▲","Trend line ▼","52w-low VWAP","Earnings VWAP", ...Object.values(MARK).map(m=>m.name)]},
-    grid:[{left:52,right:16,top:14,height:"62%"},{left:52,right:16,top:"76%",height:"18%"}],
-    axisPointer:{link:[{xAxisIndex:"all"}]},
-    tooltip:{trigger:"axis"},
-    xAxis:[{type:"category", data:dates, axisLabel:{color:C.muted}},
-           {type:"category", gridIndex:1, data:dates, axisLabel:{show:false}}],
-    yAxis:[{type:"value", scale:true, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
-           {type:"value", gridIndex:1, min:20, max:80, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}}],
-    series:[
-      {name:"Trend range", type:"line", data:S.trend.lo, lineStyle:{opacity:0}, stack:"tr", symbol:"none", silent:true},
-      {name:"Trend range", type:"line", data:S.trend.hi.map((v,i)=> v==null?null:v-S.trend.lo[i]), lineStyle:{opacity:0},
-       areaStyle:{color:"#ffcc80", opacity:.10}, stack:"tr", symbol:"none", silent:true},
-      {name:"Trade range", type:"line", data:S.trade.lo, lineStyle:{opacity:0}, stack:"td", symbol:"none", silent:true},
-      {name:"Trade range", type:"line", data:S.trade.hi.map((v,i)=> v==null?null:v-S.trade.lo[i]), lineStyle:{opacity:0},
-       areaStyle:{color:C.accent, opacity:.14}, stack:"td", symbol:"none", silent:true},
-      {name:"Price", type:"line", data:close, showSymbol:false, lineStyle:{width:1.6, color:C.text}},
-      {name:"Trend line ▲", type:"line", data:seg(true), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.green}},
-      {name:"Trend line ▼", type:"line", data:seg(false), showSymbol:false, connectNulls:false, lineStyle:{width:2.2, color:C.red}},
-      {name:"52w-low VWAP", type:"line", data:S.avwap, showSymbol:false, lineStyle:{width:1.2, color:C.violet}},
-      {name:"Earnings VWAP", type:"line", data:earningsAvwap(bars, LIVE.v2[tk]?.earnings_anchor), showSymbol:false,
-       lineStyle:{width:1.4, color:C.gold, type:"dashed"}},
-      ...markerSeries(S, bars),
-      {name:"RSI", type:"line", xAxisIndex:1, yAxisIndex:1, data:S.rsi, showSymbol:false, lineStyle:{width:1.2, color:C.gold},
-       markLine:{silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dotted"}, data:[{yAxis:40},{yAxis:60}]}},
-    ]});
+
+/* ── plain helpers for registry entries, so an entry stays one line where it can ─────────── */
+const _sma = (arr, w) => arr.map((_, i) => i < w-1 ? null
+  : arr.slice(i-w+1, i+1).reduce((a,b)=>a+b, 0) / w);
+
+/* ── THE REGISTRY ───────────────────────────────────────────────────────────────────────────
+ * pane   : "price" overlays the candles · any other key opens its own pane, created on demand
+ * type   : "line" | "histogram"
+ * multi  : the entry draws SEVERAL series under one toggle — compute returns
+ *          [{vals, color, width, dash}]. A risk range is two lines the reader thinks of as one
+ *          thing, and splitting it into two chips would let someone turn half a band on.
+ * ctx    : {tk, v2} — the ticker and its technicals_v2 row, for anything anchored to a date the
+ *          bars alone do not carry (the earnings VWAP needs earnings_anchor).
+ * on     : whether it is drawn before the viewer touches anything
+ * basis  : REQUIRED for anything that is not a direct arithmetic transform of these bars.
+ *          Rendered into the chart's caption. See the header.                               */
+const INDICATORS = {
+  sma50: {
+    label: "SMA 50", pane: "price", type: "line", color: "#6aa6f8", width: 1.2, on: true,
+    compute: (bars) => _sma(bars.map(b=>b.c), 50),
+  },
+  sma200: {
+    label: "SMA 200", pane: "price", type: "line", color: "#8b95a1", width: 1.2, on: true,
+    compute: (bars) => _sma(bars.map(b=>b.c), 200),
+  },
+  trackline: {
+    label: "Track line", pane: "price", type: "line", color: "#26a69a", width: 2.0, on: true,
+    compute: (bars, S) => S.line,
+    basis: "EMA-26 that flips after two closes beyond ±1.5 ATR — the site's own construction, "
+         + "not an exchange or vendor definition. technical_v2's backtest (2026-09-15) found it "
+         + "does NOT separate drawdown risk; it is a trend state, never a sell trigger.",
+  },
+  avwap52: {
+    label: "52w-low VWAP", pane: "price", type: "line", color: "#b39ddb", width: 1.2, on: true,
+    compute: (bars, S) => S.avwap,
+  },
+  rsi14: {
+    label: "RSI 14", pane: "rsi", type: "line", color: "#d4b45a", width: 1.2, on: true,
+    compute: (bars, S) => S.rsi, scale: {min: 0, max: 100}, guides: [30, 70],
+  },
+  volume: {
+    label: "Volume", pane: "vol", type: "histogram", on: true,
+    compute: (bars) => bars.map(b => b.v || 0),
+  },
+  // The two calibrated risk ranges. Both are bands — low and high under one toggle, because half
+  // a band is not a thing anyone wants on screen. technical_v2 computes the stored version; these
+  // are recomputed here from the bars on screen by the same construction.
+  trade_band: {
+    label: "Trade range (1w)", pane: "price", type: "line", multi: true, on: true,
+    compute: (bars, S) => [
+      {vals: S.trade.lo, color: "rgba(106,166,248,.55)", width: 1, dash: true},
+      {vals: S.trade.hi, color: "rgba(106,166,248,.55)", width: 1, dash: true}],
+  },
+  trend_band: {
+    label: "Trend range (1m)", pane: "price", type: "line", multi: true, on: false,
+    compute: (bars, S) => [
+      {vals: S.trend.lo, color: "rgba(240,169,74,.45)", width: 1, dash: true},
+      {vals: S.trend.hi, color: "rgba(240,169,74,.45)", width: 1, dash: true}],
+  },
+  avwap_earn: {
+    label: "Earnings VWAP", pane: "price", type: "line", color: "#d4b45a", width: 1.4,
+    dash: true, on: true,
+    compute: (bars, S, ctx) => earningsAvwap(bars, ctx && ctx.v2 && ctx.v2.earnings_anchor),
+    basis: "anchored at the last earnings date technical_v2 recorded — absent, and the series "
+         + "with it, when that name has no anchor stored.",
+  },
+  rvol50: {
+    label: "RVol 50", pane: "rvol", type: "histogram", on: false,
+    // Relative to the trailing 50-bar mean, so 1.0 is an average day. The same quantity
+    // ic_technicals.rel_vol stores, recomputed here from the bars on screen rather than read
+    // from the nightly row — the chart's window and the engine's are not the same window.
+    compute: (bars) => { const v = bars.map(b => b.v || 0), mu = _sma(v, 50);
+      return v.map((x, i) => mu[i] ? x / mu[i] : null); },
+    basis: "recomputed from the bars on screen, not read from ic_technicals.rel_vol — the "
+         + "chart's window and the nightly engine's are different windows and will not always "
+         + "agree to the decimal.",
+  },
+};
+/* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
+ *
+ * Replaces the echarts close-line chart. LWC is Apache-2.0 and is the ONLY TradingView product
+ * this site can use: Advanced Charts' free licence forbids hosting the library in a public code
+ * repository (ic-site is public, because Pages on a private repo is a paid plan) and limits free
+ * use to public web projects, which an auth-gated book is not. Neither restriction applies here.
+ *
+ * ATTRIBUTION IS A LICENCE CONDITION, not decoration: `attributionLogo` stays on, and the NOTICE
+ * line lives in the About tab. Do not turn either off.
+ *
+ * WHAT MOVED AND WHAT DID NOT. Every overlay is still computed in the browser by techSeries() in
+ * indicators.js — untouched by this migration, because it was always pure `bars → series` and
+ * never knew which renderer consumed it. What changed is the drawing: real candles instead of a
+ * close line, volume, panes, and native markers instead of a scatter faked at `bar.h * 1.015`.
+ *
+ * ⚠ THE LAST BAR MAY BE INCOMPLETE. ic_price_history carries today's partial bar during a
+ * session — measured 2026-11-16, AAPL read o 357.10 / h 357.10 / l 353.02 / c 353.56 on 7.4m
+ * shares against a 30-40m norm. The engines all stop at engines.trading_day.last_complete_session()
+ * for exactly this reason. The chart DRAWS it, because a price chart that hides today is wrong in
+ * a different way, but it says so in the caption rather than letting a half-formed candle pass as
+ * a finished one.
+ *
+ * ⚠ A BAR WITH NO OPEN IS SKIPPED, NEVER FILLED. db/069 leaves adj_open NULL where open_price is
+ * NULL. Substituting the close would draw a doji for a session that never traded that way — a
+ * missing value resolving into a plausible one, which is this repository's standing defect class.
+ * 99.58% of active-name bars since 2000 have an open, so the gaps are invisible; a fabricated
+ * candle would not be.
+ */
+
+// Timeframe buttons. `days` is a trading-day count translated to a calendar window for the fetch;
+// null means "everything the view holds", which db/069 fixed at 2000-01-01.
+const LWC_TF = [["3M", 63], ["6M", 126], ["YTD", "ytd"], ["1Y", 252], ["3Y", 756], ["5Y", 1260], ["Max", null]];
+
+// Per-viewer chart preferences. localStorage, wrapped: it can throw in a private window and comes
+// back empty after cleared site data, so the chart must render correctly without it. This is a
+// convenience, never state anything else reads.
+function lwcPrefs(){
+  const d = {tf: "1Y", log: false, total: true,
+             on: Object.fromEntries(Object.entries(INDICATORS).map(([k, v]) => [k, !!v.on]))};
+  try { return Object.assign(d, JSON.parse(localStorage.getItem("ic.chart") || "{}")); }
+  catch(e){ return d; }
 }
-async function loadBars(tk, days=420){
-  if(LIVE.bars?.[tk]) return LIVE.bars[tk];
-  const from = new Date(Date.now() - days*864e5).toISOString().slice(0,10);
+function lwcSave(p){ try { localStorage.setItem("ic.chart", JSON.stringify(p)); } catch(e){} }
+let LWCP = lwcPrefs();
+
+// Earliest date the view holds. db/069 set this floor deliberately — a FIXED date, so "Max" means
+// the same window today and in a year, which a rolling CURRENT_DATE - N never could.
+const LWC_FLOOR = "2000-01-01";
+
+// ⚠ A TIMEFRAME IS A VIEW, NOT A FETCH, AND THE TWO WINDOWS ARE DIFFERENT.
+// The first version used one date for both, and clicking 3M after 1Y did nothing visible: the
+// cache already held the wider set, so the fetch was a no-op and fitContent() then fitted ALL of
+// it. Worse the other way — fetching only 3 months makes SMA 200 null across the entire view,
+// because a 200-bar average needs 200 bars BEFORE the first bar you are looking at.
+// So: fetch the window plus a lead-in long enough for the slowest indicator, compute on all of
+// it, and show the part that was asked for.
+const LWC_LEADIN = 260;                   // trading days; SMA 200 is the longest lookback drawn
+
+function lwcViewFrom(tf){                 // what the viewer sees
+  if(tf === "Max") return LWC_FLOOR;
+  const spec = (LWC_TF.find(t => t[0] === tf) || [, 252])[1];
+  if(spec === "ytd") return new Date().getFullYear() + "-01-01";
+  return new Date(Date.now() - Math.ceil((spec || 252) * 1.45) * 864e5).toISOString().slice(0, 10);
+}
+function lwcFrom(tf){                     // what is fetched and computed on
+  if(tf === "Max") return LWC_FLOOR;
+  const spec = (LWC_TF.find(t => t[0] === tf) || [, 252])[1];
+  const bars = spec === "ytd"
+    ? Math.ceil((Date.now() - new Date(new Date().getFullYear() + "-01-01").getTime()) / 864e5 / 1.45)
+    : (spec || 252);
+  const from = new Date(Date.now() - Math.ceil((bars + LWC_LEADIN) * 1.45) * 864e5)
+    .toISOString().slice(0, 10);
+  return from < LWC_FLOOR ? LWC_FLOOR : from;
+}
+
+/* Bars for one ticker, cached by the WIDEST window fetched so far — asking for 1Y after Max must
+ * not refetch, and asking for Max after 1Y must. */
+async function loadBars(tk, tf){
+  const from = lwcFrom(tf || LWCP.tf);
+  const got = (LIVE.barsFrom ||= {})[tk];
+  if(LIVE.bars?.[tk] && got && got <= from) return LIVE.bars[tk];
   const rows = await qAll("site_price_history", r => r.eq("ticker", tk).gte("price_date", from).order("price_date"));
-  const out = rows.map(r => ({d:r.price_date, c:+r.adj_close, h:+(r.adj_high ?? r.adj_close), l:+(r.adj_low ?? r.adj_close), v:+(r.volume||0)}));
-  (LIVE.bars ||= {})[tk] = out; return out;
+  const out = rows.map(r => ({
+    d: r.price_date,
+    c: +r.adj_close,
+    o: r.adj_open == null ? null : +r.adj_open,     // NULL stays null — see the header
+    h: +(r.adj_high ?? r.adj_close),
+    l: +(r.adj_low  ?? r.adj_close),
+    v: +(r.volume || 0),
+    // close_price is SPLIT-adjusted; adj_close is dividend-adjusted, i.e. total return. Both are
+    // already in the view, so the toggle costs nothing but reading the other column.
+    sc: r.close_price == null ? null : +r.close_price,
+  }));
+  (LIVE.bars ||= {})[tk] = out;
+  LIVE.barsFrom[tk] = from;
+  return out;
 }
+
+const _lwcTheme = () => ({
+  layout: {background: {color: "transparent"}, textColor: C.muted, attributionLogo: true,
+           fontFamily: "Inter, system-ui, sans-serif"},
+  grid: {vertLines: {color: C.line}, horzLines: {color: C.line}},
+  rightPriceScale: {borderColor: C.line},
+  timeScale: {borderColor: C.line, rightOffset: 4},
+  crosshair: {mode: LightweightCharts.CrosshairMode.Normal},
+});
+
+/* Is the newest bar today's, i.e. still forming? Compared in America/New_York, because the
+ * session is, and a viewer in another timezone must not be told a different story. */
+function lwcPartial(bars){
+  if(!bars.length) return false;
+  const nyToday = new Date().toLocaleDateString("en-CA", {timeZone: "America/New_York"});
+  return bars[bars.length - 1].d === nyToday;
+}
+
+function lwcChrome(tk, partial, basisLines){
+  const tf = LWC_TF.map(([l]) =>
+    `<button class="tfb${l === LWCP.tf ? " on" : ""}" data-tf="${l}">${l}</button>`).join("");
+  const chips = Object.entries(INDICATORS).map(([k, cfg]) =>
+    `<button class="indchip${LWCP.on[k] ? " on" : ""}" data-ind="${k}"
+      title="${esc(cfg.basis || cfg.label)}">${esc(cfg.label)}${cfg.basis ? " ⓘ" : ""}</button>`).join("");
+  return `<div class="lwcbar">
+      <div class="tfs">${tf}</div>
+      <div class="lwcopts">
+        <button class="tfb${LWCP.log ? " on" : ""}" data-opt="log" title="Logarithmic price scale">Log</button>
+        <button class="tfb${LWCP.total ? " on" : ""}" data-opt="total"
+          title="Total return uses the dividend-adjusted close; split-adjusted uses the raw close">${
+          LWCP.total ? "Total return" : "Split-adjusted"}</button>
+      </div>
+    </div>
+    <div class="lwcchips">${chips}</div>
+    <div class="lwclegend" id="lwcLegend-${esc(tk)}"></div>
+    <div id="lwcChart-${esc(tk)}" style="height:420px"></div>
+    <div class="lwcfoot">${partial
+      ? `<span class="amber">Today's bar is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
+      : ""}${basisLines.map(b => esc(b)).join(" · ")}</div>`;
+}
+
+/* The chart. `el` is the container; chrome and canvas are built inside it. */
+function techChart(el, tk, bars){
+  if(!bars || !bars.length){ el.innerHTML = `<div class="muted">no price history</div>`; return; }
+  const S = techSeries(bars);
+  const partial = lwcPartial(bars);
+  // Only the enabled indicators contribute a basis line, so the caption describes what is on
+  // screen rather than everything that could be.
+  const basis = Object.entries(INDICATORS)
+    .filter(([k, c]) => LWCP.on[k] && c.basis).map(([, c]) => `${c.label}: ${c.basis}`);
+  el.innerHTML = lwcChrome(tk, partial, basis);
+
+  const host = document.getElementById(`lwcChart-${tk}`);
+  const chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
+    width: host.clientWidth, height: 420,
+    rightPriceScale: {borderColor: C.line, mode: LWCP.log ? 1 : 0},   // 1 = logarithmic
+  }));
+
+  // Panes are created on demand from whatever is enabled, so switching an indicator off removes
+  // its pane instead of leaving a gap. Pane 0 is always price.
+  const paneOf = {price: 0}; let nextPane = 1;
+  const pane = (name) => (paneOf[name] ??= nextPane++);
+
+  // ── price: candles ─────────────────────────────────────────────────────────────────────────
+  // A bar with no open contributes no candle (see the header). The close series is always
+  // complete, so the overlays still span the full window.
+  const px = b => LWCP.total ? b.c : (b.sc ?? b.c);
+  const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
+    upColor: C.green, downColor: C.red, borderVisible: false,
+    wickUpColor: C.green, wickDownColor: C.red,
+  }, 0);
+  candles.setData(bars.filter(b => b.o != null).map(b => ({
+    time: b.d, open: b.o, high: b.h, low: b.l, close: px(b),
+  })));
+
+  // ── the registry's indicators ──────────────────────────────────────────────────────────────
+  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {}};
+  const put = (vals, cfg, p, color, width, dash) => {
+    const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
+    const s = chart.addSeries(Type, cfg.type === "histogram"
+      ? {color: color || "rgba(106,166,248,.45)", priceLineVisible: false, lastValueVisible: false,
+         priceFormat: {type: "volume"}}
+      : {color: color || C.text, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false,
+         lineStyle: dash ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Solid}, p);
+    s.setData(bars.map((b, i) => vals[i] == null ? null : {time: b.d, value: +vals[i]}).filter(Boolean));
+    return s;
+  };
+  for(const [k, cfg] of Object.entries(INDICATORS)){
+    if(!LWCP.on[k]) continue;
+    // A server-sourced indicator needs its own site_* view and is not wired yet. It is SKIPPED
+    // rather than drawn empty, and the chip stays visible so the gap is the reader's to see.
+    if(cfg.source === "server") continue;
+    const out = cfg.compute(bars, S, ctx);
+    if(!out) continue;
+    const p = pane(cfg.pane);
+    if(cfg.multi){ out.forEach(ln => ln && ln.vals && put(ln.vals, cfg, p, ln.color, ln.width, ln.dash)); }
+    else {
+      const s2 = put(out, cfg, p, cfg.color, cfg.width, cfg.dash);
+      // guides are declared in the registry (RSI 30/70) and were being ignored -- an overbought
+      // line the reader cannot see is a threshold that may as well not exist
+      (cfg.guides || []).forEach(g => s2.createPriceLine({
+        price: g, color: C.dim, lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false}));
+    }
+  }
+
+  // ── the trend line, coloured by state ──────────────────────────────────────────────────────
+  // Two series rather than one, because a single line cannot change colour mid-series in LWC and
+  // the state IS the point. Nulls break each segment where the other takes over.
+  if(LWCP.on.trackline){
+    for(const [want, col] of [[true, C.green], [false, C.red]]){
+      const s = chart.addSeries(LightweightCharts.LineSeries,
+        {color: col, lineWidth: 2, priceLineVisible: false, lastValueVisible: false}, 0);
+      s.setData(bars.map((b, i) => S.bull[i] === want && S.line[i] != null
+        ? {time: b.d, value: S.line[i]} : null).filter(Boolean));
+    }
+  }
+
+  // ── T / B / R and TD markers, native this time ─────────────────────────────────────────────
+  const marks = [];
+  for(const [k, cfg] of Object.entries(MARK)){
+    const on = S.marks[k] || S.td[k] || [];
+    on.forEach((hit, i) => { if(hit) marks.push({
+      time: bars[i].d, position: cfg.above ? "aboveBar" : "belowBar",
+      color: cfg.color, shape: cfg.above ? "arrowDown" : "arrowUp", text: cfg.label,
+    }); });
+  }
+  if(marks.length) LightweightCharts.createSeriesMarkers(candles,
+    marks.sort((a, b) => a.time < b.time ? -1 : 1));
+
+  // ── crosshair legend ───────────────────────────────────────────────────────────────────────
+  const legend = document.getElementById(`lwcLegend-${tk}`);
+  const byDate = Object.fromEntries(bars.map(b => [b.d, b]));
+  const fmt = v => v == null ? "—" : (+v).toFixed(2);
+  const paint = (b) => { if(!b || !legend) return;
+    legend.innerHTML = `<b>${esc(tk)}</b> <span class="muted">${esc(b.d)}</span> `
+      + `O ${fmt(b.o)} H ${fmt(b.h)} L ${fmt(b.l)} <b>C ${fmt(px(b))}</b> `
+      + `<span class="muted">vol ${(b.v || 0).toLocaleString()}</span>`; };
+  paint(bars[bars.length - 1]);
+  chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
+
+  // Show the timeframe that was asked for, not everything that was fetched. The lead-in bars are
+  // loaded and computed on -- they are what makes SMA 200 exist at the left edge -- but they sit
+  // off-screen to the left until someone scrolls there.
+  const viewFrom = lwcViewFrom(LWCP.tf), lastD = bars[bars.length - 1].d;
+  if(LWCP.tf === "Max" || viewFrom <= bars[0].d) chart.timeScale().fitContent();
+  else {
+    try { chart.timeScale().setVisibleRange({from: viewFrom, to: lastD}); }
+    catch(e){ chart.timeScale().fitContent(); }   // a range outside the data throws; show it all
+  }
+  // LWC needs an explicit width; without this the chart keeps its initial size when the drawer or
+  // the window changes and the right-hand bars fall off the edge.
+  const ro = new ResizeObserver(() => chart.applyOptions({width: host.clientWidth}));
+  ro.observe(host);
+
+  // ── controls ───────────────────────────────────────────────────────────────────────────────
+  const redraw = async () => {
+    lwcSave(LWCP);
+    const b = await loadBars(tk, LWCP.tf);
+    chart.remove(); ro.disconnect();
+    techChart(el, tk, b);
+  };
+  el.querySelectorAll("[data-tf]").forEach(btn => btn.onclick = () => { LWCP.tf = btn.dataset.tf; redraw(); });
+  el.querySelectorAll("[data-opt]").forEach(btn => btn.onclick = () => {
+    LWCP[btn.dataset.opt] = !LWCP[btn.dataset.opt]; redraw(); });
+  el.querySelectorAll("[data-ind]").forEach(btn => btn.onclick = () => {
+    LWCP.on[btn.dataset.ind] = !LWCP.on[btn.dataset.ind]; redraw(); });
+}
+/* ⚠ The two chart containers carry NO fixed height. techChart() renders its own chrome, chip row,
+ * legend, a 420px canvas and a caption into whatever element it is given; the 340px and 360px
+ * boxes these used to declare were sized for the old echarts canvas and clipped everything below
+ * the plot. The class="chart" wrapper went with them for the same reason.
+ */
+/* ═══ the name drawer — everything that opens when you click a ticker ═══════════════════════
+ *
+ * This file was chart_technical.js and held the chart as well. The chart moved to chart_lwc.js
+ * (TradingView Lightweight Charts) and its computation to indicators.js; techSeries(), MARK and
+ * earningsAvwap() live there now, unchanged. What is left is the drawer: the card, the header,
+ * and openName(), which assembles the pillars, range bar, duration, fundamentals, card, thesis,
+ * levels and last-signals blocks around whatever the chart draws.
+ */
 const techCard = (tk) => `<div class="card" style="padding:12px;margin-top:12px">
   <div class="card-h"><div><h3>Technical setup</h3><div class="sub">trend line · risk-range bands · 52-week-low and earnings VWAP · T / B / R and TD markers</div></div></div>
-  <div class="chart" id="drTech-${esc(tk)}" style="height:340px"></div></div>`;
+  <div id="drTech-${esc(tk)}"></div></div>`;
 async function drawTechCard(tk){
   const el = document.getElementById(`drTech-${tk}`); if(!el) return;
   const bars = await loadBars(tk);
@@ -1254,7 +1609,7 @@ async function openName(tk){
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
     ${pillarBlock(m)}
-    <div class="card" style="padding:12px"><div class="chart" id="nmChart" style="height:360px"></div></div>
+    <div class="card" style="padding:12px"><div id="nmChart"></div></div>
     ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${cardBlock(tk)}${thesisBlock(tk, true)}
     ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
       [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
