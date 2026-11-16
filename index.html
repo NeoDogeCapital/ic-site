@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:59 · 6e9b106</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:10 · c280f3f</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:59 · 6e9b106</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:10 · c280f3f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1307,8 +1307,25 @@ const INDICATORS = {
   },
   trackline: {
     group: "Price",
-    label: "Track line", pane: "price", type: "line", color: "#26a69a", width: 2.0, on: true,
-    compute: (bars, S) => S.line,
+    /* ⚠ ONE SERIES, PER-POINT COLOUR — AND IT WAS BEING DRAWN THREE TIMES BEFORE.
+     * This entry used to return the bare `S.line` in one colour (#26a69a) while chart_lwc.js
+     * ALSO carried a dedicated block drawing the same line twice more, green where bull and red
+     * where bear. So the chart showed a continuous green track line with red laid over its
+     * bearish stretches — which reads as two indicators disagreeing rather than one line
+     * changing state, and is why the bear colour never looked like it replaced anything.
+     * The renderer's special case is gone and this is the only definition.
+     * It does NOT use one-series-per-colour-with-gaps, because GAPS DO NOT EXIST in a LWC line
+     * series — measured against this build, a line bridges straight across both whitespace and
+     * omitted points. The library honours a per-point `color` on LineData instead, so a line
+     * that changes colour is ONE series carrying a colour per bar. `color` is omitted on the
+     * entry so the chip shows no swatch; the data key's swatch follows the crosshair bar. */
+    label: "Track line", pane: "price", width: 2.0, on: true, type: "line", multi: true,
+    compute: (bars, S) => [{
+      vals:   S.line,
+      colors: S.bull.map(b => b === false ? "#ef5350" : "#26a69a"),
+      states: S.bull.map(b => b === false ? "↓" : "↑"),
+      width: 2, label: "Track line",
+    }],
     basis: "EMA-26 that flips after two closes beyond ±1.5 ATR. ⚠ It is a FITTED APPROXIMATION "
          + "of a third-party indicator — technical_v2 tuned it to the 'Alpha Trend VIP' line on "
          + "the SPX / NVDA / MA reference charts (2026-09-15), catching every colour change with "
@@ -1421,20 +1438,20 @@ const INDICATORS = {
        * state the engine collapses. alpha_trend() consumers are untouched. */
       const dir = at.map((v, i) => v == null || i < 2 || at[i-2] == null ? null
                                  : v > at[i-2] ? 1 : v < at[i-2] ? -1 : 0);
-      // Segments must OVERLAP by one bar or the line breaks visibly at every colour change: a
-      // point belongs to its own segment and to the next one's start.
-      const seg = (want) => at.map((v, i) =>
-        v == null ? null
-        : dir[i] === want ? v
-        : (dir[i + 1] === want || dir[i - 1] === want) ? v
-        : null);
+      // ONE series, a colour per bar. Three series with gaps between them is exactly what drew
+      // three crossing lines: a LWC line series bridges straight across missing points, so each
+      // "segment" ran the full width of the chart instead of stopping at its own state.
       // Deliberately the HEAVIEST line on the price pane (3.0 against the track line's 2.0 and
       // the moving averages' 1.2-1.4): it is the trend read, and on a pane carrying four or five
       // overlays the one you are actually reading should not be the same weight as the rest.
-      return [
-        {vals: seg(1),  color: "#26a69a", width: 3, label: "AlphaTrend ↑"},
-        {vals: seg(0),  color: "#f0c04a", width: 3, label: "AlphaTrend →"},
-        {vals: seg(-1), color: "#ef5350", width: 3, label: "AlphaTrend ↓"}];
+      const C3 = {"1": "#26a69a", "0": "#f0c04a", "-1": "#ef5350"};
+      const A3 = {"1": "↑", "0": "→", "-1": "↓"};
+      return [{
+        vals:   at,
+        colors: dir.map(d => d == null ? "#f0c04a" : C3[String(d)]),
+        states: dir.map(d => d == null ? "" : A3[String(d)]),
+        width: 3, label: "AlphaTrend",
+      }];
     },
     basis: "the OPEN-SOURCE AlphaTrend (ATR bands steered by Money Flow Index ≥ 50), ported "
          + "verbatim from technical_v2.alpha_trend(). GREEN rising · AMBER flat · RED falling, "
@@ -2274,7 +2291,16 @@ async function techChart(el, tk, dailyBars){
    * swatch whose colour is re-derived from the registry can disagree with the line on screen if
    * a multi-line entry overrode it. One list, written where the series is made.          */
   const SER = [];
-  const put = (vals, cfg, p, color, width, dash, label) => {
+  /* `colors` (and `states`) are the ONE-LINE-MANY-COLOURS path. LWC honours a per-point `color`
+   * on LineData, so a trend line that changes colour is ONE series, not one series per state.
+   * ⚠ This is not a style preference, it is the only correct way to do it here: measured against
+   * this exact library build, a LineSeries BRIDGES both whitespace points ({time} with no value)
+   * AND omitted points — a V-shape with its middle removed drew 8,465 red pixels against the
+   * full line's 7,999, i.e. MORE ink, because the straight bridge is longer than the V it
+   * replaced. So you cannot cut a hole in a line series by withholding data, and the usual
+   * "one series per colour, gaps in between" idiom silently draws every segment straight across
+   * every other segment's span. That is what put three crossing lines on the chart. */
+  const put = (vals, cfg, p, color, width, dash, label, colors, states) => {
     const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
     const col = color || (cfg.type === "histogram" ? "rgba(106,166,248,.45)" : C.text);
     const s = chart.addSeries(Type, cfg.type === "histogram"
@@ -2295,10 +2321,16 @@ async function techChart(el, tk, dailyBars){
      * cannot slope. LWC breaks a line on a whitespace point — {time} with no `value` — which is
      * what a missing bar is. Same defect as every other one in this repo: the gap resolved into
      * a plausible value (an interpolation) instead of looking missing. */
-    s.setData(bars.map((b, i) => vals[i] == null ? {time: b.d} : {time: b.d, value: +vals[i]}));
+    s.setData(bars.map((b, i) => vals[i] == null
+      ? {time: b.d}
+      : colors && colors[i] ? {time: b.d, value: +vals[i], color: colors[i]}
+                            : {time: b.d, value: +vals[i]}));
     const map = new Map();
     bars.forEach((b, i) => { if(vals[i] != null) map.set(b.d, +vals[i]); });
     SER.push({pane: p, label: label || cfg.label, color: col, dash: !!dash, map,
+              // the key's swatch follows the line: on a per-point-coloured series it shows the
+              // colour of the bar under the crosshair, and `states` names that state
+              colors: colors || null, states: states || null,
               // A CATEGORICAL series must print its category, not the integer it is plotted at:
               // a grade legend reading "4.00" is the encoding leaking into the reader's view.
               fmtVal: cfg.fmtVal || null,
@@ -2315,7 +2347,7 @@ async function techChart(el, tk, dailyBars){
     // false of the trade band, whose bands are dashed because they are bands. A legend that
     // invents a provenance claim is worse than one that only gives a name.
     if(cfg.multi){ out.forEach(ln => ln && ln.vals && put(ln.vals, cfg, p, ln.color, ln.width,
-                     ln.dash, ln.label || cfg.label)); }
+                     ln.dash, ln.label || cfg.label, ln.colors, ln.states)); }
     else {
       const s2 = put(out, cfg, p, cfg.color, cfg.width, cfg.dash);
       // guides are declared in the registry (RSI 30/70) and were being ignored -- an overbought
@@ -2326,19 +2358,9 @@ async function techChart(el, tk, dailyBars){
     }
   }
 
-  // ── the trend line, coloured by state ──────────────────────────────────────────────────────
-  // Two series rather than one, because a single line cannot change colour mid-series in LWC and
-  // the state IS the point. Nulls break each segment where the other takes over.
-  if(LWCP.on.trackline){
-    for(const [want, col] of [[true, C.green], [false, C.red]]){
-      const s = chart.addSeries(LightweightCharts.LineSeries,
-        {color: col, lineWidth: 2, priceLineVisible: false, lastValueVisible: false}, 0);
-        // Whitespace, not a dropped point — the two-colour track line had the same bridging
-      // defect as AlphaTrend and for the same reason: each colour is mostly gaps.
-      s.setData(bars.map((b, i) => S.bull[i] === want && S.line[i] != null
-        ? {time: b.d, value: S.line[i]} : {time: b.d}));
-    }
-  }
+  // The track line used to be drawn HERE as well as by its registry entry — a third and fourth
+  // copy of the same line. It is a `multi` registry entry now and needs no special case; see
+  // indicators.js::trackline. Do not reintroduce a renderer branch for one indicator.
 
   // ── T / B / R and TD markers, native this time ─────────────────────────────────────────────
   const marks = [];
@@ -2423,9 +2445,11 @@ async function techChart(el, tk, dailyBars){
       }
       const mine = SER.filter(x => x.pane === i);
       html += (i === 0 && mine.length ? `<div class="lwcpl-r">` : "") + mine.map(x => {
-        const v = x.map.get(b.d);
+        const v = x.map.get(b.d), bi = idxOf[b.d];
         const shown = v == null ? "—" : x.fmtVal ? x.fmtVal(v) : x.vol ? fmtV(v) : fmt(v);
-        return `<span class="lwcpl-i">${swatch(x.color, x.dash)}${esc(x.label)} `
+        const col = x.colors && x.colors[bi] ? x.colors[bi] : x.color;
+        const st  = x.states && x.states[bi] ? ` <span class="muted">${esc(x.states[bi])}</span>` : "";
+        return `<span class="lwcpl-i">${swatch(col, x.dash)}${esc(x.label)}${st} `
              + `<b>${esc(shown)}</b></span>`;
       }).join("") + (i === 0 && mine.length ? `</div>` : "");
       box.innerHTML = html;
