@@ -294,7 +294,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:00 · e87411d</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:07 · 2bdd446</div>
   </div>
 </section>
 
@@ -323,7 +323,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:00 · e87411d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:07 · 2bdd446</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -685,6 +685,8 @@ function sparkline(el, pts, color){
 }
 
 /* ═══ router ═════════════════════════════════════════════════════════════ */
+// `performance` is the ROUTE name (data-v="performance"), so the key stays; only the function
+// was renamed, because `function performance` clobbers window.performance -- see its header.
 
 /* ═══ shared table sort — ONE definition, used by Grid, Universe and Signals ═══════════════
  *
@@ -1111,9 +1113,9 @@ function slugCard(){
       tbl(["Period","Up periods","Avg up","Avg down","Slugging"], rows)) + `</div>`;
 }
 async function performanceAll(el){
-  performance(el);
+  performanceView(el);
   // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
-  // inserted: performance() sets innerHTML, so anything written before it is wiped, and every other
+  // inserted: performanceView() sets innerHTML, so anything written before it is wiped, and every other
   // section on this page appends — DOM surgery here would be the one place doing something else.
   const mbox = document.createElement("div");
   el.appendChild(mbox);
@@ -1501,6 +1503,196 @@ const INDICATORS = {
          + "agree to the decimal.",
   },
 };
+
+/* ═══ PAPER STRATEGY BOOKS — the forward record, as an overlay ═══════════════════════════════
+ *
+ * `ic_paper_nav` is the out-of-sample record of whether the process beats SPY: 39 books marked
+ * daily off monthly locks. Drawn here so a book's track can sit under the name you are looking
+ * at, which is the comparison the Analytics tab cannot make.
+ *
+ * ⚠⚠ MOST OF THIS RECORD IS RECONSTRUCTED, AND THE CHART SAYS SO IN THE LINE ITSELF.
+ * CLAUDE.md's paper-tracking entry: "Nothing is backfilled from these sources — NO LONGER TRUE
+ * as of 2026-10-17". Four scripts rebuilt 33 of the 39 books BACKWARDS from point-in-time
+ * sources, and an adversarial review on 2026-10-20 rated most of that DO-NOT-USE. A single
+ * continuous line from 2024 to today would present eight months of replica alongside one month
+ * of record as one object — the same defect as a substituted neutral that no basis column
+ * distinguishes from a measured one.
+ *
+ * So each book draws as up to TWO series, same colour: the reconstructed span DASHED, the
+ * forward record SOLID, split at that book's own live-lock date. A book with nothing
+ * reconstructed draws one solid line. The split is not cosmetic — it is where the evidence
+ * changes kind.
+ *
+ * THE CUT DATES ARE READ, NOT GUESSED. Each is the backfill script's own constant:
+ *   paper_backfill.LIVE_START       = 2026-09-15  → the 13 RULES books + the 2 LONG_SHORT books
+ *   paper_duration_backfill.LIVE_FROM              → value_implied_growth 10-08, the other 5 10-16
+ *   paper_factor_backfill.LIVE_START = 2026-10-16  → all 12 fac_/ls_fac_ books
+ * Verified against the data on 2026-11-16: 39 strategies, 33 with a declared cut, 0 declared
+ * but absent, and the 6 with no cut are exactly the books CLAUDE.md names as never backfilled.
+ * Inferring the cut from a book's first NAV date would be the "do not infer the loaded screen"
+ * error again: `fac_lowvol` begins 2026-06-08 and `quad_q1` 2026-06-25, and neither date has
+ * anything to do with when its record stopped being a replica.                                */
+const PAPER_RECON_FROM = {
+  // paper_backfill.LIVE_START — the tracker's own first lock-in
+  grade_a: "2026-09-15", grade_ab: "2026-09-15", grade_cd: "2026-09-15",
+  grid_a_buy: "2026-09-15", grid_ab_buy: "2026-09-15", ab_not_down: "2026-09-15",
+  ab_tech_weak: "2026-09-15", tech_buy: "2026-09-15", universe_ew: "2026-09-15",
+  quad_q1: "2026-09-15", quad_q2: "2026-09-15", quad_q3: "2026-09-15", quad_q4: "2026-09-15",
+  ls_a_buy_vs_cd_sell: "2026-09-15", ls_a_buy_vs_q4_weak: "2026-09-15",
+  // paper_duration_backfill.LIVE_FROM
+  value_implied_growth: "2026-10-08",
+  dur_terminal_heavy: "2026-10-16", ls_visible_vs_terminal: "2026-10-16",
+  rate_long_duration: "2026-10-16", rate_short_duration: "2026-10-16",
+  ls_rate_duration: "2026-10-16",
+  // paper_factor_backfill.LIVE_START
+  fac_value: "2026-10-16", fac_momentum: "2026-10-16", fac_quality: "2026-10-16",
+  fac_lowvol: "2026-10-16", fac_size: "2026-10-16", fac_growth: "2026-10-16",
+  ls_fac_value: "2026-10-16", ls_fac_momentum: "2026-10-16", ls_fac_quality: "2026-10-16",
+  ls_fac_lowvol: "2026-10-16", ls_fac_size: "2026-10-16", ls_fac_growth: "2026-10-16",
+};
+// The six with no reconstruction at all. Declared rather than derived as "the rest", so that a
+// 40th book added to paper_tracker lands in neither list and is caught instead of defaulting
+// into the clean one -- a new book silently labelled "forward record" is the worse failure.
+const PAPER_NO_RECON = ["spy", "actual_book", "proposal",
+                        "val_brake_kept", "val_brake_cut", "ls_val_brake"];
+
+/* WHAT GETS A TOGGLE, AND WHY EACH ONE. Eight of the 39, not all: 39 toggles is a menu nobody
+ * reads, and the point of a registry is that putting something in front of a reader costs a
+ * deliberate edit. The full cut map above still covers all 39, so adding one is a one-line
+ * change here and the honesty machinery already applies to it. */
+const PAPER_SHOWN = [
+  ["spy",                  "SPY (benchmark)",     "#8d99ae", 1.4],
+  ["actual_book",          "The actual book",     "#f0a94a", 1.8],
+  ["universe_ew",          "Universe EW",         "#6aa6f8", 1.2],
+  ["value_implied_growth", "Value: implied gr.",  "#26a69a", 1.4],
+  ["fac_value",            "Factor: value",       "#4db6ac", 1.2],
+  ["dur_terminal_heavy",   "Terminal-heavy",      "#ef5350", 1.2],
+  ["val_brake_kept",       "VAL brake: kept",     "#a78bfa", 1.4],
+  ["val_brake_cut",        "VAL brake: cut",      "#c77dff", 1.4],
+];
+
+/* ⚠ ONE REBASE ANCHOR FOR EVERY DRAWN SERIES, AND IT IS THE LATEST START AMONG THEM.
+ * A NAV is base-100 at the book's own inception, so plotting two books unrebased compares two
+ * different origins; rebasing each to 100 at its OWN first visible bar is worse still, because
+ * both lines then leave 100 on different dates and the reader compares levels that share no
+ * basis. So: find the first bar on which EVERY series switched on has a value, rebase all of
+ * them there, and draw nothing before it.
+ * The cost is deliberate and visible — switching on `val_brake_kept` (7 observations, first
+ * 2026-11-05) truncates the comparison to that week for everything else too. That is the
+ * truth about the evidence, and a visibly short chart is the honest failure mode where a
+ * long chart off mismatched origins is the silent one. The anchor date is printed in the
+ * caption so it is never implicit.                                                          */
+function paperAnchor(bars, ctx){
+  const rows = ctx.srv("site_paper_nav");
+  if(!rows || !rows.length) return -1;
+  let anchor = -1;
+  for(const [key] of PAPER_SHOWN){
+    if(!LWCP.on[`paper_${key}`]) continue;
+    const vals = alignServer(bars, rows, "nav_date", "nav", r => r.strategy === key);
+    if(!vals) return -1;
+    const i = vals.findIndex(v => v != null);
+    if(i < 0) return -1;
+    if(i > anchor) anchor = i;
+  }
+  // The name's own price is rebased on the same anchor, but it must not SET it: a price series
+  // covers the whole window, so it would always lose the max and never move the anchor anyway.
+  return anchor;
+}
+
+function paperSeries(bars, ctx, key, color, width){
+  const rows = ctx.srv("site_paper_nav");
+  const vals = alignServer(bars, rows, "nav_date", "nav", r => r.strategy === key);
+  if(!vals) return null;
+  const a = paperAnchor(bars, ctx);
+  if(a < 0 || vals[a] == null || !+vals[a]) return null;
+  const base = +vals[a];
+  const reb = vals.map((v, i) => (i < a || v == null) ? null : 100 * v / base);
+
+  const cut = PAPER_RECON_FROM[key] || null;
+  if(!cut) return [{vals: reb, color, width}];
+  // Split at the cut. The dashed span KEEPS the first clean point so the two segments meet --
+  // otherwise there is a one-bar gap exactly at the join, which reads as missing data.
+  const iCut = bars.findIndex(b => b.d >= cut);
+  if(iCut < 0) return [{vals: reb, color, width, dash: true}];     // all of it is replica
+  if(iCut <= a) return [{vals: reb, color, width}];                 // anchor is past the cut
+  return [
+    {vals: reb.map((v, i) => i <= iCut ? v : null), color, width, dash: true},
+    {vals: reb.map((v, i) => i >= iCut ? v : null), color, width},
+  ];
+}
+
+/* Per-book caveats. These are not colour commentary: each is a finding already recorded in
+ * CLAUDE.md or a journal entry, and a reader comparing two of these lines needs them to read the
+ * comparison correctly -- above all that the two best-performing books are not independent. */
+const PAPER_NOTE = {
+  spy: "The benchmark every other book is measured against; nothing is selected, so there was "
+     + "never anything to reconstruct.",
+  actual_book: "The real holdings, marked. ⚠ It is NOT a replica, but it does predate the "
+     + "tracker's first lock (2026-09-15): before that it is recorded history rather than a "
+     + "prospective lock, which is a weaker claim than the solid line implies.",
+  universe_ew: "Every active name, equal weighted — what the bench did, and the baseline any "
+     + "tilt has to beat before it has earned anything.",
+  value_implied_growth: "One half of the ONE result the 2026-10-20 review supported: +17.95% "
+     + "over 2026-06-24 → 10-19 against SPY +4.53%. ⚠ Its 2026-10-08 lock holds five "
+     + "FX-contaminated names (db/029, db/030 — 7.5% of a 67-name book); journalled and "
+     + "deliberately not restated, because editing a locked forward record is the one thing the "
+     + "paper design refuses to do.",
+  fac_value: "The other half of that same result, +17.49%. ⚠ NOT independent confirmation of it "
+     + "— the two books overlap 59–73% by name and agree to half a point, which is why they "
+     + "agree.",
+  dur_terminal_heavy: "The counter-example: −11.76% over the window the two value books made "
+     + "+17.5%. ⚠ Rated DO-NOT-USE, placebo p = 0.47, and its sort is inverse implied growth by "
+     + "construction (spearman with bond_floor_share is exactly −1.0000), so it is a value "
+     + "screen in duration clothing rather than a duration measure.",
+  val_brake_kept: "Forward test, 7 observations. kept and cut PARTITION the buy list, so the "
+     + "SPREAD between them is the test and neither leg against SPY is. ⚠ The first lock was "
+     + "struck intraday on 2026-11-05 as SPY fell 4.24% open→close, so all 75 positions are off "
+     + "that day's close; kept's mean premium was +3.89% against cut's +2.46%, leaving kept a "
+     + "+1.43pp cost-basis handicap AGAINST its own claim. The lock stands (Niko, 2026-11-09).",
+  val_brake_cut: "The other half of that partition — the buy-side names inside the richest VAL "
+     + "fifth. Read kept MINUS cut, not either level; see the kept note for the intraday-lock "
+     + "handicap, which runs in cut's favour.",
+};
+
+const _PAPER_WARN =
+  "⚠ DASHED = RECONSTRUCTED, SOLID = FORWARD RECORD. The dashed span was rebuilt BACKWARDS by a "
++ "backfill script in Oct 2026 and an adversarial review on 2026-10-20 rated most of it "
++ "DO-NOT-USE; its selection basis is also stale in two named ways (a 4th trend copy that "
++ "disagreed with the live rule on 17.6% of names, and a 5th earnings-quality classifier still "
++ "on the retired bare > 0 test), deliberately not restated. `companies` begins 2026-06-04, so "
++ "nothing before then rests on a universe the model actually held. All series are rebased to "
++ "100 on the first bar where every book switched on has data — read the SHAPE, not the level.";
+
+INDICATORS.paper_self = {
+  group: "Paper",
+  label: "This name, rebased", pane: "paper", type: "line",
+  color: "#e0e0e0", width: 1.2, on: false,
+  source: "server", view: "site_paper_nav",
+  compute: (bars, S, ctx) => {
+    const a = paperAnchor(bars, ctx);
+    if(a < 0 || !bars[a] || !bars[a].c) return null;
+    const base = bars[a].c;
+    return bars.map((b, i) => i < a || b.c == null ? null : 100 * b.c / base);
+  },
+  basis: "the symbol's own close, rebased to 100 on the same bar as the paper books so the two "
+       + "are comparable. It reads site_paper_nav only to find that shared anchor, and draws "
+       + "nothing when no paper book is switched on.",
+};
+
+for(const [key, label, color, width] of PAPER_SHOWN){
+  const cut = PAPER_RECON_FROM[key] || null;
+  INDICATORS[`paper_${key}`] = {
+    group: "Paper",
+    label, pane: "paper", type: "line", color, width, on: false, multi: true,
+    source: "server", view: "site_paper_nav",
+    compute: (bars, S, ctx) => paperSeries(bars, ctx, key, color, width),
+    basis: `paper book "${key}" from ic_paper_nav, NOT a per-name signal and identical on every `
+         + `chart. ` + (cut
+             ? `Reconstructed before ${cut} (dashed) and forward record from ${cut} (solid). `
+             : `No part of it was reconstructed. `)
+         + (PAPER_NOTE[key] || "") + " " + _PAPER_WARN,
+  };
+}
 /* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
  *
  * Replaces the echarts close-line chart. LWC is Apache-2.0 and is the ONLY TradingView product
@@ -1676,12 +1868,23 @@ async function lwcPrefetch(){
   const views = new Set();
   for(const [k, cfg] of Object.entries(INDICATORS))
     if(LWCP.on[k] && cfg.source === "server" && cfg.view) views.add(cfg.view);
-  for(const v of views) if(!LIVE.srv[v]) LIVE.srv[v] = await qAll(v, r => r.order(INDICATORS_DATEKEY[v] || "as_of"));
+  for(const v of views) if(!LIVE.srv[v]) LIVE.srv[v] = await qAll(v, r => {
+    const q = r.order(INDICATORS_DATEKEY[v] || "as_of");
+    return INDICATORS_QUERY[v] ? INDICATORS_QUERY[v](q) : q;
+  });
 }
 // Which column carries the date in each served view — they do not agree (ic_paper_nav uses
 // nav_date), so it is declared rather than guessed.
 const INDICATORS_DATEKEY = {site_market_regime: "as_of", site_portfolio_fragility: "as_of",
                             site_paper_nav: "nav_date"};
+
+// Server-side narrowing, for a view that serves far more than the chart draws. site_paper_nav
+// holds all 39 paper books (~8,000 rows) and the registry exposes 8 of them, so the other 31 are
+// filtered in Postgres instead of fetched over the wire and thrown away. DECLARED per view: a
+// view with no entry here is fetched whole, which is correct but not free.
+const INDICATORS_QUERY = {
+  site_paper_nav: q => q.in("strategy", PAPER_SHOWN.map(p => p[0])),
+};
 
 function alignServer(bars, rows, dkey, vkey, filter){
   if(!rows || !rows.length) return null;
@@ -1783,7 +1986,23 @@ async function techChart(el, tk, dailyBars){
   el.innerHTML = lwcChrome(tk, partial, basis);
 
   const host = document.getElementById(`lwcChart-${tk}`);
-  const chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
+
+  /* ⚠⚠ EVERYTHING FROM HERE TO THE `catch` IS GUARDED, AND THE CONTROLS BELOW IT ARE NOT.
+   * On 2026-11-16 every indicator toggle and every timeframe button on this chart was found to
+   * be dead. The cause was elsewhere (a `function performance()` in index.html clobbering
+   * window.performance, which Lightweight Charts calls internally) but the reason it was
+   * INVISIBLE is this function's shape: the control wiring sat at the very end, so any throw
+   * above it left a fully rendered chart whose buttons did nothing, with no error on screen.
+   * A chart that fails loudly is a bug; a chart that renders and silently ignores every click
+   * is the "missing information must look missing" defect in the UI layer.
+   * So: the drawing is guarded and reports its failure where the reader is looking, and the
+   * controls are wired in the `finally` — they are plain DOM handlers and do not depend on the
+   * canvas existing, so a broken chart must still be re-drawable from its own buttons.
+   * The guarded body is deliberately left at its original indentation: re-indenting 100 lines
+   * would bury the restructuring in a whitespace diff.                                        */
+  let chart = null, ro = null;
+  try {
+  chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
     width: host.clientWidth, height: lwcHeight(),
     rightPriceScale: {borderColor: C.line, mode: LWCP.log ? 1 : 0},   // 1 = logarithmic
   }));
@@ -1879,14 +2098,28 @@ async function techChart(el, tk, dailyBars){
   }
   // LWC needs an explicit width; without this the chart keeps its initial size when the drawer or
   // the window changes and the right-hand bars fall off the edge.
-  const ro = new ResizeObserver(() => chart.applyOptions({width: host.clientWidth}));
+  ro = new ResizeObserver(() => chart.applyOptions({width: host.clientWidth}));
   ro.observe(host);
 
+  } catch(err){
+    // Say so, on the page, naming the thing that failed. The foot is where every other caveat
+    // about this chart already is, so a failure belongs there rather than only in the console.
+    const foot = el.querySelector(".lwcfoot");
+    const msg = `Chart failed to draw: ${err && err.message ? err.message : err}. `
+              + `The controls below still work — the series are what failed, not the page.`;
+    if(foot) foot.innerHTML = `<span class="neg">${esc(msg)}</span>`;
+    console.error("techChart:", err);
+  } finally {
+
   // ── controls ───────────────────────────────────────────────────────────────────────────────
+  // Wired whatever happened above. `chart`/`ro` may be null after a failure, so teardown is
+  // guarded: a redraw from a broken chart must be able to replace it, which is the one action
+  // most likely to recover the page.
   const redraw = async () => {
     lwcSave(LWCP);
     const b = await loadBars(tk, LWCP.tf);
-    chart.remove(); ro.disconnect();
+    if(chart) chart.remove();
+    if(ro) ro.disconnect();
     techChart(el, tk, b);
   };
   el.querySelectorAll("[data-tf]").forEach(btn => btn.onclick = () => { LWCP.tf = btn.dataset.tf; redraw(); });
@@ -1906,6 +2139,8 @@ async function techChart(el, tk, dailyBars){
   // tick would make choosing three indicators three round trips.
   const mPanel = document.getElementById(`lwcIndMenu-${tk}`);
   if(mPanel) mPanel.onclick = e => e.stopPropagation();
+
+  }   // end finally — controls are always wired
 }
 /* ⚠ The two chart containers carry NO fixed height. techChart() renders its own chrome, chip row,
  * legend, a 420px canvas and a caption into whatever element it is given; the 340px and 360px
@@ -3689,9 +3924,9 @@ function modelsCard(){
 // HOW HAVE WE DONE. Returns against SPY over every window, what the record looks like trade by
 // trade, whether any of it is skill, and what the book pays.
 async function performanceAll(el){
-  performance(el);
+  performanceView(el);
   // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
-  // inserted: performance() sets innerHTML, so anything written before it is wiped, and every other
+  // inserted: performanceView() sets innerHTML, so anything written before it is wiped, and every other
   // section on this page appends — DOM surgery here would be the one place doing something else.
   const mbox = document.createElement("div");
   el.appendChild(mbox);
@@ -3748,7 +3983,7 @@ async function holdingsAll(el){
     const box = document.createElement("div"); el.appendChild(box);
     box.innerHTML = sectionHead("Valuation & profitability") + anValuationCard(X);
   }
-  await section(el, "The book through time", b => history(b));
+  await section(el, "The book through time", b => historyView(b));
 }
 // WHAT IS OUT THERE. Grid and Universe were the same ~454 names with two overlapping tables on two
 // tabs — the quad scatter and the grade x technical matrix are two views of one population, and
@@ -4656,7 +4891,19 @@ function openHolding(tk){
 }
 
 /* ═══ PERFORMANCE ════════════════════════════════════════════════════════ */
-function performance(el){
+/* ⚠⚠ DO NOT NAME THIS `performance`. It was called that until 2026-11-16, and because the page
+ * is ONE concatenated script a top-level `function performance(){}` ASSIGNS TO THE GLOBAL OBJECT
+ * and replaced `window.performance` — the browser's own timer API — for every script on the page.
+ * Nothing complained until the chart arrived: Lightweight Charts calls `performance.now()`
+ * internally, got `undefined`, and `techChart` threw AFTER creating its canvases but BEFORE the
+ * block at its end that wires the controls. The result was a chart that rendered perfectly with
+ * every indicator and timeframe button dead and no error anywhere — so the whole indicator
+ * library and the D/2D/W toggles had been inert since the LWC migration (a96a623).
+ * This is the "page is one concatenated script" hazard the sorting.js header warns about, in its
+ * worse costume: a duplicate `const` dies loudly at parse, while shadowing a browser global is
+ * silent, and `node --check` per module cannot see either. The guard is now
+ * `scripts/site/shadow_check.js`, run in deploy-site.yml.                                     */
+function performanceView(el){
   const m = D.perf.metrics, P = D.perf, T = P.trades_all || {};
   el.innerHTML = head("Portfolio", "Performance analytics", `<span class="muted">${m.n||P.dates.length} trading days · rf ${pct(P.rf_mean,1,false)}</span>`) +
   `<div class="kpis">
@@ -5025,7 +5272,13 @@ function factors(el){
 }
 
 /* ═══ HISTORY ════════════════════════════════════════════════════════════ */
-function history(el){
+/* ⚠ DO NOT NAME THIS `history` — same hazard as performanceView above. A top-level
+ * `function history(){}` in the page's one concatenated script replaces `window.history`, the
+ * browser navigation API, for every script on the page. Found by scripts/site/shadow_check.js
+ * on 2026-11-16, in the same sweep that found the `performance` collision; unlike that one it
+ * had not yet broken anything visible, because nothing on the page had called history.pushState
+ * yet. A hazard with no instance in the data is still the hazard.                             */
+function historyView(el){
   const HH = D.holdings_history, TR = D.trades;
   const dates = [...new Set(HH.map(x=>x.d))].sort();
   const names = [...new Set(HH.map(x=>x.tk))];
