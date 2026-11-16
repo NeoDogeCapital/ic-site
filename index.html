@@ -294,7 +294,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:07 · 2bdd446</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:20 · a2ad1fb</div>
   </div>
 </section>
 
@@ -323,7 +323,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:07 · 2bdd446</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:20 · a2ad1fb</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1920,10 +1920,23 @@ function lwcPartial(bars){
 // How tall the canvas needs to be. A fixed 420px squeezed the price pane to a sliver once a few
 // indicator panes were open — with everything on it was 7 panes in 420px and the candles were
 // unreadable. Price keeps a floor and each extra pane adds its own room.
+/* ⚠ THESE TWO NUMBERS ARE A BUDGET, AND THE BUDGET IS ENFORCED BELOW (setStretchFactor).
+ * They were only ever half a rule: lwcHeight() added 95px of canvas per indicator pane, and
+ * Lightweight Charts then ignored that and split the WHOLE height by stretch factor — 2 for the
+ * price pane and 1 for every other. So the default set (RSI + volume) gave the candles 230px of
+ * a 490px chart, 47%, and every further indicator took another full share while contributing
+ * only 95px. Switching on six panes left a year of price action in ~200px: every line flat,
+ * no trend readable, which is the one thing the chart is for.
+ * Declaring the budget here and applying the SAME numbers as stretch factors makes the declared
+ * geometry and the actual geometry one thing — the price pane now holds its height no matter how
+ * many indicators are open, and each indicator pane costs exactly what it is budgeted.         */
+const LWC_PRICE_PX = 420;      // the price pane's budget — tall enough to read a year of candles
+const LWC_PANE_PX  = 95;       // every indicator pane's budget
+
 function lwcHeight(){
   const panes = new Set(["price"]);
   for(const [k, cfg] of Object.entries(INDICATORS)) if(LWCP.on[k]) panes.add(cfg.pane);
-  return 300 + Math.max(0, panes.size - 1) * 95;
+  return LWC_PRICE_PX + Math.max(0, panes.size - 1) * LWC_PANE_PX;
 }
 
 function lwcChrome(tk, partial, basisLines){
@@ -2086,6 +2099,18 @@ async function techChart(el, tk, dailyBars){
       + `<span class="muted">vol ${(b.v || 0).toLocaleString()}</span>`; };
   paint(bars[bars.length - 1]);
   chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
+
+  // ── pane geometry ──────────────────────────────────────────────────────────────────────────
+  // Apply the budget lwcHeight() just computed. Without this the library's own 2:1 default wins
+  // and the price pane shrinks with every indicator added; see the constants' header.
+  try {
+    chart.panes().forEach((pn, i) => pn.setStretchFactor(i === 0 ? LWC_PRICE_PX : LWC_PANE_PX));
+  } catch(e){
+    // An older library build without setStretchFactor: keep the default 2:1 rather than fail the
+    // whole chart over its proportions. Logged, not silent -- a layout that quietly reverts is
+    // how this went unnoticed in the first place.
+    console.warn("lwc: pane stretch factors unavailable, falling back to the library default", e);
+  }
 
   // Show the timeframe that was asked for, not everything that was fetched. The lead-in bars are
   // loaded and computed on -- they are what makes SMA 200 exist at the left edge -- but they sit
