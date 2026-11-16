@@ -324,7 +324,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:29 · 0af32a6</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:33 · f6f88f9</div>
   </div>
 </section>
 
@@ -353,7 +353,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:29 · 0af32a6</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:33 · f6f88f9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1362,16 +1362,19 @@ const INDICATORS = {
   trade_band: {
     group: "Price",
     label: "Trade range (1w)", pane: "price", type: "line", multi: true, on: true,
+    // The two edges are labelled, because the data key lists every series and two entries both
+    // reading "Trade range (1w)" with different numbers is a reader's problem to solve rather
+    // than an answer. A band has a low and a high and the key should say which is which.
     compute: (bars, S) => [
-      {vals: S.trade.lo, color: "rgba(106,166,248,.55)", width: 1, dash: true},
-      {vals: S.trade.hi, color: "rgba(106,166,248,.55)", width: 1, dash: true}],
+      {vals: S.trade.lo, color: "rgba(106,166,248,.55)", width: 1, dash: true, label: "Trade range (1w) low"},
+      {vals: S.trade.hi, color: "rgba(106,166,248,.55)", width: 1, dash: true, label: "Trade range (1w) high"}],
   },
   trend_band: {
     group: "Price",
     label: "Trend range (1m)", pane: "price", type: "line", multi: true, on: false,
     compute: (bars, S) => [
-      {vals: S.trend.lo, color: "rgba(240,169,74,.45)", width: 1, dash: true},
-      {vals: S.trend.hi, color: "rgba(240,169,74,.45)", width: 1, dash: true}],
+      {vals: S.trend.lo, color: "rgba(240,169,74,.45)", width: 1, dash: true, label: "Trend range (1m) low"},
+      {vals: S.trend.hi, color: "rgba(240,169,74,.45)", width: 1, dash: true, label: "Trend range (1m) high"}],
   },
   avwap_earn: {
     group: "Price",
