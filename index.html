@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:10 · c280f3f</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:12 · 06ae461</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:10 · c280f3f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:12 · 06ae461</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1446,8 +1446,14 @@ const INDICATORS = {
       // overlays the one you are actually reading should not be the same weight as the rest.
       const C3 = {"1": "#26a69a", "0": "#f0c04a", "-1": "#ef5350"};
       const A3 = {"1": "↑", "0": "→", "-1": "↓"};
+      /* ⚠ UNKNOWN IS NOT FLAT. `dir` is null for the first two bars of the valid line, because
+       * the direction is measured against the value two bars back and there is none yet. Those
+       * bars were being painted AMBER — the colour that means "the ratchet is holding" — which
+       * states a trend reading the data cannot support. The amber tally gave it away: 39
+       * amber bars against 23 genuinely flat ones. The value is dropped instead, so the line
+       * simply starts two bars later rather than opening with a neutral claim. */
       return [{
-        vals:   at,
+        vals:   at.map((v, i) => dir[i] == null ? null : v),
         colors: dir.map(d => d == null ? "#f0c04a" : C3[String(d)]),
         states: dir.map(d => d == null ? "" : A3[String(d)]),
         width: 3, label: "AlphaTrend",
