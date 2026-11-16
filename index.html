@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:34 · 6eba8b3</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:38 · 45be671</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:34 · 6eba8b3</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:38 · 45be671</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2140,8 +2140,31 @@ function lwcChrome(tk, partial, basisLines){
 async function techChart(el, tk, dailyBars){
   if(!dailyBars || !dailyBars.length){ el.innerHTML = `<div class="muted">no price history</div>`; return; }
   await lwcPrefetch(tk);          // any server-sourced indicator that is switched on
-  // Aggregate FIRST: techSeries and every registry compute() run on whatever a bar is now.
-  const bars = aggBars(dailyBars, LWCP.iv);
+
+  /* ⚠⚠ PUT EVERY PRICE ON ONE BASIS BEFORE ANYTHING READS IT.
+   * `o`, `h` and `l` arrive DIVIDEND-ADJUSTED from site_price_history (adj_open/high/low) while
+   * the close switched with the Split-adjusted / Total-return toggle — so in Split-adjusted mode
+   * the candle paired an adjusted open with an unadjusted close, and the body was wrong by the
+   * whole dividend adjustment. The error grows the further back you look, because that is what
+   * a dividend adjustment does: SPY's adj_close/close_price runs 0.628 in 2000, 0.973 in 2024,
+   * 0.996 in 2026. Measured consequence — the share of SPY bars rendering GREEN in that mode was
+   * 100% every year through 2024, 96.4% in 2025 and 75% in 2026, against 45-60% on a correct
+   * basis. Every candle before roughly last spring was green, which is exactly what Niko saw on
+   * the Markets tab in Max.
+   * db/069's own header warned about this in the other direction ("mixing an unadjusted open
+   * with an adjusted close would draw a candle whose body is wrong by the whole dividend
+   * adjustment") and the renderer did it anyway, because the open was added to a code path whose
+   * close was already conditional.
+   * Rebasing HERE, before aggBars and before techSeries, means the candles, every indicator and
+   * the data key are all on the basis the toggle names — rather than the candles alone. The
+   * factor is close_price/adj_close, i.e. undoing the dividend adjustment; a bar missing either
+   * close keeps its values rather than being scaled by a guess. */
+  const based = LWCP.total ? dailyBars : dailyBars.map(b => {
+    const f = (b.c && b.sc != null) ? b.sc / b.c : null;
+    return f == null ? b : {...b, c: b.sc, o: b.o == null ? null : b.o * f, h: b.h * f, l: b.l * f};
+  });
+  // Aggregate SECOND: techSeries and every registry compute() run on whatever a bar is now.
+  const bars = aggBars(based, LWCP.iv);
   const S = techSeries(bars);
   // On D the last bar is partial only if it is today's. On 2D/W the last BUCKET is partial
   // whenever it holds fewer sessions than a full one, which is most of the time.
@@ -2185,7 +2208,9 @@ async function techChart(el, tk, dailyBars){
   // ── price: candles ─────────────────────────────────────────────────────────────────────────
   // A bar with no open contributes no candle (see the header). The close series is always
   // complete, so the overlays still span the full window.
-  const px = b => LWCP.total ? b.c : (b.sc ?? b.c);
+  // The basis is already applied above, so the close is just the close. It was
+  // `LWCP.total ? b.c : (b.sc ?? b.c)` — the conditional that the open, high and low never had.
+  const px = b => b.c;
   /* Candles / Bars / Line. A line chart is not a cosmetic preference: it is the only one of the
    * three that can draw a bar with NO OPEN, and db/069 leaves `adj_open` NULL where the vendor
    * had none rather than substituting the close. The OHLC forms filter those bars out — one
