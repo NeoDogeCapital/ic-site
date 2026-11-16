@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:42 · db04f8f</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:47 · db15257</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:42 · db04f8f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:47 · db15257</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1428,10 +1428,13 @@ const INDICATORS = {
         : dir[i] === want ? v
         : (dir[i + 1] === want || dir[i - 1] === want) ? v
         : null);
+      // Deliberately the HEAVIEST line on the price pane (3.0 against the track line's 2.0 and
+      // the moving averages' 1.2-1.4): it is the trend read, and on a pane carrying four or five
+      // overlays the one you are actually reading should not be the same weight as the rest.
       return [
-        {vals: seg(1),  color: "#26a69a", width: 1.8, label: "AlphaTrend ↑"},
-        {vals: seg(0),  color: "#f0c04a", width: 1.8, label: "AlphaTrend →"},
-        {vals: seg(-1), color: "#ef5350", width: 1.8, label: "AlphaTrend ↓"}];
+        {vals: seg(1),  color: "#26a69a", width: 3, label: "AlphaTrend ↑"},
+        {vals: seg(0),  color: "#f0c04a", width: 3, label: "AlphaTrend →"},
+        {vals: seg(-1), color: "#ef5350", width: 3, label: "AlphaTrend ↓"}];
     },
     basis: "the OPEN-SOURCE AlphaTrend (ATR bands steered by Money Flow Index ≥ 50), ported "
          + "verbatim from technical_v2.alpha_trend(). GREEN rising · AMBER flat · RED falling, "
@@ -2338,7 +2341,22 @@ async function techChart(el, tk, dailyBars){
   /* ⚠ MARKERS ARE HIDDEN WHEN THEY WOULD BE TOO DENSE TO READ — AND THE CAPTION SAYS SO.
    * On Max (~6,700 daily bars in ~900px) the T/B/R and TD Sequential 9s and 13s fire thousands
    * of times and the price pane becomes confetti: a marker on every bar marks nothing.
-   * Suppressed above roughly ONE MARKER PER 12 PIXELS of chart width.
+   * Suppressed above roughly ONE MARKER PER 25 PIXELS of chart width.
+   *
+   * ⚠ 25 IS MEASURED, NOT PICKED. The first attempt used 12px and 3Y was still unreadable,
+   * because 12px is narrower than a marker: an arrow plus its "13" label needs about 25px of
+   * horizontal room before two of them touch. Markers fire at a steady ~0.10 per bar, so the
+   * spacing follows directly from the range (counted over a 900px chart):
+   *     3M    63 bars     5 markers   180 px apart
+   *     6M   126           9          100
+   *     1Y   252          23           39.1   readable
+   *     3Y   756          78           11.5   collides
+   *     5Y  1260         140            6.4
+   *     Max 6700         764            1.2
+   * 25px sits between the last comfortable range and the first bad one. It also fixes the real
+   * reason 3Y slipped through: at width/12 the cap was 75 against 78 markers, so 3Y cleared it
+   * on any chart wider than ~940px. Raising the divisor makes a wider chart show more markers
+   * without ever letting a range through on width alone.
    *
    * The test is DENSITY, not the timeframe button, and the difference is not pedantry: Max with
    * MONTHLY bars is ~320 bars and perfectly legible, while 3Y with DAILY bars is ~750 and is
@@ -2349,7 +2367,7 @@ async function techChart(el, tk, dailyBars){
    * HAS no signals — the defect this repository keeps producing — so the number withheld goes
    * into the caption with what to do about it. Hiding information is allowed; hiding that you
    * hid it is not. */
-  const markCap = Math.max(20, Math.round((host.clientWidth || 900) / 12));
+  const markCap = Math.max(12, Math.round((host.clientWidth || 900) / 25));
   const marksHidden = marks.length > markCap ? marks.length : 0;
   if(marks.length && !marksHidden) LightweightCharts.createSeriesMarkers(candles,
     marks.sort((a, b) => a.time < b.time ? -1 : 1));
@@ -2452,8 +2470,8 @@ async function techChart(el, tk, dailyBars){
   if(marksHidden){
     const foot = el.querySelector(".lwcfoot");
     if(foot) foot.insertAdjacentHTML("afterbegin",
-      `<span class="amber">${marksHidden} T/B/R and TD marker(s) hidden</span> — more than one `
-    + `per 12px at this range, where a marker on every bar marks nothing. Shorten the range or `
+      `<span class="amber">${marksHidden} T/B/R and TD marker(s) hidden</span> — closer than `
+    + `25px apart at this range, which is narrower than the markers themselves. Shorten the range or `
     + `widen the bar interval to see them. `);
   }
   requestAnimationFrame(placeBoxes);
