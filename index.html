@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:38 · 45be671</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:42 · db04f8f</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:38 · 45be671</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:42 · db04f8f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1404,14 +1404,40 @@ const INDICATORS = {
         const prev = i && at[i-1] != null ? at[i-1] : (flow[i] >= 50 ? up : dn);
         at[i] = flow[i] >= 50 ? Math.max(up, prev) : Math.min(dn, prev);
       }
-      // bull = the line is above where it was two bars ago, as in alpha_trend()
-      const bull = at.map((v, i) => v != null && i >= 2 && at[i-2] != null ? v > at[i-2] : null);
+      /* ⚠ THREE STATES, BECAUSE THE LINE HAS THREE — AND TWO OF THEM USED TO BE RED.
+       * AlphaTrend is a RATCHET: in the flow>=50 regime it is max(up, prev), so it rises or
+       * HOLDS and never falls (mirrored below 50). The old test was the binary
+       * `bull = at[i] > at[i-2]`, exactly as alpha_trend() computes it — but a flat ratchet
+       * fails `>` and so was drawn BEARISH. Measured over the last 420 sessions:
+       *   SPY  rising 24.0%  falling  9.5%  FLAT 66.5%
+       *   QQQ         21.5%          16.0%       62.5%
+       *   NVDA        19.6%          18.5%       61.8%
+       *   PLTR        24.7%          18.5%       56.7%
+       *   ANET        18.9%          15.3%       65.8%
+       * So about two-thirds of the line was painted red while the trend was simply holding,
+       * which is why it read bearish most of the time and looked insensitive. The flat state is
+       * not a rounding artefact — it is the ratchet doing its job between advances.
+       * The engine's `bull` is UNCHANGED and still binary; this is the DISPLAY splitting a
+       * state the engine collapses. alpha_trend() consumers are untouched. */
+      const dir = at.map((v, i) => v == null || i < 2 || at[i-2] == null ? null
+                                 : v > at[i-2] ? 1 : v < at[i-2] ? -1 : 0);
+      // Segments must OVERLAP by one bar or the line breaks visibly at every colour change: a
+      // point belongs to its own segment and to the next one's start.
+      const seg = (want) => at.map((v, i) =>
+        v == null ? null
+        : dir[i] === want ? v
+        : (dir[i + 1] === want || dir[i - 1] === want) ? v
+        : null);
       return [
-        {vals: at.map((v,i)=> bull[i] === true  ? v : null), color: "#26a69a", width: 1.8},
-        {vals: at.map((v,i)=> bull[i] === false ? v : null), color: "#ef5350", width: 1.8}];
+        {vals: seg(1),  color: "#26a69a", width: 1.8, label: "AlphaTrend ↑"},
+        {vals: seg(0),  color: "#f0c04a", width: 1.8, label: "AlphaTrend →"},
+        {vals: seg(-1), color: "#ef5350", width: 1.8, label: "AlphaTrend ↓"}];
     },
     basis: "the OPEN-SOURCE AlphaTrend (ATR bands steered by Money Flow Index ≥ 50), ported "
-         + "verbatim from technical_v2.alpha_trend(). technical_v2 judged it 'too choppy vs the "
+         + "verbatim from technical_v2.alpha_trend(). GREEN rising · AMBER flat · RED falling, "
+         + "against the line two bars back: it is a RATCHET, so it holds far more often than it "
+         + "moves (flat on 57-67% of bars across SPY/QQQ/NVDA/PLTR/ANET over 420 sessions) and "
+         + "a flat stretch is the trend holding, NOT a reversal. technical_v2 judged it 'too choppy vs the "
          + "reference charts' and shipped the fitted track line instead — so the two WILL "
          + "disagree, and that disagreement is the honest version of the difference. Note: this "
          + "MFI is Money Flow Index, not the Market Fragility Index.",
@@ -2309,7 +2335,23 @@ async function techChart(el, tk, dailyBars){
       color: cfg.color, shape: cfg.above ? "arrowDown" : "arrowUp", text: cfg.label,
     }); });
   }
-  if(marks.length) LightweightCharts.createSeriesMarkers(candles,
+  /* ⚠ MARKERS ARE HIDDEN WHEN THEY WOULD BE TOO DENSE TO READ — AND THE CAPTION SAYS SO.
+   * On Max (~6,700 daily bars in ~900px) the T/B/R and TD Sequential 9s and 13s fire thousands
+   * of times and the price pane becomes confetti: a marker on every bar marks nothing.
+   * Suppressed above roughly ONE MARKER PER 12 PIXELS of chart width.
+   *
+   * The test is DENSITY, not the timeframe button, and the difference is not pedantry: Max with
+   * MONTHLY bars is ~320 bars and perfectly legible, while 3Y with DAILY bars is ~750 and is
+   * not. A rule keyed to the "Max" label would hide markers where they read fine and show them
+   * where they do not. It also scales with the pane, so a wider window shows more of them.
+   *
+   * ⚠ AND IT IS NEVER SILENT. A chart that quietly drops signals looks identical to a name that
+   * HAS no signals — the defect this repository keeps producing — so the number withheld goes
+   * into the caption with what to do about it. Hiding information is allowed; hiding that you
+   * hid it is not. */
+  const markCap = Math.max(20, Math.round((host.clientWidth || 900) / 12));
+  const marksHidden = marks.length > markCap ? marks.length : 0;
+  if(marks.length && !marksHidden) LightweightCharts.createSeriesMarkers(candles,
     marks.sort((a, b) => a.time < b.time ? -1 : 1));
 
   // ── THE DATA KEY: one legend per pane, swatch + name + value at the crosshair ───────────────
@@ -2407,6 +2449,13 @@ async function techChart(el, tk, dailyBars){
                  + `some lines are unlabelled`);
     paint(lastBar);
   };
+  if(marksHidden){
+    const foot = el.querySelector(".lwcfoot");
+    if(foot) foot.insertAdjacentHTML("afterbegin",
+      `<span class="amber">${marksHidden} T/B/R and TD marker(s) hidden</span> — more than one `
+    + `per 12px at this range, where a marker on every bar marks nothing. Shorten the range or `
+    + `widen the bar interval to see them. `);
+  }
   requestAnimationFrame(placeBoxes);
   chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
 
