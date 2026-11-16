@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:12 · 06ae461</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:20 · baacea9</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:12 · 06ae461</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:20 · baacea9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2124,10 +2124,23 @@ function lwcPartial(bars){
 const LWC_PRICE_PX = 420;      // the price pane's budget — tall enough to read a year of candles
 const LWC_PANE_PX  = 95;       // every indicator pane's budget
 
-function lwcHeight(){
-  const panes = new Set(["price"]);
-  for(const [k, cfg] of Object.entries(INDICATORS)) if(LWCP.on[k]) panes.add(cfg.pane);
-  return LWC_PRICE_PX + Math.max(0, panes.size - 1) * LWC_PANE_PX;
+/* ⚠ BUDGET THE PANES THAT WILL BE DRAWN, NOT THE ONES THAT ARE TOGGLED.
+ * This used to derive the pane set from `LWCP.on` alone, which is a statement about the MENU,
+ * not about the chart. An indicator whose compute() declines — returns null because the data it
+ * needs does not exist for this symbol — still reserved a 95px pane that was never created.
+ * The case that showed it: Grade and Quadrant switched on while looking at SPY on the Markets
+ * tab. They are server-sourced per name, SPY is not a row in `companies`, the view returns
+ * nothing, no series is made and no pane appears — but the chart was still sized for one, so it
+ * came out 95px taller than its contents (measured: 705px budgeted, 3 panes of 464/105/105 plus
+ * a 28px axis). Nothing was visibly broken, because LWC redistributes the surplus across the
+ * panes that do exist — the price pane simply grew. A budget for something absent, silently
+ * absorbed, is the same shape as every other defect here.
+ * `panes` is passed in by the caller, which now computes the indicators BEFORE sizing the chart.
+ * An indicator that returns an all-null array still keeps its pane deliberately: an empty pane
+ * labelled "MACD —" says "on, no data yet", while no pane at all reads as a broken toggle. */
+function lwcHeight(panes){
+  const n = panes ? panes.size : 1;
+  return LWC_PRICE_PX + Math.max(0, n - 1) * LWC_PANE_PX;
 }
 
 function lwcChrome(tk, partial, basisLines){
@@ -2245,10 +2258,29 @@ async function techChart(el, tk, dailyBars){
    * canvas existing, so a broken chart must still be re-drawable from its own buttons.
    * The guarded body is deliberately left at its original indentation: re-indenting 100 lines
    * would bury the restructuring in a whitespace diff.                                        */
+  /* COMPUTE FIRST, THEN SIZE. Every enabled indicator is evaluated here, before the chart
+   * exists, so the height can be budgeted on what will actually be drawn. An entry whose
+   * compute() returns nothing is dropped now rather than reserving a pane it never fills.
+   * A compute() that THROWS takes only itself out, named in the console — one broken indicator
+   * must not cost the chart. */
+  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {},
+               srv: v => (LIVE.srv || {})[INDICATORS_PERNAME.has(v) ? `${v}|${tk}` : v] || []};
+  const COMPUTED = [];
+  for(const [k, cfg] of Object.entries(INDICATORS)){
+    if(!LWCP.on[k]) continue;
+    let out = null;
+    try { out = cfg.compute(bars, S, ctx); }
+    catch(e){ console.warn(`lwc: indicator "${k}" failed to compute — skipped`, e); continue; }
+    if(!out) continue;                                   // declined: no data for this symbol
+    if(cfg.multi && !out.some(ln => ln && ln.vals)) continue;
+    COMPUTED.push([k, cfg, out]);
+  }
+  const panesUsed = new Set(["price", ...COMPUTED.map(([, cfg]) => cfg.pane)]);
+
   let chart = null, ro = null;
   try {
   chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
-    width: host.clientWidth, height: lwcHeight(),
+    width: host.clientWidth, height: lwcHeight(panesUsed),
     rightPriceScale: {borderColor: C.line, mode: LWCP.log ? 1 : 0},   // 1 = logarithmic
   }));
 
@@ -2288,8 +2320,7 @@ async function techChart(el, tk, dailyBars){
   }
 
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
-  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {},
-               srv: v => (LIVE.srv || {})[INDICATORS_PERNAME.has(v) ? `${v}|${tk}` : v] || []};
+  // Already computed above (see COMPUTE FIRST, THEN SIZE); this only draws them.
   /* SER is the DATA KEY's source of truth: every series that reaches the canvas registers here
    * with the colour it was actually drawn in and a date->value map. The legend reads THIS rather
    * than the crosshair's seriesData, for two reasons — the value must still show when the
@@ -2343,10 +2374,7 @@ async function techChart(el, tk, dailyBars){
               vol: cfg.type === "histogram"});
     return s;
   };
-  for(const [k, cfg] of Object.entries(INDICATORS)){
-    if(!LWCP.on[k]) continue;
-    const out = cfg.compute(bars, S, ctx);
-    if(!out) continue;
+  for(const [k, cfg, out] of COMPUTED){
     const p = pane(cfg.pane);
     // ⚠ The label comes from the LINE or the entry — never inferred from `dash`. The first
     // version read a dashed line as "(reconstructed)", which is true of the paper books and
@@ -2530,7 +2558,7 @@ async function techChart(el, tk, dailyBars){
   // LWC needs an explicit width; without this the chart keeps its initial size when the drawer or
   // the window changes and the right-hand bars fall off the edge.
   ro = new ResizeObserver(() => {
-    chart.applyOptions({width: host.clientWidth});
+    chart.applyOptions({width: host.clientWidth, height: lwcHeight(panesUsed)});
     requestAnimationFrame(placeBoxes);   // the pane rows move with the container
   });
   ro.observe(host);
