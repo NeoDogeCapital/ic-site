@@ -316,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:29 · 504ab3b</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:34 · 6eba8b3</div>
   </div>
 </section>
 
@@ -345,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:29 · 504ab3b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:34 · 6eba8b3</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1719,6 +1719,88 @@ for(const [key, label, color, width] of PAPER_SHOWN){
          + (PAPER_NOTE[key] || "") + " " + _PAPER_WARN,
   };
 }
+
+/* ═══ THE MODEL'S OWN VERDICT, OVER TIME — grade and quadrant ════════════════════════════════
+ *
+ * The grid says what the model calls a name TODAY. These two say what it has been calling it,
+ * against the price, which is the comparison the grid cannot make: a downgrade three weeks
+ * before a breakdown and a downgrade three weeks after it are different facts about the model.
+ *
+ * SERVER-SOURCED AND PER NAME (`site_decision_history`, db/070). `site_decision_matrix` clamps
+ * to `as_of = max(as_of)` because it backs a decision grid, so the history needed its own view.
+ * It is fetched for the ticker on screen and cached under that ticker — see INDICATORS_PERNAME.
+ *
+ * ⚠ PLOTTED 4 = BEST, AND THE LEGEND PRINTS THE LABEL, NOT THE NUMBER. Both are categorical, so
+ * they are mapped onto one 1-4 axis (A/Q1 at 4, D/Q4 at 1) and share a pane: "what does the
+ * model think of this name" is one question with two answers, and putting them on one axis lets
+ * a reader see the grid and the quad agree or disagree at a glance. The axis therefore reads
+ * 1-4 with no units — `fmtVal` puts "A" and "Q1" in the data key so the encoding never reaches
+ * the reader, and the integer is an implementation detail of drawing a category as a line.
+ *
+ * ⚠ STEP LINES, NOT SLOPES. A grade holds until it changes. Drawing a slope from B to C across
+ * three weeks shows a transition that never happened — the name was B, and then it was C.
+ *
+ * ⚠ GAPS ARE REAL. 2,960 of 20,541 rows carry a NULL quadrant: a name whose EPS axis is
+ * undefined (negative trailing EPS, §13.4) HAS no quadrant. alignServer passes the null through
+ * and the line breaks. Carrying the previous quadrant across that span would assert a
+ * classification the model explicitly declined to make.
+ *
+ * ⚠ AND THE HISTORY IS SHORT AND MOSTLY FLAT: 45 snapshots, 2026-09-15 to 2026-11-14. On a 1Y
+ * or Max window these are a stub at the right edge, and 425 of 466 names never changed grade
+ * over it (394 never changed quadrant). A flat line here is the finding, not a failure to draw.
+ * They are absent, never zero, outside the observed window — the series simply stops.
+ *
+ * ⚠ NOT ON THE MARKETS TAB, BY CONSTRUCTION. SPY and the other index ETFs are not rows in
+ * `companies`, so they have no decision row, the query returns nothing and the indicator does
+ * not draw. The model scores businesses; an index fund is not one.
+ */
+const GRADE_LVL = {A: 4, B: 3, C: 2, D: 1};
+const QUAD_LVL  = {Q1: 4, Q2: 3, Q3: 2, Q4: 1};          // EV rank: Q1 best (§ QUAD FRAMEWORK)
+const _lvlName  = (m) => (v) => Object.keys(m).find(k => m[k] === v) || "—";
+
+INDICATORS.grade_hist = {
+  group: "Signals",
+  label: "Grade", pane: "model", type: "line", color: "#6aa6f8", width: 2, on: false, step: true,
+  source: "server", view: "site_decision_history",
+  fmtVal: _lvlName(GRADE_LVL),
+  compute: (bars, S, ctx) => alignServer(bars, ctx.srv("site_decision_history"),
+                                         "as_of", "_grade_lvl"),
+  basis: "the decision grid's own grade for THIS name on each date it was computed, from "
+       + "ic_decision_matrix via site_decision_history (db/070). Plotted A=4 B=3 C=2 D=1 so "
+       + "best is at the top and it shares an axis with the quadrant; the key prints the letter, "
+       + "not the number. A STEP line, because a grade holds until it changes. ⚠ The record "
+       + "starts 2026-09-15 (45 snapshots) and the line simply stops before that rather than "
+       + "being carried back — and 425 of 466 names never changed grade in that window, so a "
+       + "flat line is the reading rather than a missing one.",
+};
+
+INDICATORS.quad_hist = {
+  group: "Signals",
+  label: "Quadrant", pane: "model", type: "line", color: "#f0a94a", width: 2, on: false, step: true,
+  source: "server", view: "site_decision_history",
+  fmtVal: _lvlName(QUAD_LVL),
+  compute: (bars, S, ctx) => alignServer(bars, ctx.srv("site_decision_history"),
+                                         "as_of", "_quad_lvl"),
+  basis: "the V12 quadrant for THIS name on each date, from the same view as Grade. Plotted on "
+       + "EV RANK so best is at the top (Q1 Full Compounders = 4 … Q4 Reset/Avoid = 1); the key "
+       + "prints Q1-Q4. ⚠ Q4 is the WORST bucket, not the mildest — revenue falling while EPS "
+       + "expands. ⚠ A BREAK IN THE LINE IS REAL: 14.4% of rows carry no quadrant because the "
+       + "name's EPS axis is undefined (negative trailing EPS, §13.4), and the last value is NOT "
+       + "carried across that span — the model declined to classify it. Same 2026-09-15 start as "
+       + "Grade; 394 of 466 names never changed quadrant in the window.",
+};
+
+/* alignServer reads a numeric column, and these two arrive as 'A' and 'Q1'. Decoding them here,
+ * once, when the rows land — rather than inside each compute() — keeps the mapping in one place
+ * and means an UNRECOGNISED code becomes null (absent, a gap) instead of NaN, which Postgres and
+ * every comparison downstream would happily accept as a populated value. */
+function decodeDecisionRows(rows){
+  for(const r of rows || []){
+    if(r._grade_lvl === undefined) r._grade_lvl = GRADE_LVL[r.grade] ?? null;
+    if(r._quad_lvl  === undefined) r._quad_lvl  = QUAD_LVL[r.quadrant] ?? null;
+  }
+  return rows;
+}
 /* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
  *
  * Replaces the echarts close-line chart. LWC is Apache-2.0 and is the ONLY TradingView product
@@ -1900,15 +1982,27 @@ async function loadBars(tk, tf){
  * back-fill before the first observation, no flat line continuing past the last. A fragility
  * index that appears to run from 2000 because the chart carried its first value backwards would
  * be inventing eighteen years of regime history.                                              */
-async function lwcPrefetch(){
+async function lwcPrefetch(tk){
   LIVE.srv ||= {};
   const views = new Set();
   for(const [k, cfg] of Object.entries(INDICATORS))
     if(LWCP.on[k] && cfg.source === "server" && cfg.view) views.add(cfg.view);
-  for(const v of views) if(!LIVE.srv[v]) LIVE.srv[v] = await qAll(v, r => {
-    const q = r.order(INDICATORS_DATEKEY[v] || "as_of");
-    return INDICATORS_QUERY[v] ? INDICATORS_QUERY[v](q) : q;
-  });
+  for(const v of views){
+    // A PER-NAME view is cached and fetched per name. The fragility indices are market-wide, so
+    // one fetch serves every chart in the session; the decision history is 20,000+ rows across
+    // 466 names and the chart draws ONE of them, so it is fetched for that name and keyed by it.
+    // Caching a per-name view under the bare view name would serve AAPL's grade line on MSFT's
+    // chart — a plausible, wrong line, which is the defect class this repo keeps producing.
+    const perName = INDICATORS_PERNAME.has(v);
+    const key = perName ? `${v}|${tk}` : v;
+    if(LIVE.srv[key]) continue;
+    const rows = await qAll(v, r => {
+      let q = r.order(INDICATORS_DATEKEY[v] || "as_of");
+      if(perName) q = q.eq("ticker", tk);
+      return INDICATORS_QUERY[v] ? INDICATORS_QUERY[v](q) : q;
+    });
+    LIVE.srv[key] = INDICATORS_DECODE[v] ? INDICATORS_DECODE[v](rows) : rows;
+  }
 }
 // Which column carries the date in each served view — they do not agree (ic_paper_nav uses
 // nav_date), so it is declared rather than guessed.
@@ -1922,6 +2016,14 @@ const INDICATORS_DATEKEY = {site_market_regime: "as_of", site_portfolio_fragilit
 const INDICATORS_QUERY = {
   site_paper_nav: q => q.in("strategy", PAPER_SHOWN.map(p => p[0])),
 };
+
+// Views served PER TICKER rather than once per session. Declared, like everything else here: a
+// view that is per-name and not listed would be fetched once and then shown on every other name.
+const INDICATORS_PERNAME = new Set(["site_decision_history"]);
+
+// A view whose rows need decoding before a compute() can read them as numbers (grade "A" -> 4).
+// Done once where the rows land, not per indicator, so the mapping has one home.
+const INDICATORS_DECODE = {site_decision_history: r => decodeDecisionRows(r)};
 
 function alignServer(bars, rows, dkey, vkey, filter){
   if(!rows || !rows.length) return null;
@@ -2037,7 +2139,7 @@ function lwcChrome(tk, partial, basisLines){
 /* The chart. `el` is the container; chrome and canvas are built inside it. */
 async function techChart(el, tk, dailyBars){
   if(!dailyBars || !dailyBars.length){ el.innerHTML = `<div class="muted">no price history</div>`; return; }
-  await lwcPrefetch();            // any server-sourced indicator that is switched on
+  await lwcPrefetch(tk);          // any server-sourced indicator that is switched on
   // Aggregate FIRST: techSeries and every registry compute() run on whatever a bar is now.
   const bars = aggBars(dailyBars, LWCP.iv);
   const S = techSeries(bars);
@@ -2109,7 +2211,8 @@ async function techChart(el, tk, dailyBars){
   }
 
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
-  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {}, srv: v => (LIVE.srv || {})[v] || []};
+  const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {},
+               srv: v => (LIVE.srv || {})[INDICATORS_PERNAME.has(v) ? `${v}|${tk}` : v] || []};
   /* SER is the DATA KEY's source of truth: every series that reaches the canvas registers here
    * with the colour it was actually drawn in and a date->value map. The legend reads THIS rather
    * than the crosshair's seriesData, for two reasons — the value must still show when the
@@ -2124,11 +2227,18 @@ async function techChart(el, tk, dailyBars){
       ? {color: col, priceLineVisible: false, lastValueVisible: false,
          priceFormat: {type: "volume"}}
       : {color: col, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false,
+         // A STEP line for anything that holds a value until it changes. A grade does not
+         // interpolate from B to C over three weeks; drawing a slope between them would show a
+         // transition that never happened.
+         lineType: cfg.step ? LightweightCharts.LineType.WithSteps : LightweightCharts.LineType.Simple,
          lineStyle: dash ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Solid}, p);
     s.setData(bars.map((b, i) => vals[i] == null ? null : {time: b.d, value: +vals[i]}).filter(Boolean));
     const map = new Map();
     bars.forEach((b, i) => { if(vals[i] != null) map.set(b.d, +vals[i]); });
     SER.push({pane: p, label: label || cfg.label, color: col, dash: !!dash, map,
+              // A CATEGORICAL series must print its category, not the integer it is plotted at:
+              // a grade legend reading "4.00" is the encoding leaking into the reader's view.
+              fmtVal: cfg.fmtVal || null,
               vol: cfg.type === "histogram"});
     return s;
   };
@@ -2218,8 +2328,9 @@ async function techChart(el, tk, dailyBars){
       const mine = SER.filter(x => x.pane === i);
       html += (i === 0 && mine.length ? `<div class="lwcpl-r">` : "") + mine.map(x => {
         const v = x.map.get(b.d);
+        const shown = v == null ? "—" : x.fmtVal ? x.fmtVal(v) : x.vol ? fmtV(v) : fmt(v);
         return `<span class="lwcpl-i">${swatch(x.color, x.dash)}${esc(x.label)} `
-             + `<b>${x.vol ? fmtV(v) : fmt(v)}</b></span>`;
+             + `<b>${esc(shown)}</b></span>`;
       }).join("") + (i === 0 && mine.length ? `</div>` : "");
       box.innerHTML = html;
     });
