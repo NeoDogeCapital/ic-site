@@ -212,12 +212,20 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 .lwckx:hover{color:var(--text);background:rgba(255,255,255,.1)}
 .lwcsw{display:inline-block;width:10px;height:2px;border-radius:1px;vertical-align:middle;flex:0 0 auto}
 /* pointer-events:none so the legend never eats a crosshair move or a drag on the pane beneath it */
+/* ⚠ max-width keeps the key clear of the price axis, and the VALUES row wraps.
+   At drawer width (570px) a single nowrap line fitted four of eleven overlays and cut the rest
+   off mid-word — "—Trade ra" — so AlphaTrend, Grade and Quadrant had no readable value at all.
+   A key that silently shows the first few entries is worse than one that takes a second line:
+   the whole point is to say what every line on the chart reads. The HEADER row (OHLC) stays on
+   one line; only the overlay values wrap. */
 .lwcpl{position:absolute;left:9px;z-index:3;pointer-events:none;font:500 11px var(--mono);
-  color:var(--text);white-space:nowrap;overflow:hidden;text-shadow:0 0 4px var(--bg),0 0 4px var(--bg)}
+  color:var(--text);white-space:nowrap;max-width:calc(100% - 68px);
+  text-shadow:0 0 4px var(--bg),0 0 4px var(--bg)}
 .lwcpl-h{font-weight:700}
 /* the price pane prints two rows -- OHLC, then the overlays' values -- like the reference setup;
    each row stays on one line and the first .lwcpl-i on a row drops its left margin */
-.lwcpl-r{line-height:1.5;white-space:nowrap}
+.lwcpl-r{line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lwcpl-r+.lwcpl-r{white-space:normal}      /* the values row wraps rather than being cut off */
 .lwcpl-r+.lwcpl-r .lwcpl-i:first-child{margin-left:0}
 .lwcpl-i{margin-left:11px;color:var(--muted)}
 .lwcpl-i b{color:var(--text);font-weight:600;margin-left:3px}
@@ -316,7 +324,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:20 · baacea9</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 17:29 · 0af32a6</div>
   </div>
 </section>
 
@@ -345,7 +353,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:20 · baacea9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 17:29 · 0af32a6</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
