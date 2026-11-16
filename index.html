@@ -200,6 +200,28 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 .lwcsep{display:inline-block;width:1px;height:16px;background:var(--line2);margin:0 5px;vertical-align:middle}
 .lwclegend{font:500 12px var(--mono);color:var(--text);min-height:17px;margin-bottom:4px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
+/* THE DATA KEY. Two halves: .lwckey is the removable chip row above the chart (what is on, and
+   the × to take it off), .lwcpl is the per-pane legend drawn OVER the canvas (which line is
+   which, and what it reads at the crosshair). Before these the chart drew up to nine unlabelled
+   lines and reported only the symbol's own OHLC. */
+.lwckey{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+.lwckc{display:inline-flex;align-items:center;gap:5px;font:500 11px Inter,sans-serif;color:var(--text);
+  background:var(--card2,rgba(255,255,255,.04));border:1px solid var(--line);border-radius:11px;padding:2px 4px 2px 8px}
+.lwckx{background:none;border:0;color:var(--dim);cursor:pointer;font:600 13px Inter,sans-serif;
+  line-height:1;padding:1px 4px;border-radius:50%}
+.lwckx:hover{color:var(--text);background:rgba(255,255,255,.1)}
+.lwcsw{display:inline-block;width:10px;height:2px;border-radius:1px;vertical-align:middle;flex:0 0 auto}
+/* pointer-events:none so the legend never eats a crosshair move or a drag on the pane beneath it */
+.lwcpl{position:absolute;left:9px;z-index:3;pointer-events:none;font:500 11px var(--mono);
+  color:var(--text);white-space:nowrap;overflow:hidden;text-shadow:0 0 4px var(--bg),0 0 4px var(--bg)}
+.lwcpl-h{font-weight:700}
+/* the price pane prints two rows -- OHLC, then the overlays' values -- like the reference setup;
+   each row stays on one line and the first .lwcpl-i on a row drops its left margin */
+.lwcpl-r{line-height:1.5;white-space:nowrap}
+.lwcpl-r+.lwcpl-r .lwcpl-i:first-child{margin-left:0}
+.lwcpl-i{margin-left:11px;color:var(--muted)}
+.lwcpl-i b{color:var(--text);font-weight:600;margin-left:3px}
+@media(max-width:700px){.lwcpl{font-size:10px;left:5px}.lwcpl-i{margin-left:7px}}
 /* The caption carries each indicator's `basis` from the registry -- what a series actually IS when
    it is not a plain transform of the bars. It is small, and it is not optional. */
 .lwcfoot{color:var(--dim);font-size:10.5px;line-height:1.55;margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
@@ -294,7 +316,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:20 · a2ad1fb</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 16:29 · 504ab3b</div>
   </div>
 </section>
 
@@ -323,7 +345,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:20 · a2ad1fb</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 16:29 · 504ab3b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1599,7 +1621,7 @@ function paperAnchor(bars, ctx){
   return anchor;
 }
 
-function paperSeries(bars, ctx, key, color, width){
+function paperSeries(bars, ctx, key, color, width, label){
   const rows = ctx.srv("site_paper_nav");
   const vals = alignServer(bars, rows, "nav_date", "nav", r => r.strategy === key);
   if(!vals) return null;
@@ -1609,15 +1631,19 @@ function paperSeries(bars, ctx, key, color, width){
   const reb = vals.map((v, i) => (i < a || v == null) ? null : 100 * v / base);
 
   const cut = PAPER_RECON_FROM[key] || null;
-  if(!cut) return [{vals: reb, color, width}];
+  if(!cut) return [{vals: reb, color, width, label}];
   // Split at the cut. The dashed span KEEPS the first clean point so the two segments meet --
   // otherwise there is a one-bar gap exactly at the join, which reads as missing data.
   const iCut = bars.findIndex(b => b.d >= cut);
-  if(iCut < 0) return [{vals: reb, color, width, dash: true}];     // all of it is replica
-  if(iCut <= a) return [{vals: reb, color, width}];                 // anchor is past the cut
+  if(iCut < 0) return [{vals: reb, color, width, dash: true,
+                        label: `${label} (reconstructed)`}];      // all of it is replica
+  if(iCut <= a) return [{vals: reb, color, width, label}];          // anchor is past the cut
+  // The labels are set HERE, where the split actually means reconstruction, rather than being
+  // inferred downstream from the line being dashed — other entries dash lines for other reasons.
   return [
-    {vals: reb.map((v, i) => i <= iCut ? v : null), color, width, dash: true},
-    {vals: reb.map((v, i) => i >= iCut ? v : null), color, width},
+    {vals: reb.map((v, i) => i <= iCut ? v : null), color, width, dash: true,
+     label: `${label} (reconstructed)`},
+    {vals: reb.map((v, i) => i >= iCut ? v : null), color, width, label},
   ];
 }
 
@@ -1685,7 +1711,7 @@ for(const [key, label, color, width] of PAPER_SHOWN){
     group: "Paper",
     label, pane: "paper", type: "line", color, width, on: false, multi: true,
     source: "server", view: "site_paper_nav",
-    compute: (bars, S, ctx) => paperSeries(bars, ctx, key, color, width),
+    compute: (bars, S, ctx) => paperSeries(bars, ctx, key, color, width, label),
     basis: `paper book "${key}" from ic_paper_nav, NOT a per-name signal and identical on every `
          + `chart. ` + (cut
              ? `Reconstructed before ${cut} (dashed) and forward record from ${cut} (solid). `
@@ -1748,7 +1774,7 @@ if(typeof window !== "undefined" && !window.__lwcMenuWired){
  * same as it does for today's daily bar, because a half-week candle that looks finished is a
  * statement about a week that has not happened.
  */
-const LWC_IV = [["D", 1], ["2D", 2], ["W", "W"]];
+const LWC_IV = [["D", 1], ["2D", 2], ["W", "W"], ["M", "M"]];
 
 // ISO week key (Monday-start), so a bucket is "the week of", not "five bars from wherever the
 // window happened to begin" — a rolling 5-bar group would redraw every day and no two charts
@@ -1765,7 +1791,10 @@ function aggBars(bars, iv){
   const out = [];
   let key = null, cur = null;
   bars.forEach((b, i) => {
-    const k = iv === "W" ? _isoWeek(b.d) : Math.floor(i / 2);
+    // M buckets on calendar month (the date's own YYYY-MM), for the same reason W uses the ISO
+    // week rather than 21 bars: a calendar bucket is the same bucket on every chart and every
+    // day, while an N-bar bucket slides forward each session and no two charts agree.
+    const k = iv === "W" ? _isoWeek(b.d) : iv === "M" ? b.d.slice(0, 7) : Math.floor(i / 2);
     if(k !== key){
       if(cur) out.push(cur);
       key = k;
@@ -1787,10 +1816,18 @@ function aggBars(bars, iv){
 // back empty after cleared site data, so the chart must render correctly without it. This is a
 // convenience, never state anything else reads.
 function lwcPrefs(){
-  const d = {tf: "1Y", iv: "D", log: false, total: true,
+  const d = {tf: "1Y", iv: "D", log: false, total: true, ser: "candles",
              on: Object.fromEntries(Object.entries(INDICATORS).map(([k, v]) => [k, !!v.on]))};
-  try { return Object.assign(d, JSON.parse(localStorage.getItem("ic.chart") || "{}")); }
-  catch(e){ return d; }
+  try {
+    const p = Object.assign(d, JSON.parse(localStorage.getItem("ic.chart") || "{}"));
+    // A pref saved before `ser` existed has none, and a hand-edited one may hold anything.
+    // An unknown form would fall through every branch and draw NO price series at all, which
+    // looks like missing data rather than a bad setting.
+    if(!["candles", "bars", "line"].includes(p.ser)) p.ser = "candles";
+    if(!LWC_IV.some(x => x[0] === p.iv)) p.iv = "D";
+    if(!LWC_TF.some(x => x[0] === p.tf)) p.tf = "1Y";
+    return p;
+  } catch(e){ return d; }
 }
 function lwcSave(p){ try { localStorage.setItem("ic.chart", JSON.stringify(p)); } catch(e){} }
 let LWCP = lwcPrefs();
@@ -1944,13 +1981,30 @@ function lwcChrome(tk, partial, basisLines){
     `<button class="tfb${l === LWCP.tf ? " on" : ""}" data-tf="${l}">${l}</button>`).join("")
     + `<span class="lwcsep"></span>`
     + LWC_IV.map(([l]) => `<button class="tfb${l === LWCP.iv ? " on" : ""}" data-iv="${l}"
-        title="Bar interval — every indicator is recomputed on these bars">${l}</button>`).join("");
+        title="Bar interval — every indicator is recomputed on these bars">${l}</button>`).join("")
+    + `<span class="lwcsep"></span>`
+    + [["candles", "Candles"], ["bars", "Bars"], ["line", "Line"]].map(([v, l]) =>
+        `<button class="tfb${v === LWCP.ser ? " on" : ""}" data-ser="${v}"
+          title="${v === "line" ? "Closing price only — the one form that can draw a session with no recorded open" : "Open, high, low and close"}">${l}</button>`).join("");
   // The library lives in a MENU, not a permanent row: 18 chips on screen is clutter, and the
   // count on the button is the thing a reader actually needs ("how many are on"). Same idiom as
   // the Grid's "Filter columns" panel, deliberately — one gesture to learn, not two.
   const groups = {};
   for(const [k, cfg] of Object.entries(INDICATORS)) (groups[cfg.group || "Other"] ||= []).push([k, cfg]);
   const nOn = Object.values(LWCP.on).filter(Boolean).length;
+  /* The removable key: one chip per indicator that is ON, with the × that turns it off. It is
+   * the second half of "which line is which" — the pane legends name the lines where they are
+   * drawn, and this says what is on at all and lets a reader take one off without hunting
+   * through the menu for it. The swatch is omitted where the registry declares no colour,
+   * because a chip showing a colour the line is not drawn in is worse than no swatch; the pane
+   * legend carries the colour the series was ACTUALLY created with. */
+  const keyRow = !nOn ? "" : `<div class="lwckey">` + Object.entries(INDICATORS)
+    .filter(([k]) => LWCP.on[k])
+    .map(([k, cfg]) => `<span class="lwckc" title="${esc(cfg.basis || cfg.label)}">`
+       + (cfg.color ? `<i class="lwcsw" style="background:${esc(cfg.color)}"></i>` : "")
+       + `${esc(cfg.label)}<button class="lwckx" data-indoff="${esc(k)}" `
+       + `title="Remove ${esc(cfg.label)} from the chart">×</button></span>`).join("")
+    + `</div>`;
   const chips = `<div class="lwcmenuwrap">
       <button class="tfb lwcmenubtn${lwcMenuOpen ? " on" : ""}" id="lwcIndBtn-${esc(tk)}"
         title="Choose which indicators the chart draws">Indicators <b>${nOn}</b> ▾</button>
@@ -1973,11 +2027,11 @@ function lwcChrome(tk, partial, basisLines){
       </div>
     </div>
     <div class="lwcchips">${chips}</div>
-    <div class="lwclegend" id="lwcLegend-${esc(tk)}"></div>
+    ${keyRow}
     <div id="lwcChart-${esc(tk)}"></div>
     <div class="lwcfoot">${partial
-      ? `<span class="amber">The last ${LWCP.iv === "D" ? "bar" : LWCP.iv === "W" ? "week" : "2-day bucket"} is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
-      : ""}${LWCP.iv !== "D" ? `Bars are ${LWCP.iv === "W" ? "weekly (ISO weeks, Monday-start)" : "two sessions"}, and every indicator is computed on them, not on daily bars resampled. ` : ""}${basisLines.map(b => esc(b)).join(" · ")}</div>`;
+      ? `<span class="amber">The last ${LWCP.iv === "D" ? "bar" : LWCP.iv === "W" ? "week" : LWCP.iv === "M" ? "month" : "2-day bucket"} is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
+      : ""}${LWCP.iv !== "D" ? `Bars are ${LWCP.iv === "W" ? "weekly (ISO weeks, Monday-start)" : LWCP.iv === "M" ? "monthly (calendar months)" : "two sessions"}, and every indicator is computed on them, not on daily bars resampled. ` : ""}${basisLines.map(b => esc(b)).join(" · ")}</div>`;
 }
 
 /* The chart. `el` is the container; chrome and canvas are built inside it. */
@@ -1991,7 +2045,8 @@ async function techChart(el, tk, dailyBars){
   // whenever it holds fewer sessions than a full one, which is most of the time.
   const lastN = bars[bars.length - 1].n || 1;
   const partial = lwcPartial(dailyBars)
-    || (LWCP.iv === "2D" && lastN < 2) || (LWCP.iv === "W" && lastN < 5);
+    || (LWCP.iv === "2D" && lastN < 2) || (LWCP.iv === "W" && lastN < 5)
+    || (LWCP.iv === "M" && lastN < 18);   // ~21 sessions in a full month; 18 allows for holidays
   // Only the enabled indicators contribute a basis line, so the caption describes what is on
   // screen rather than everything that could be.
   const basis = Object.entries(INDICATORS)
@@ -2029,24 +2084,52 @@ async function techChart(el, tk, dailyBars){
   // A bar with no open contributes no candle (see the header). The close series is always
   // complete, so the overlays still span the full window.
   const px = b => LWCP.total ? b.c : (b.sc ?? b.c);
-  const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
-    upColor: C.green, downColor: C.red, borderVisible: false,
-    wickUpColor: C.green, wickDownColor: C.red,
-  }, 0);
-  candles.setData(bars.filter(b => b.o != null).map(b => ({
-    time: b.d, open: b.o, high: b.h, low: b.l, close: px(b),
-  })));
+  /* Candles / Bars / Line. A line chart is not a cosmetic preference: it is the only one of the
+   * three that can draw a bar with NO OPEN, and db/069 leaves `adj_open` NULL where the vendor
+   * had none rather than substituting the close. The OHLC forms filter those bars out — one
+   * missing session in two years is invisible — but on a name with a sparse history the line is
+   * the honest view, so the caption says how many bars the chosen form had to drop. */
+  const withOpen = bars.filter(b => b.o != null);
+  const dropped = bars.length - withOpen.length;
+  let candles;
+  if(LWCP.ser === "line"){
+    candles = chart.addSeries(LightweightCharts.LineSeries,
+      {color: C.green, lineWidth: 2, priceLineVisible: false, lastValueVisible: true}, 0);
+    candles.setData(bars.map(b => ({time: b.d, value: px(b)})));
+  } else if(LWCP.ser === "bars"){
+    candles = chart.addSeries(LightweightCharts.BarSeries,
+      {upColor: C.green, downColor: C.red, thinBars: false, lastValueVisible: true}, 0);
+    candles.setData(withOpen.map(b => ({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)})));
+  } else {
+    candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
+      upColor: C.green, downColor: C.red, borderVisible: false,
+      wickUpColor: C.green, wickDownColor: C.red, lastValueVisible: true,
+    }, 0);
+    candles.setData(withOpen.map(b => ({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)})));
+  }
 
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
   const ctx = {tk, v2: (LIVE.v2 || {})[tk] || {}, srv: v => (LIVE.srv || {})[v] || []};
-  const put = (vals, cfg, p, color, width, dash) => {
+  /* SER is the DATA KEY's source of truth: every series that reaches the canvas registers here
+   * with the colour it was actually drawn in and a date->value map. The legend reads THIS rather
+   * than the crosshair's seriesData, for two reasons — the value must still show when the
+   * pointer is off the chart (the reader is looking at the last bar then, not at nothing), and a
+   * swatch whose colour is re-derived from the registry can disagree with the line on screen if
+   * a multi-line entry overrode it. One list, written where the series is made.          */
+  const SER = [];
+  const put = (vals, cfg, p, color, width, dash, label) => {
     const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
+    const col = color || (cfg.type === "histogram" ? "rgba(106,166,248,.45)" : C.text);
     const s = chart.addSeries(Type, cfg.type === "histogram"
-      ? {color: color || "rgba(106,166,248,.45)", priceLineVisible: false, lastValueVisible: false,
+      ? {color: col, priceLineVisible: false, lastValueVisible: false,
          priceFormat: {type: "volume"}}
-      : {color: color || C.text, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false,
+      : {color: col, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false,
          lineStyle: dash ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Solid}, p);
     s.setData(bars.map((b, i) => vals[i] == null ? null : {time: b.d, value: +vals[i]}).filter(Boolean));
+    const map = new Map();
+    bars.forEach((b, i) => { if(vals[i] != null) map.set(b.d, +vals[i]); });
+    SER.push({pane: p, label: label || cfg.label, color: col, dash: !!dash, map,
+              vol: cfg.type === "histogram"});
     return s;
   };
   for(const [k, cfg] of Object.entries(INDICATORS)){
@@ -2054,7 +2137,12 @@ async function techChart(el, tk, dailyBars){
     const out = cfg.compute(bars, S, ctx);
     if(!out) continue;
     const p = pane(cfg.pane);
-    if(cfg.multi){ out.forEach(ln => ln && ln.vals && put(ln.vals, cfg, p, ln.color, ln.width, ln.dash)); }
+    // ⚠ The label comes from the LINE or the entry — never inferred from `dash`. The first
+    // version read a dashed line as "(reconstructed)", which is true of the paper books and
+    // false of the trade band, whose bands are dashed because they are bands. A legend that
+    // invents a provenance claim is worse than one that only gives a name.
+    if(cfg.multi){ out.forEach(ln => ln && ln.vals && put(ln.vals, cfg, p, ln.color, ln.width,
+                     ln.dash, ln.label || cfg.label)); }
     else {
       const s2 = put(out, cfg, p, cfg.color, cfg.width, cfg.dash);
       // guides are declared in the registry (RSI 30/70) and were being ignored -- an overbought
@@ -2089,16 +2177,54 @@ async function techChart(el, tk, dailyBars){
   if(marks.length) LightweightCharts.createSeriesMarkers(candles,
     marks.sort((a, b) => a.time < b.time ? -1 : 1));
 
-  // ── crosshair legend ───────────────────────────────────────────────────────────────────────
-  const legend = document.getElementById(`lwcLegend-${tk}`);
+  // ── THE DATA KEY: one legend per pane, swatch + name + value at the crosshair ───────────────
+  // Before this the chart said `O H L C vol` for the symbol and nothing at all for the eight
+  // other lines on it, so a reader could see four overlays on the price pane and had no way to
+  // learn which was SMA 50 and which was the 52-week VWAP, let alone what either one read. An
+  // unlabelled line is an unreadable one.
+  //
+  // The overlays are positioned from the MEASURED pane rows rather than from LWC_PRICE_PX /
+  // LWC_PANE_PX, even though those now govern the layout: the time axis is taken out of the
+  // total before the stretch factors are applied, so the budget and the pixels differ by a few
+  // each pane, and a legend drawn from the budget would sit slightly wrong in every pane but
+  // the first. Measure the thing you are positioning against.
   const byDate = Object.fromEntries(bars.map(b => [b.d, b]));
+  const idxOf  = Object.fromEntries(bars.map((b, i) => [b.d, i]));
   const fmt = v => v == null ? "—" : (+v).toFixed(2);
-  const paint = (b) => { if(!b || !legend) return;
-    legend.innerHTML = `<b>${esc(tk)}</b> <span class="muted">${esc(b.d)}</span> `
-      + `O ${fmt(b.o)} H ${fmt(b.h)} L ${fmt(b.l)} <b>C ${fmt(px(b))}</b> `
-      + `<span class="muted">vol ${(b.v || 0).toLocaleString()}</span>`; };
-  paint(bars[bars.length - 1]);
-  chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
+  const fmtV = v => v == null ? "—" : Math.abs(v) >= 1e4 ? (+v).toLocaleString(undefined, {maximumFractionDigits: 0}) : (+v).toFixed(2);
+  const swatch = (c, dash) => `<span class="lwcsw" style="background:${dash ? "transparent" : esc(c)};`
+    + `${dash ? `border-top:2px dashed ${esc(c)}` : ""}"></span>`;
+
+  const boxes = [];
+
+  let lastBar = bars[bars.length - 1];
+  const paint = (b) => {
+    if(!b) return;
+    lastBar = b;
+    const up = b.o != null && px(b) >= b.o;
+    const prev = bars[idxOf[b.d] - 1];
+    const chg = prev ? px(b) - px(prev) : null;
+    const chgPct = prev && px(prev) ? 100 * chg / px(prev) : null;
+    boxes.forEach((box, i) => {
+      let html = "";
+      if(i === 0){
+        html = `<div class="lwcpl-r"><span class="lwcpl-h">${esc(tk)}</span> <span class="muted">${esc(b.d)}</span> `
+             + (b.o != null
+                 ? `<span class="${up ? "pos" : "neg"}">O ${fmt(b.o)} H ${fmt(b.h)} L ${fmt(b.l)} C ${fmt(px(b))}</span> `
+                 : `<span class="muted">C ${fmt(px(b))}</span> `)
+             + (chg == null ? "" : `<span class="${chg >= 0 ? "pos" : "neg"}">${chg >= 0 ? "+" : ""}${fmt(chg)} (${chgPct >= 0 ? "+" : ""}${fmt(chgPct)}%)</span>`)
+             + `</div>`;
+      }
+      const mine = SER.filter(x => x.pane === i);
+      html += (i === 0 && mine.length ? `<div class="lwcpl-r">` : "") + mine.map(x => {
+        const v = x.map.get(b.d);
+        return `<span class="lwcpl-i">${swatch(x.color, x.dash)}${esc(x.label)} `
+             + `<b>${x.vol ? fmtV(v) : fmt(v)}</b></span>`;
+      }).join("") + (i === 0 && mine.length ? `</div>` : "");
+      box.innerHTML = html;
+    });
+  };
+
 
   // ── pane geometry ──────────────────────────────────────────────────────────────────────────
   // Apply the budget lwcHeight() just computed. Without this the library's own 2:1 default wins
@@ -2112,6 +2238,42 @@ async function techChart(el, tk, dailyBars){
     console.warn("lwc: pane stretch factors unavailable, falling back to the library default", e);
   }
 
+  /* ⚠ THE PANE LEGENDS ARE PLACED ON THE NEXT FRAME, AND THAT IS NOT A HEDGE — IT IS MEASURED.
+   * Lightweight Charts splits the panes on its own frame, so synchronously after the series are
+   * added the chart is still ONE pane: rows read [582, 28] immediately after techChart and
+   * [400, 1, 91, 1, 90, 28] from the first requestAnimationFrame onward (measured 2026-11-16,
+   * same probe, rAF1 / rAF2 / 60ms / 360ms all identical). Built synchronously, the filter that
+   * keeps rows over 40px found the single unsplit row and produced a legend for the price pane
+   * and silently none for RSI or volume — a key that labels some of the lines is the defect this
+   * is meant to remove. getBoundingClientRect() forces layout but cannot run the library's own
+   * frame, so forcing layout was not enough.
+   * placeBoxes() is also the resize path: the rows move when the container does, and a legend
+   * pinned to where a pane used to be is worse than none. */
+  host.style.position = "relative";
+  const placeBoxes = () => {
+    host.querySelectorAll(".lwcpl").forEach(n => n.remove());
+    boxes.length = 0;
+    const hostTop = host.getBoundingClientRect().top;
+    [...host.querySelectorAll("tr")]
+      .filter(tr => tr.querySelector("canvas") && tr.getBoundingClientRect().height > 40)
+      .forEach(tr => {
+        const d = document.createElement("div");
+        d.className = "lwcpl";
+        d.style.top = Math.round(tr.getBoundingClientRect().top - hostTop + 3) + "px";
+        host.appendChild(d);
+        boxes.push(d);
+      });
+    // A pane with series but no legend box is a pane of unlabelled lines — say so rather than
+    // drawing a quietly incomplete key.
+    const want = new Set(SER.map(x => x.pane)).size;
+    if(boxes.length < want)
+      console.warn(`lwc: ${boxes.length} legend box(es) for ${want} pane(s) with series — `
+                 + `some lines are unlabelled`);
+    paint(lastBar);
+  };
+  requestAnimationFrame(placeBoxes);
+  chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
+
   // Show the timeframe that was asked for, not everything that was fetched. The lead-in bars are
   // loaded and computed on -- they are what makes SMA 200 exist at the left edge -- but they sit
   // off-screen to the left until someone scrolls there.
@@ -2123,7 +2285,10 @@ async function techChart(el, tk, dailyBars){
   }
   // LWC needs an explicit width; without this the chart keeps its initial size when the drawer or
   // the window changes and the right-hand bars fall off the edge.
-  ro = new ResizeObserver(() => chart.applyOptions({width: host.clientWidth}));
+  ro = new ResizeObserver(() => {
+    chart.applyOptions({width: host.clientWidth});
+    requestAnimationFrame(placeBoxes);   // the pane rows move with the container
+  });
   ro.observe(host);
 
   } catch(err){
@@ -2149,10 +2314,13 @@ async function techChart(el, tk, dailyBars){
   };
   el.querySelectorAll("[data-tf]").forEach(btn => btn.onclick = () => { LWCP.tf = btn.dataset.tf; redraw(); });
   el.querySelectorAll("[data-iv]").forEach(btn => btn.onclick = () => { LWCP.iv = btn.dataset.iv; redraw(); });
+  el.querySelectorAll("[data-ser]").forEach(btn => btn.onclick = () => { LWCP.ser = btn.dataset.ser; redraw(); });
   el.querySelectorAll("[data-opt]").forEach(btn => btn.onclick = () => {
     LWCP[btn.dataset.opt] = !LWCP[btn.dataset.opt]; redraw(); });
   el.querySelectorAll("[data-ind]").forEach(btn => btn.onclick = () => {
     LWCP.on[btn.dataset.ind] = !LWCP.on[btn.dataset.ind]; redraw(); });
+  el.querySelectorAll("[data-indoff]").forEach(btn => btn.onclick = () => {
+    LWCP.on[btn.dataset.indoff] = false; redraw(); });
   const mBtn = document.getElementById(`lwcIndBtn-${tk}`);
   if(mBtn) mBtn.onclick = (e) => { e.stopPropagation(); lwcMenuOpen = !lwcMenuOpen;
     const m = document.getElementById(`lwcIndMenu-${tk}`);
