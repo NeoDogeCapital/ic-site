@@ -267,7 +267,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 14:00 · e0ad42c</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:20 · f711ba7</div>
   </div>
 </section>
 
@@ -295,7 +295,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 14:00 · e0ad42c</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:20 · f711ba7</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -658,6 +658,120 @@ function sparkline(el, pts, color){
 
 /* ═══ router ═════════════════════════════════════════════════════════════ */
 
+/* ═══ shared table sort — ONE definition, used by Grid, Universe and Signals ═══════════════
+ *
+ * WHY THIS FILE EXISTS. The multi-key sort was written once inside grid() and Signals had its own
+ * single-key version beside it, so "sort this table" meant two different things depending on which
+ * tab you were on. Rather than copy 45 lines into a second place, it lives here — the same reason
+ * the 28% cap, the trend rule, the earnings band and the QGS tiers each ended up with one home.
+ * This repo has paid for a duplicated rule seven times; a sort is a cheap one to get right first.
+ *
+ * ⚠ THE PAGE IS ONE CONCATENATED SCRIPT. A `const` declared here must NOT also be declared in a
+ * view module: two `const GRADE_ORD` in the same script is "Identifier has already been declared"
+ * and the whole page dies at parse, every tab with it. `node --check` in deploy-site.yml checks
+ * each file ALONE and cannot see this class — check the built page, not just the modules.
+ *
+ * HOW A SORT READS. The list is ordered: the first key wins and later keys break ties. Click a
+ * header to sort by it alone (re-click flips); shift-click to add it as a tie-breaker, or to flip
+ * one already in the list. Blanks sink on whichever key and whichever direction, because a missing
+ * value is not a small one — the same rule as everywhere else here.
+ */
+
+// Rank orders, so a sort reads the way the model reads rather than alphabetically. Moved here from
+// grid.js: an ordinal field sorted A-Z misrepresents it, and these are the model's own orderings.
+const GRADE_ORD  = {A:0, B:1, C:2, D:3};
+const TECH_ORD   = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
+const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4,
+                    AVOID_EXTENDED:5, NO_DATA:6};
+const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4,
+                    HOLD_WAIT_TREND:5, HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9,
+                    REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
+// Quad order is EV RANK, not the label. Q1 best → Q4 worst (CLAUDE.md § QUAD FRAMEWORK). The
+// digits happen to sort the same way lexically, which is exactly why this was never noticed as a
+// missing ordering — but a name with NO quadrant must sink, and `(r.quadrant ?? "")` floated it to
+// the top of an ascending sort instead. Returning null here sinks it, like every other key.
+const QUAD_ORD   = {Q1:0, Q2:1, Q3:2, Q4:3};
+
+/* Compare two rows against an ordered key list.
+ * keyFn(row, k) returns a number, a string, or null for "no value".            */
+function sortCompare(a, b, sortList, keyFn, finalTie){
+  for(const {k, d} of sortList){
+    const x = keyFn(a, k), y = keyFn(b, k);
+    if(x == null && y == null) continue;
+    if(x == null) return 1;                     // blanks always sink, whichever key
+    if(y == null) return -1;
+    // A key may return a TUPLE for a compound ordering -- Signals sorts timing as
+    // [bucket, depth-in-range], which is one column the reader thinks of as one thing and the
+    // sort has to treat as two. Compared element by element, first element wins.
+    let c = 0;
+    if(Array.isArray(x)){
+      for(let i = 0; i < x.length && !c; i++){
+        const xi = x[i], yi = y[i];
+        if(xi == null && yi == null) continue;
+        if(xi == null){ c = 1; break; }
+        if(yi == null){ c = -1; break; }
+        c = typeof xi === "string" ? xi.localeCompare(yi) : xi - yi;
+      }
+    } else {
+      c = typeof x === "string" ? x.localeCompare(y) : x - y;
+    }
+    if(c) return c * d;
+  }
+  // The final tie-break is deliberately NOT multiplied by direction: it exists to make equal rows
+  // land in a stable order, and a stable order that flips with the arrow is not one.
+  return finalTie ? finalTie(a, b) : 0;
+}
+
+/* Sort a copy, so a caller's array is never reordered under it. */
+function sortRows(rows, sortList, keyFn, finalTie){
+  return rows.slice().sort((a, b) => sortCompare(a, b, sortList, keyFn, finalTie));
+}
+
+/* Header cells. `cols` is [[key, label, kind, tip], …] — kind "num" opens descending.
+ * `extraClass(k)` is optional, for a table that groups columns visually.       */
+function sortHeadHTML(cols, sortList, extraClass){
+  return cols.map(([k, label, , tip]) => {
+    const at = sortList.findIndex(x => x.k === k), on = at >= 0;
+    const arrow = on ? (sortList[at].d > 0 ? " ↑" : " ↓") : "";
+    // the rank shows only when more than one key is active, so a single sort stays uncluttered
+    const rank = on && sortList.length > 1 ? `<sup class="srank">${at + 1}</sup>` : "";
+    const blk = extraClass ? extraClass(k) : "";
+    return `<th data-sort="${k}" class="${on ? "sorted" : ""}${blk}" style="cursor:pointer;white-space:nowrap"
+      title="${esc(tip || "Sort by " + label)} · shift-click to add as a tie-breaker">${label}${arrow}${rank}</th>`;
+  }).join("");
+}
+
+/* Wire the header clicks. `get()` returns the current list, `set(list)` stores it — passed as
+ * functions because each table owns its own sort state and a shared module must not hold it. */
+function bindSortHead(headId, cols, get, set, draw){
+  document.querySelectorAll(`#${headId} th[data-sort]`).forEach(th => th.onclick = e => {
+    const k = th.dataset.sort;
+    // a new column opens best-first: highest for numbers, best rank or A-Z otherwise
+    const num_ = (cols.find(c => c[0] === k) || [])[2] === "num";
+    const list = get(), at = list.findIndex(x => x.k === k);
+    if(e.shiftKey){
+      if(at >= 0) list[at].d = -list[at].d;          // already a key — flip its direction
+      else list.push({k, d: num_ ? -1 : 1});         // otherwise append as a tie-breaker
+      set(list);
+    } else {
+      set([{k, d: (at === 0 ? -list[0].d : (num_ ? -1 : 1))}]);
+    }
+    draw();
+  });
+}
+
+/* The "sorted by X then Y" line, and the link back to a single key. */
+function renderSortNote(noteId, clearId, cols, get, set, draw){
+  const sn = document.getElementById(noteId);
+  if(!sn) return;
+  const list = get();
+  sn.innerHTML = list.length > 1
+    ? "sorted by " + list.map(x => `${(cols.find(c => c[0] === x.k) || [, x.k])[1]} ${x.d > 0 ? "↑" : "↓"}`).join(" then ")
+      + ` · <a href="#" id="${clearId}">single sort</a>`
+    : "click a header to sort · shift-click to add a tie-breaker";
+  const sc = document.getElementById(clearId);
+  if(sc) sc.onclick = ev => { ev.preventDefault(); set([get()[0]]); draw(); };
+}
 /* ═══ ABOUT — the process, start to finish, in plain language ═════════════ */
 function about(el){
   const step = (n, title, body) => `<div class="card" style="margin-top:14px"><div class="card-h"><div>
@@ -784,11 +898,17 @@ function about(el){
 
 /* ═══ SIGNALS: universe-wide technical analysis (v2) ══════════════════════ */
 let sigFilter = {q:"", trend:"", timing:"", held:false};
-let sigSort = {k:"range_pos", d:1};
+// An ordered list, not a single key -- the same sort the Grid and Universe tabs use, from
+// sorting.js. First key wins, later keys break ties; shift-click a header to add one.
+let sigSort = [{k:"range_pos", d:1}];
 const TREND_ORD = {BULLISH:0, BEARISH:1};
 const REGIME_ORD = {BULL:0, NEUTRAL:1, BEAR:2};
 const SIG_COLS = [
-  ["ticker","Ticker","txt"], ["close","Price","num"], ["trend","Trend line","ord"], ["range_pos","Timing","ord"],
+  ["ticker","Ticker","txt"], ["close","Price","num"],
+  // grade and quad come from the decision matrix, not from technicals_v2 -- this table joins the
+  // two so the technical read sits beside what the model thinks of the business.
+  ["grade","Grade","ord"], ["quad","Quad","ord"],
+  ["trend","Trend line","ord"], ["range_pos","Timing","ord"],
   ["trade_mid","Trade range (1w)","num"], ["trend_mid","Trend range (1m)","num"], ["rsi","RSI","num"],
   ["rvol","Rel vol","num"], ["above_52w_low_avwap","52w-low VWAP","ord"], ["td","TD b/s","num"],
   ["range_move","Range moving","ord"],
@@ -814,6 +934,8 @@ function sigKey(v, k, M){
   if(k === "range_pos") return [TIMING_ORD[v.timing] ?? 9, n(v.range_pos) ?? 9];   // timing bucket, then depth in range
   if(k === "above_52w_low_avwap") return v.above_52w_low_avwap ? 0 : 1;
   if(k === "tech_rating") return TECH_ORD[(M[v.ticker]||{}).tech_rating] ?? 9;
+  if(k === "grade") return GRADE_ORD[(M[v.ticker]||{}).grade] ?? null;
+  if(k === "quad")  return QUAD_ORD[(M[v.ticker]||{}).quadrant] ?? null;
   if(k === "trade_mid") return v.trade_low == null ? null : (+v.trade_low + +v.trade_high) / 2;
   if(k === "trend_mid") return v.trend_low == null ? null : (+v.trend_low + +v.trend_high) / 2;
   if(k === "td") return (v.td_buy_count || 0) - (v.td_sell_count || 0);
@@ -846,26 +968,20 @@ async function signalsV2(el){
   const T_COUNT = {BULLISH: count("trend","BULLISH"), BEARISH: count("trend","BEARISH")};
   const draw = () => {
     const f = sigFilter;
-    const rows = V.filter(v => (!f.trend || v.trend === f.trend) && (!f.timing || v.timing === f.timing)
+    const rowsUnsorted = V.filter(v => (!f.trend || v.trend === f.trend) && (!f.timing || v.timing === f.timing)
         && (!f.held || held.has(v.ticker))
         && (!f.q || (v.ticker + " " + (M[v.ticker]?.sector || "")).toLowerCase().includes(f.q.toLowerCase())))
-      .sort((a,b) => {
-        let x = sigKey(a, sigSort.k, M), y = sigKey(b, sigSort.k, M);
-        if(Array.isArray(x)){                                   // timing: bucket first, then position
-          const c0 = x[0] - y[0] || x[1] - y[1];
-          return c0 * sigSort.d;
-        }
-        if(x == null && y == null) return 0;
-        if(x == null) return 1;                                 // blanks always sink
-        if(y == null) return -1;
-        const c = typeof x === "string" ? x.localeCompare(y) : x - y;
-        return (c || a.ticker.localeCompare(b.ticker)) * sigSort.d;
-      });
+      ;
+    const rows = sortRows(rowsUnsorted, sigSort, (v, k) => sigKey(v, k, M),
+      // stable final order so equal rows do not shuffle between draws
+      (a, b) => a.ticker.localeCompare(b.ticker));
     document.getElementById("sigRows").innerHTML = rows.map(v => {
       const m = M[v.ticker] || {};
       return `<tr data-open="${v.ticker}" style="cursor:pointer">
         <td><b>${held.has(v.ticker) ? "★ " : ""}${esc(v.ticker)}</b></td>
         <td>${usd(v.close,2)}</td>
+        <td>${esc(m.grade || "\u2014")}</td>
+        <td>${esc(m.quadrant || "\u2014")}</td>
         <td>${trendChip(v.trend)}<div class="muted" style="font-size:10px">${esc(v.trend_since||"")}</div></td>
         <td>${timingChip(v.timing, v.range_pos)}</td>
         <td class="mono" style="font-size:11px">${usd(v.trade_low,2)} – ${usd(v.trade_high,2)}</td>
@@ -877,16 +993,17 @@ async function signalsV2(el){
         <td>${rangeCell(v.ticker)}</td>
         <td>${esc(m.tech_rating ? m.tech_rating.replace("_"," ") : "—")}</td></tr>`;
     }).join("");
+    // Header and row are built from two lists. The grid has carried this guard since a cell was
+    // added without its header and every column to the right rendered under the wrong name;
+    // Signals had the same hazard and no guard, and just gained two columns.
+    { const first = document.querySelector("#sigRows tr");
+      if(first && first.children.length !== SIG_COLS.length)
+        console.error("signals: " + SIG_COLS.length + " headers but " + first.children.length + " cells per row"); }
     document.getElementById("sigN").textContent = rows.length + " names";
-    document.getElementById("sigHead").innerHTML = SIG_COLS.map(([k,label]) =>
-      `<th data-sort="${k}" style="cursor:pointer;white-space:nowrap" title="Sort by ${label}">${label}${
-        sigSort.k === k ? (sigSort.d > 0 ? " ↑" : " ↓") : ""}</th>`).join("");
-    document.querySelectorAll("#sigHead th[data-sort]").forEach(th => th.onclick = () => {
-      const k = th.dataset.sort;
-      const num_ = (SIG_COLS.find(c => c[0] === k) || [])[2] === "num";
-      sigSort = {k, d: sigSort.k === k ? -sigSort.d : (num_ ? -1 : 1)};
-      draw();
-    });
+    document.getElementById("sigHead").innerHTML = sortHeadHTML(SIG_COLS, sigSort);
+    bindSortHead("sigHead", SIG_COLS, () => sigSort, l => { sigSort = l; }, draw);
+    renderSortNote("sigSortNote", "sigSortClear", SIG_COLS, () => sigSort,
+                   l => { sigSort = l; }, draw);
   };
   const ev = LIVE.events.slice(0, 120);
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${V.length} names · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
@@ -909,7 +1026,7 @@ async function signalsV2(el){
                 pct(+r.high_chg,1), pct(+r.low_chg,1), pct(+r.width_chg,1),
                 timingChip(v.timing, v.range_pos)];
       }))) + `</div>` : "") + `
-  <div style="margin-top:16px">` + card("Universe technicals", `<span id="sigN"></span>`,
+  <div style="margin-top:16px">` + card("Universe technicals", `<span id="sigN"></span> \u00b7 <span id="sigSortNote" class="muted"></span>`,
     `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <input class="search" id="sq" placeholder="Ticker or sector" value="${esc(sigFilter.q)}">
       <select class="input" id="strend" style="width:auto"><option value="">Any trend</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>
@@ -1325,13 +1442,10 @@ function selectEl(id, label, value, opts){
 }
 // Multi-key sort: an ordered list, first key wins and later keys break ties. Click a header to
 // sort by it alone; shift-click to add it as a tie-breaker (or flip it if already in the list).
+// The machinery and the rank orders (GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QUAD_ORD) moved
+// to sorting.js so Signals could use the SAME sort rather than a second one. Only the state --
+// which table is sorted how -- stays here, because it is per-table.
 let gridSort = [{k:"grade", d:1}];
-// Rank orders so a sort reads the way the model reads: best first on a descending click.
-const GRADE_ORD = {A:0, B:1, C:2, D:3};
-const TECH_ORD = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
-const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4, AVOID_EXTENDED:5, NO_DATA:6};
-const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4, HOLD_WAIT_TREND:5,
-  HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9, REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
 // ── FUNDAMENTALS ─────────────────────────────────────────────────────────────
 // The card was pure prose. These are the numbers behind it, read straight from the model's own
 // columns, plus how each has MOVED across the vintages in company_market_data. Trailing
@@ -1877,6 +1991,11 @@ function gridKey(r, k){
   if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
   if(k === "action") return ACTION_ORD[r.action] ?? 99;
   if(k === "qgs_tier") return QGS_ORD[r.qgs_tier] ?? 9;
+  // Quadrant fell through to the string branch below, where `?? ""` made a MISSING quad an empty
+  // string rather than null -- so unquadded names floated to the TOP of an ascending sort instead
+  // of sinking like every other blank. QUAD_ORD is EV rank (Q1 best), which the digits happen to
+  // match lexically; the fix here is the null, not the order.
+  if(k === "quadrant") return QUAD_ORD[r.quadrant] ?? null;
   if(k === "composite" || k === "range_pos" || k === "p1" || k === "p2" || k === "p3")
     return r[k] == null ? null : +r[k];
   // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
@@ -1905,19 +2024,9 @@ async function grid(el){
   const cell = (g,t) => M.filter(r => r.grade===g && r.tech_rating===t);
   const draw = () => {
     const f = gridFilter;
-    const rows = M.filter(r => matchesFilters(r, M))
-      .sort((a,b) => {
-        for(const {k, d} of gridSort){
-          const x = gridKey(a, k), y = gridKey(b, k);
-          if(x == null && y == null) continue;
-          if(x == null) return 1;                    // blanks always sink, whichever key
-          if(y == null) return -1;
-          const c = typeof x === "string" ? x.localeCompare(y) : x - y;
-          if(c) return c * d;
-        }
-        // final tie-break on grade so equal rows have a stable, meaningful order
-        return (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9);
-      });
+    const rows = sortRows(M.filter(r => matchesFilters(r, M)), gridSort, gridKey,
+      // final tie-break on grade so equal rows have a stable, meaningful order
+      (a, b) => (GRADE_ORD[a.grade] ?? 9) - (GRADE_ORD[b.grade] ?? 9));
     // 400 was below the universe (454 graded names), so 54 names were always off the end whichever
     // way you sorted — and sorting by Mkt cap is now a headline feature, where the tail is the point.
     // 600 clears the universe with room to grow; the "showing first N" note stays as the backstop.
@@ -1944,36 +2053,11 @@ async function grid(el){
     // saying so. Held names can fall in that tail.
     document.getElementById("gridN").textContent = rows.length + " names"
       + (rows.length > CAP ? ` · showing first ${CAP}, filter or sort to reach the rest` : "");
-    document.getElementById("gridHead").innerHTML = GRID_COLS.map(([k,label,,tip]) => {
-      const at = gridSort.findIndex(x => x.k === k), on = at >= 0;
-      const arrow = on ? (gridSort[at].d > 0 ? " ↑" : " ↓") : "";
-      // show the rank only when more than one key is active, so a single sort stays uncluttered
-      const rank = on && gridSort.length > 1 ? `<sup class="srank">${at + 1}</sup>` : "";
-      const blk = FAC_KEYS.includes(k) ? " fac" + (k === "mcap" ? " fb0" : "") : "";
-      return `<th data-sort="${k}" class="${on ? "sorted" : ""}${blk}" style="cursor:pointer;white-space:nowrap"
-        title="${esc(tip || "Sort by " + label)} · shift-click to add as a tie-breaker">${label}${arrow}${rank}</th>`;
-    }).join("");
-    document.querySelectorAll("#gridHead th[data-sort]").forEach(th => th.onclick = e => {
-      const k = th.dataset.sort;
-      // a new column opens best-first: highest for numbers, best rank or A-Z otherwise
-      const num_ = (GRID_COLS.find(c => c[0] === k) || [])[2] === "num";
-      const at = gridSort.findIndex(x => x.k === k);
-      if(e.shiftKey){
-        if(at >= 0) gridSort[at].d = -gridSort[at].d;   // already a key — flip its direction
-        else gridSort.push({k, d: num_ ? -1 : 1});      // otherwise append as a tie-breaker
-      } else {
-        gridSort = [{k, d: (at === 0 ? -gridSort[0].d : (num_ ? -1 : 1))}];
-      }
-      draw();
-    });
-    const sn = document.getElementById("sortNote");
-    if(sn) sn.innerHTML = gridSort.length > 1
-      ? "sorted by " + gridSort.map((x,i) =>
-          `${(GRID_COLS.find(c => c[0] === x.k)||[,x.k])[1]} ${x.d > 0 ? "↑" : "↓"}`).join(" then ")
-        + ` · <a href="#" id="sortClear">single sort</a>`
-      : "click a header to sort · shift-click to add a tie-breaker";
-    const sc = document.getElementById("sortClear");
-    if(sc) sc.onclick = ev => { ev.preventDefault(); gridSort = [gridSort[0]]; draw(); };
+    document.getElementById("gridHead").innerHTML = sortHeadHTML(GRID_COLS, gridSort,
+      k => FAC_KEYS.includes(k) ? " fac" + (k === "mcap" ? " fb0" : "") : "");
+    bindSortHead("gridHead", GRID_COLS, () => gridSort, l => { gridSort = l; }, draw);
+    renderSortNote("sortNote", "sortClear", GRID_COLS, () => gridSort,
+                   l => { gridSort = l; }, draw);
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</div>` +
