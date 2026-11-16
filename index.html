@@ -191,6 +191,11 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 .indchip:not(.on){opacity:.55}
 .lwcchips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .lwcgrp{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+/* Markets: the symbol selector. Same chip as the timeframe buttons — one visual language for
+   "pick one of these", rather than a third kind of button. */
+.mktsel{display:flex;gap:4px;flex-wrap:wrap}
+.mktsel .tfb{font:600 12.5px Inter,sans-serif;padding:6px 13px}
+.tbl tr.sorted td{background:rgba(175,100,82,.07)}
 .lwcglab{font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-right:2px}
 .lwcsep{display:inline-block;width:1px;height:16px;background:var(--line2);margin:0 5px;vertical-align:middle}
 .lwclegend{font:500 12px var(--mono);color:var(--text);min-height:17px;margin-bottom:4px;white-space:nowrap;
@@ -289,7 +294,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:41 · 544fbde</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-16 15:46 · e87411d</div>
   </div>
 </section>
 
@@ -308,6 +313,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
       <span class="navgrp">Universe</span>
       <a href="#universe" data-v="universe">Universe</a>
       <a href="#signals" data-v="signals">Signals</a>
+      <a href="#markets" data-v="markets">Markets</a>
       <span class="navgrp">Process</span>
       <a href="#memo" data-v="memo">Memo</a>
       <a href="#research" data-v="research">Research</a>
@@ -317,7 +323,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:41 · 544fbde</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-16 15:46 · e87411d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1951,6 +1957,124 @@ async function openName(tk){
   document.getElementById("drawer").scrollTop = 0;
   const bars = await loadBars(tk);
   if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
+}
+/* ═══ MARKETS — the major equity indices, on the same chart as everything else ═══════════════
+ *
+ * Six ETFs, chosen to span the thing rather than to be six large funds: US large (SPY), US
+ * large growth / tech (QQQ), US small (IWM), developed ex-US (EFA), emerging (EEM), and the
+ * EQUAL-WEIGHT S&P (RSP). RSP is the one that earns its place twice — against SPY it is the
+ * cleanest breadth read available here, and breadth is a weighted leg of the Market Fragility
+ * Index that is otherwise measured on OUR ~410 names only (market_regime.py: "breadth measured
+ * across the names WE track earns -3.6pp … asking our own universe answers that directly
+ * instead of by analogy"). RSP/SPY is the market's version of the same question.
+ *
+ * ⚠ THESE ARE NOT UNIVERSE NAMES. None of the six is a row in `companies`, so there is no
+ * decision-matrix grade, no technicals_v2, no thesis and no drawer — and that is correct, not a
+ * gap: the model scores businesses, and an index fund is not one. The chart handles their
+ * absence rather than inventing it (the earnings VWAP has no anchor and simply does not draw).
+ * Clicking one must therefore NOT open the name drawer, which would render a card of dashes.
+ *
+ * Everything else is shared: the same techChart, the same indicator registry, the same menu and
+ * the same D/2D/W intervals. A second chart implementation for six symbols is how two charts of
+ * the same thing start disagreeing.
+ */
+const MARKETS = [
+  ["SPY", "S&P 500"],
+  ["QQQ", "Nasdaq 100"],
+  ["IWM", "Russell 2000"],
+  ["RSP", "S&P 500 equal weight"],
+  ["EFA", "Developed ex-US"],
+  ["EEM", "Emerging markets"],
+];
+
+let mktSym = "SPY";
+try { mktSym = localStorage.getItem("ic.mkt") || "SPY"; } catch(e){}
+if(!MARKETS.some(m => m[0] === mktSym)) mktSym = "SPY";   // a stale pref must not blank the tab
+
+// Trailing return over n BARS, from whatever bars are loaded. Null rather than 0 when the window
+// does not reach back that far — a name with 40 bars has no 252-bar return, and 0% would read as
+// "flat" instead of "unknown".
+function _ret(bars, n){
+  if(!bars || bars.length <= n) return null;
+  const a = bars[bars.length - 1 - n].c, b = bars[bars.length - 1].c;
+  return a ? b / a - 1 : null;
+}
+// ⚠ YTD IS NULL UNLESS THE WINDOW ACTUALLY CONTAINS THE START OF THE YEAR.
+// The first version took the earliest loaded bar of the current year, which on a 3-month window
+// is a September bar — so the column would have read "YTD" and meant "since September", quietly,
+// and only in the one place a reader cannot check it. If the loaded window BEGINS inside the
+// current year then its first bar is not the year's first bar, and the honest answer is that we
+// do not know. The table also loads a YTD-wide window below so this is rarely hit.
+function _ytd(bars){
+  if(!bars || !bars.length) return null;
+  const last = bars[bars.length - 1], yr = last.d.slice(0, 4);
+  if(bars[0].d.slice(0, 4) === yr) return null;      // window starts mid-year: not a YTD
+  const first = bars.find(b => b.d.slice(0, 4) === yr);
+  return first && first.c ? last.c / first.c - 1 : null;
+}
+
+async function markets(el){
+  el.innerHTML = head("Markets", "Major equity indices", `<span class="muted">loading…</span>`);
+
+  // Every symbol's bars, for the table. Cached by loadBars, so this is six fetches once and
+  // nothing thereafter; the selected symbol's chart reuses the same cache.
+  // The window is the WIDER of the chart's timeframe and YTD, because the table has a YTD column
+  // and a 3-month fetch cannot answer it. loadBars caches by the widest span already fetched, so
+  // asking for more here costs nothing on the chart's side.
+  const wide = lwcFrom(LWCP.tf) < lwcFrom("YTD") ? LWCP.tf : "YTD";
+  const bars = {};
+  for(const [tk] of MARKETS) bars[tk] = await loadBars(tk, wide);
+
+  const pct = (v, dp) => v == null ? '<span class="muted">—</span>'
+    : `<span class="${v >= 0 ? "pos" : "neg"}">${(v * 100).toFixed(dp == null ? 1 : dp)}%</span>`;
+
+  const rows = MARKETS.map(([tk, name]) => {
+    const b = bars[tk] || [];
+    const last = b.length ? b[b.length - 1] : null;
+    return `<tr data-mkt="${tk}" style="cursor:pointer"${tk === mktSym ? ' class="sorted"' : ""}>
+      <td><b>${esc(tk)}</b></td><td class="muted">${esc(name)}</td>
+      <td class="mono">${last ? usd(last.c, 2) : "—"}</td>
+      <td>${pct(_ret(b, 1))}</td><td>${pct(_ret(b, 5))}</td><td>${pct(_ret(b, 21))}</td>
+      <td>${pct(_ytd(b))}</td>
+      <td class="muted" style="font-size:11px">${last ? esc(last.d) : "—"}</td></tr>`;
+  }).join("");
+
+  // RSP against SPY in one number, because the pair is the reason RSP is on this list and a
+  // reader should not have to compute it. Positive = equal weight leading = broad participation.
+  const spy = bars.SPY, rsp = bars.RSP;
+  const breadth = (n) => {
+    const a = _ret(rsp, n), b = _ret(spy, n);
+    return a == null || b == null ? null : a - b;
+  };
+  const breadthCard = card("Breadth — equal weight vs cap weight",
+    "RSP minus SPY. Positive means the average S&P name is beating the index, i.e. the move is broad; "
+    + "negative means a handful of large names are carrying it.",
+    `<div class="kpis" style="margin:0">
+       ${kpi("5 days",  breadth(5)  == null ? "—" : ((breadth(5)  * 100).toFixed(2) + "pp"), "RSP − SPY", breadth(5)  >= 0 ? "pos" : "neg")}
+       ${kpi("21 days", breadth(21) == null ? "—" : ((breadth(21) * 100).toFixed(2) + "pp"), "RSP − SPY", breadth(21) >= 0 ? "pos" : "neg")}
+       ${kpi("63 days", breadth(63) == null ? "—" : ((breadth(63) * 100).toFixed(2) + "pp"), "RSP − SPY", breadth(63) >= 0 ? "pos" : "neg")}
+     </div>`);
+
+  el.innerHTML = head("Markets", "Major equity indices",
+      `<span class="muted">${MARKETS.length} indices · chart and indicators shared with the rest of the site</span>`)
+    + `<div class="mktsel">${MARKETS.map(([tk, name]) =>
+        `<button class="tfb${tk === mktSym ? " on" : ""}" data-mkt="${tk}" title="${esc(name)}">${esc(tk)}</button>`).join("")}</div>`
+    + `<div class="card" style="padding:12px;margin-top:10px"><div id="mktChart"></div></div>`
+    + `<div style="margin-top:14px">` + breadthCard + `</div>`
+    + `<div style="margin-top:14px">` + card("Index returns", "trailing, on the bars currently loaded",
+        `<div class="table-wrap"><table class="tbl"><thead><tr>
+           <th>Ticker</th><th>Index</th><th>Last</th><th>1d</th><th>5d</th><th>21d</th><th>YTD</th><th>As of</th>
+         </tr></thead><tbody>${rows}</tbody></table></div>`) + `</div>`;
+
+  const pick = (tk) => {
+    mktSym = tk;
+    try { localStorage.setItem("ic.mkt", tk); } catch(e){}
+    markets(el);
+  };
+  el.querySelectorAll("[data-mkt]").forEach(n => n.onclick = () => pick(n.dataset.mkt));
+
+  const host = document.getElementById("mktChart");
+  if(host) techChart(host, mktSym, bars[mktSym]);
 }
 /* ═══ timing (technical v2) ═══════════════════════════════════════════════ */
 const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
@@ -4013,7 +4137,7 @@ async function memo(el){
 }
 
 
-const VIEWS = {overview, holdings: holdingsAll, memo, performance: performanceAll, risk: riskAll, universe: universeAll, signals: signalsV2, research, about, grid: universeAll, analytics: riskAll, proposal: research, theses: research, history: holdingsAll, factors: riskAll};
+const VIEWS = {overview, holdings: holdingsAll, memo, performance: performanceAll, risk: riskAll, universe: universeAll, signals: signalsV2, research, about, grid: universeAll, analytics: riskAll, proposal: research, theses: research, markets, history: holdingsAll, factors: riskAll};
 function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
