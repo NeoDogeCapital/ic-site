@@ -424,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:00 · 264d504</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:35 · 9137b8e</div>
   </div>
 </section>
 
@@ -459,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:00 · 264d504</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:35 · 9137b8e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1346,23 +1346,9 @@ function drawAttribution(box){
     if(b.disabled) return; attrPeriod = b.dataset.p; drawAttribution(box); });
 }
 
-async function performanceAll(el){
-  performanceView(el);
-  // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
-  // inserted: performanceView() sets innerHTML, so anything written before it is wiped, and every other
-  // section on this page appends — DOM surgery here would be the one place doing something else.
-  const mbox = document.createElement("div");
-  el.appendChild(mbox);
-  mbox.innerHTML = sectionHead("The model of models", `<span class="muted">what a client actually holds</span>`) + modelsCard();
-  drawModels();
-  const attrBox = document.createElement("div"); el.appendChild(attrBox);
-  try{ drawAttribution(attrBox); }catch(e){ attrBox.innerHTML = sectionHead("Attribution") + `<div class="note">Attribution unavailable: ${esc(e.message||e)}</div>`; }
-  const slug = document.createElement("div"); slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard(); el.appendChild(slug);
-  const riskBox = document.createElement("div"); el.appendChild(riskBox);
-  try{ await risk(riskBox); }catch(e){ riskBox.innerHTML = sectionHead("Risk") + `<div class="note">Risk data unavailable: ${esc(e.message||e)}</div>`; }
-  const facBox = document.createElement("div"); el.appendChild(facBox);
-  try{ factors(facBox); }catch(e){ facBox.innerHTML = sectionHead("Factors") + `<div class="note">Factor data unavailable: ${esc(e.message||e)}</div>`; }
-}
+// performanceAll lives in model_of_models.js. A second copy sat here, loaded first and silently
+// replaced by that one — so the attribution section wired into it never rendered (2026-11-18).
+// build_live.py now refuses a function declared twice across the modules.
 /* ═══ indicator registry — what the technical chart may draw, and on what basis ═══
  *
  * A REGISTRY, NOT AUTO-DISCOVERY. Same discipline as engines/book.HEDGED_ETFS,
@@ -4614,6 +4600,9 @@ async function performanceAll(el){
   el.appendChild(mbox);
   mbox.innerHTML = sectionHead("The model of models", `<span class="muted">what a client actually holds</span>`) + modelsCard();
   drawModels();
+  // Attribution (engines/attribution.py, payload key "attribution"): what drove the gap to SPY.
+  const attrBox = document.createElement("div"); el.appendChild(attrBox);
+  try{ drawAttribution(attrBox); }catch(e){ attrBox.innerHTML = sectionHead("Attribution") + `<div class="note">Attribution unavailable: ${esc(e.message||e)}</div>`; }
   const slug = document.createElement("div");
   slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard();
   el.appendChild(slug);
