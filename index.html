@@ -46,6 +46,13 @@ tr:focus-visible,th:focus-visible{outline-offset:-2px;border-radius:0}
 /* gate */
 #gate{position:relative;z-index:2;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px}
 .gate-card{width:100%;max-width:340px}
+/* THREE STATES, ONE OF THEM THE FORM (critique run 3). The form was the page's default markup, so a
+   reader who was already signed in looked at a password box for the 3–8 seconds the book took to
+   load — which reads as "you have been signed out". checking: the stored session is being read.
+   loading: there is one, the data is on its way. signin: there is none, or the load failed. */
+.gate-status{display:none;text-align:center;color:var(--muted);font:500 var(--fs-sm) var(--mono);letter-spacing:.06em;padding:26px 0 4px}
+#gate[data-state="checking"] #gateForm,#gate[data-state="loading"] #gateForm{display:none}
+#gate[data-state="checking"] .gate-status,#gate[data-state="loading"] .gate-status{display:block}
 .gate-hero{background:linear-gradient(180deg,rgba(99,50,56,.30),rgba(18,22,30,.90));border:1px solid var(--line2);border-radius:var(--r-xl);padding:44px 24px 58px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
 .logo{width:48px;height:48px;border-radius:var(--r-md);border:1px solid var(--line2);background:rgba(10,13,18,.6);display:grid;place-items:center;margin:0 auto 18px}
 .gate-hero h1{margin:0 0 10px;font-size:var(--fs-xl);font-weight:700;letter-spacing:-.01em}
@@ -248,6 +255,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
    sliding under it do not show through; the hairline marks the edge of what is pinned. */
 .t td.stick,.t th.stick{position:sticky;left:0;z-index:1;background:var(--panel-solid);box-shadow:1px 0 0 var(--line2)}
 .t th.stick{z-index:2}
+@media(max-width:700px){.t td.stick .nm{max-width:96px;white-space:nowrap}.t td.stick,.t th.stick{padding-right:8px}}   /* was 200px of a 313px table: same cap as the grid's pinned column */
 .t tr.row:hover td.stick{background:color-mix(in srgb,var(--panel-solid) 94%,#6aa6f8)}
 /* METHOD NOTES FOLD (2026-11-18): the finding stays visible, the derivation sits one click away. */
 details.howto{margin-top:10px}
@@ -434,7 +442,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 <body>
 
 <!-- ─── gate ─────────────────────────────────────────────────────────────── -->
-<section id="gate">
+<section id="gate" data-state="checking">
   <div class="gate-card">
     <div class="gate-hero">
       <img src="assets/logo-wordmark-light.png" alt="Integrity Wealth Partners" style="width:min(300px,78%);height:auto;margin:0 auto 18px;display:block">
@@ -449,7 +457,8 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:44 · 2628335</div>
+    <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:51 · 760f792</div>
   </div>
 </section>
 
@@ -484,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:44 · 2628335</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:51 · 760f792</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -689,6 +698,7 @@ async function enter(){
     LIVE.cards = Object.fromEntries((await qAll("site_company_card")).map(v => [v.ticker, v])); }
   catch(x){
     err.textContent = x.message === "no-access" ? "This account doesn't have access." : "Couldn't load data: " + (x.message||x);
+    gateState("signin");      // the form comes back WITH the reason, never a blank loading screen
     document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; return;
   }
   document.getElementById("gate").hidden = true; document.getElementById("app").hidden = false;
@@ -716,10 +726,24 @@ document.getElementById("gateForm").addEventListener("submit", async e => {
   const {error} = await SB.auth.signInWithPassword({email: document.getElementById("em").value.trim(), password: document.getElementById("pw").value});
   if(error){ err.textContent = "Incorrect email or password."; btn.disabled = false; btn.textContent = "Sign in"; return; }
   document.getElementById("pw").value = ""; btn.disabled = false; btn.textContent = "Sign in";
+  gateState("loading", "Signed in · loading the book…");     // not the form again, as if nothing had happened
   await enter();
 });
 document.getElementById("lock").onclick = async () => { await SB.auth.signOut(); location.hash = ""; location.reload(); };
-(async () => { const {data} = await SB.auth.getSession(); if(data.session) await enter(); })();
+// The gate's three states (index.html: checking / loading / signin). A failure to even read the
+// session falls through to the form: a sign-in box is a recoverable place to be, a spinner is not.
+function gateState(s, msg){
+  const g = document.getElementById("gate"), st = document.getElementById("gateStatus");
+  if(g && g.setAttribute) g.setAttribute("data-state", s);
+  if(st && msg) st.textContent = msg;
+}
+(async () => {
+  let session = null;
+  try{ session = (await SB.auth.getSession()).data.session; }catch(e){}
+  if(!session){ gateState("signin"); return; }
+  gateState("loading", "Signed in · loading the book…");
+  await enter();
+})();
 
 /* ═══ formatting ═════════════════════════════════════════════════════════ */
 /* ⚠ C READS THE :root TOKENS — IT IS NOT A SECOND PALETTE (2026-11-17).
@@ -1067,12 +1091,46 @@ function renderSortNote(noteId, clearId, cols, get, set, draw){
   const sc = document.getElementById(clearId);
   if(sc) sc.onclick = ev => { ev.preventDefault(); set([get()[0]]); draw(); };
 }
-/* ═══ ABOUT — the process, start to finish, in plain language ═════════════ */
+/* ═══ ABOUT — the process, start to finish, in plain language ═════════════
+ *
+ * EVERY FIGURE ON THIS PAGE THAT CAN CHANGE IS READ, NOT TYPED (critique run 3, 2026-11-18). It said
+ * "about 350 names" while the model tracked 474, "sector cap 28% of names" for a rule that is a
+ * share of capital, "the live book has beaten SPY" when it trailed, a beta of 1.7 that was 1.63,
+ * and "V12.1" a month into V12.2 — each true the day it was written. A methodology page that is
+ * wrong about its own numbers is worse than none, because it is the page a new reader trusts
+ * most. So the universe count, the screen date, the cap and what breaches it, the drawdown limits
+ * and their readings, and the record against SPY all come from the same payload the tabs use, and
+ * each says "not in the payload" when it is missing rather than falling back to a remembered value.
+ */
+// Where the live record stands, in one sentence. st = {from, cum, bench_cum, beta, alpha_ann, t_alpha}.
+function aboutStanding(st){
+  if(!st || st.cum == null || st.bench_cum == null)
+    return `the live record is not in the payload, so nothing is claimed here. See <a href="#performance">Performance</a>.`;
+  const risk = st.beta == null ? "" : st.beta > 1.05 ? ` while carrying more market risk than the index (beta ${num(st.beta)})`
+             : ` at a beta of ${num(st.beta)}`;
+  const sig = st.t_alpha == null ? "" : Math.abs(st.t_alpha) >= 2 ? ` (t = ${num(st.t_alpha, 1)})`
+            : ` (t = ${num(st.t_alpha, 1)}), which is not distinguishable from zero`;
+  return `the live book has returned ${pct(st.cum)} against SPY's ${pct(st.bench_cum)}${st.from ? ` since ${esc(st.from)}` : ""}.
+    It ${st.cum > st.bench_cum ? "leads" : "trails"} the index${risk}${st.alpha_ann == null ? "." :
+    `, and alpha after that beta is ${pct(st.alpha_ann)} a year${sig}.`}`;
+}
 function about(el){
+  const nTracked = (D.universe || []).length;
+  const scr = (String(((LIVE.pipeline || {}).screen_file || {}).value || "").match(/\d{4}-\d{2}-\d{2}/) || [])[0];
+  const CAP = D.cap || {}, capLim = CAP.limit ?? null, capEx = new Set(CAP.exempt || []);
+  const over = CAP.table ? Object.entries(CAP.table).filter(([sec, w]) => !capEx.has(sec) && capLim != null && w > capLim).sort((a, b) => b[1] - a[1]) : null;
+  const capNow = over == null ? "The current reading is not in the payload."
+    : over.length ? `Today ${over.map(([sec, w]) => `${esc(sec)} is ${num(w, 1)}%`).join(" and ")}, over the cap.` : "No sector is over it today.";
+  const g1 = (D.gates || {}).drawdown_1y;
+  const gateNow = !g1 ? "The current readings are not in the payload."
+    : `Today's book reads ${num(g1.p50 * 100, 1)}% and ${num(g1.p95 * 100, 1)}%, and ${
+        g1.p50_pass === false && g1.p95_pass === false ? "fails both" : g1.p50_pass === false || g1.p95_pass === false ? "fails one" : "passes both"}.`;
+  const M = (D.perf || {}).metrics || {};
+  const standing0 = {from: D.inception, cum: M.total_return, bench_cum: M.spy_total, beta: M.beta, alpha_ann: M.alpha, t_alpha: null};
   const step = (n, title, body) => `<div class="card" style="margin-top:14px"><div class="card-h"><div>
       <h3><span style="color:var(--brand);font-variant-numeric:tabular-nums">${n}</span> &nbsp;${title}</h3></div></div>
       <div style="padding:2px 2px 4px;line-height:1.65">${body}</div></div>`;
-  el.innerHTML = head("Integrity Compounders", "How the model works", `<span class="muted">V12.1</span>`) +
+  el.innerHTML = head("Integrity Compounders", "How the model works", `<span class="muted">V12.2</span>`) +
   `<div class="card"><div style="line-height:1.7">
      <b>What we are trying to own:</b> businesses that compound — they earn high returns on the capital they
      employ, convert profit into cash, and reinvest it at attractive rates, with management that allocates
@@ -1092,7 +1150,8 @@ function about(el){
       <li>Leverage contained, capital spending not consuming the business</li>
       <li>Buybacks positive, valuation not extreme</li>
     </ul>
-    The screen currently admits about 350 names out of thousands, and is refreshed weekly. Every entry and exit
+    We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Universe tab"} out of thousands listed. A new screen is
+    loaded every week or two${scr ? `; the one in use is dated ${esc(scr)}` : ""}. Every entry and exit
     is logged. A name is never dropped automatically: screen absence is surfaced for review, and holdings are exempt.`) +
   step(2, "The quadrant — accelerating or decelerating?", `
     For every name we compare what the business is expected to do against what it has done:
@@ -1114,8 +1173,9 @@ function about(el){
       <li><b>Earnings-quality flag</b> — if earnings are accelerating while gross profit is not, the improvement
           is flagged as potentially engineered and gets extra scrutiny.</li>
     </ul>`) +
-  step(4, "Human scoring — the three pillars", `
-    Every candidate is scored 1–10 on three pillars, with evidence:
+  step(4, "Scoring — the three pillars", `
+    Every candidate is scored 1–10 on three pillars. The first pass is written by a model working from filed
+    financials and primary sources, with its evidence set out in a memo that we review and can adjust:
     <ul class="list">
       <li><b>Business quality (40%)</b> — moat durability, economics, reinvestment quality</li>
       <li><b>Management &amp; capital allocation (35%)</b> — direction of returns on capital, M&amp;A and buyback
@@ -1128,7 +1188,7 @@ function about(el){
       <li><b>A</b> — accelerating, high quality, scores clear, no flags</li>
       <li><b>B</b> — ownable, something short of A</li>
       <li><b>C</b> — unscored, composite under 6.5, one floor breach, or earnings flagged</li>
-      <li><b>D</b> — thesis broken, or both floors breached</li>
+      <li><b>D</b> — thesis broken, composite under 5.0, or both floors breached</li>
     </ul>`) +
   step(6, "Technicals — timing, never thesis", `
     Technicals decide <i>when</i>, never <i>what</i>:
@@ -1137,7 +1197,8 @@ function about(el){
           uptrend have had a materially lower chance of a large drawdown. We don't initiate into a downtrend.</li>
       <li><b>Timing</b> from where price sits in its expected range, whether buyers since the 52-week low and
           since the last earnings report are in profit, and recent bottom or reversal signals. It reads
-          Low in range → Top of range: a position, not an instruction, read beside the action.</li>
+          from Low in range to Top of range, or No zone when price qualifies for none: a position, not an
+          instruction, read beside the action.</li>
     </ul>
     Each piece was backtested before use; what failed — a second trend line, RSI regimes, exhaustion counts
     alone — was left out.`) +
@@ -1151,11 +1212,14 @@ function about(el){
       <li><b>Three position sizes</b> — 2% starter, 4% full, 6% the most we will deliberately
           allocate to one name. A winner that drifts above 6% is left alone; nothing is trimmed
           for getting large, and a reduction is always a decision someone makes and records</li>
-      <li><b>Sector cap 28%</b> of names</li>
+      <li><b>Sector cap ${capLim == null ? "28" : num(capLim, 0)}%</b> by weight: a sector's share of total capital, cash included. It caps
+          what we select, so an index fund counts as one line. ${capNow}</li>
       <li><b>Correlation clusters</b> — names that move together are capped at four per cluster</li>
       <li><b>Turnover control</b> — a supported holding isn't sold merely for being outranked</li>
-      <li><b>Risk gates</b> — a proposed book must pass simulated drawdown limits (1-year median ≤ 12%,
-          worst case ≤ 20%) and is stress-tested against past crises and factor shocks</li>
+      <li><b>Drawdown limits</b> — the book is simulated over one year against two limits: the median path
+          no worse than ${g1 ? num(g1.p50_limit * 100, 0) : "12"}% and the worst 1-in-20 path no worse than ${g1 ? num(g1.p95_limit * 100, 0) : "20"}%.
+          ${gateNow} A failure is reported as a breach on Overview and Risk; it does not trade anything.
+          The book is also stress-tested against past crises and factor shocks</li>
     </ul>`) +
   step(9, "The thesis — and what would make us sell", `
     Nothing is owned without a written thesis in three parts:
@@ -1174,18 +1238,25 @@ function about(el){
     it is a reason to re-check the thesis.`) +
   step(11, "What we have proven — and what we haven't", `
     <ul class="list">
-      <li><b>Where we stand:</b> the live book has beaten SPY, but its 1.7 beta explains the gap; measured alpha
-          is not yet distinguishable from zero.</li>
+      <li><b>Where we stand:</b> <span id="abStand">${aboutStanding(standing0)}</span></li>
       <li><b>What the tests support:</b> trend state helps avoid large drawdowns, and buying qualified names at
-          the low end of their range beat buying them extended. Quality grades plus technical confirmation beat
-          the screened universe by roughly 7–8%/yr since January 2024 — a test that still carries survivorship
-          bias and is not statistically conclusive.</li>
+          the low end of their range beat buying them extended. In the one point-in-time backtest (January 2024
+          to September 2026, 33 months, grades from a trailing-data proxy) names graded A or B <i>and</i> in an
+          uptrend beat the equal-weighted universe by about 0.6% a month, t = 1.2 — not statistically conclusive.
+          The trend filter did that work: the grade on its own did not beat the universe in that test.</li>
       <li><b>What we do about it:</b> since September 2026 every variant — the grid's picks, the proposal, the
           quads, and the real book — is tracked forward monthly against SPY, unedited. That record, not a
           backtest, is what will show whether the process adds value.</li>
     </ul>`) +
   `<div class="note" style="margin-top:18px">Integrity Wealth Partners · internal research tool.
      Nothing here is a recommendation or an offer.</div>`;
+  // The t-statistic needs the daily series, which loads separately. The sentence above is already
+  // true without it; this adds whether the alpha is distinguishable from zero, and if the load
+  // fails the page simply does not say.
+  if(typeof anLoad === "function") anLoad().then(X => {
+    const st = X && X.stats && X.stats.SPY, t = document.getElementById("abStand");
+    if(st && t) t.innerHTML = aboutStanding(st);
+  }).catch(() => {});
 }
 
 
@@ -5210,7 +5281,19 @@ function bellPanelHTML(){
     ${watch.length ? `<div class="bp-g">Watchlist setups <span class="muted">· names the grid wants to buy</span></div>${watch.map(row).join("")}` : ""}
     ${low.length ? `<details class="bp-low"><summary>${plural(low.length, "low-level flag")} on holdings</summary>${low.map(row).join("")}</details>` : ""}
     <div class="bp-f">Timing and confirmation, never thesis: a flag is a reason to look at the thesis and
-      the timing field, not an instruction to trade. <a href="#memo">Read the technicals note →</a></div>`;
+      the timing field, not an instruction to trade. ${bellNoteLink(d)}</div>`;
+}
+// THE LINK GOES TO A NOTE THAT EXISTS, ON THE DAY IT WAS WRITTEN FOR (critique run 3). It used to be
+// a bare #memo. The Memo opens on its newest date, and through the trading day that is TODAY — a
+// morning note and no technicals note, because that one is written after the close — so the link
+// landed on a page with nothing about the flags the reader had just clicked from. Now it carries
+// the flags' own session, the Memo opens on that date and scrolls to the card, and when no note
+// was written for the session the panel says so instead of offering a link to nowhere.
+function bellNoteLink(d){
+  const notes = (LIVE.briefs || []).filter(x => x.kind === "technicals").map(x => x.as_of).sort().reverse();
+  if(notes.includes(d)) return `<a href="#memo" data-memo="${esc(d)}">Read the technicals note →</a>`;
+  if(notes.length) return `No technicals note was written for ${esc(d)}. <a href="#memo" data-memo="${esc(notes[0])}">Read the ${esc(notes[0])} note →</a>`;
+  return `No technicals note has been written yet.`;
 }
 
 function toggleBell(force){
@@ -5220,7 +5303,12 @@ function toggleBell(force){
   if(bellOpen){
     p.innerHTML = bellPanelHTML();
     p.querySelectorAll(".bp-row[data-tk]").forEach(b => b.onclick = () => { toggleBell(false); openName(b.dataset.tk); });
-    p.querySelectorAll('a[href="#memo"]').forEach(a => a.onclick = () => toggleBell(false));
+    p.querySelectorAll('a[href="#memo"]').forEach(a => a.onclick = () => {
+      toggleBell(false);
+      memoJump = {date: a.dataset.memo, to: "memoTech"};
+      // already on the Memo: the hash does not change, so nothing would re-render — do it here
+      if((location.hash || "").split("/")[0] === "#memo") route();
+    });
     const d = _flagLatest(); if(d) _markSeen(d);
     renderBell();
   }
@@ -5246,15 +5334,17 @@ if(typeof window !== "undefined" && !window.__bellWired){
 }
 
 /* The Memo tab's fourth note. Same card as the others; tickers open the drawer like everywhere else. */
-function memoTechnicals(row){
+function memoTechnicals(row, anchor){
   if(!row || !row.payload) return "";
-  const b = row.payload;
+  const b = row.payload, earlier = anchor && row.as_of !== anchor;
   const li = xs => (xs||[]).map(x => `<li><a href="#grid/${esc(x.ticker)}" class="tk"
       style="text-decoration:none">${esc(x.ticker)}</a> — ${esc(x.read)}</li>`).join("");
   const hold = li(b.holdings), watch = li(b.watchlist);
-  return `<div class="card brief technicals">
+  return `<div class="card brief technicals" id="memoTech" tabindex="-1" style="scroll-margin-top:96px">
     <div class="bhead"><div><div class="caps">Technicals note · setups and breakdowns · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
       <h3>${esc(b.headline||"")}</h3></div></div>
+    ${earlier ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} session's note. The one for
+      ${esc(anchor)} is written after the close.</div>` : ""}
     <div class="bgrid">
       ${hold ? `<div><h4>Holdings</h4><ul class="blist">${hold}</ul></div>` : ""}
       ${watch ? `<div><h4>Watchlist setups</h4><ul class="blist">${watch}</ul></div>` : ""}
@@ -5272,6 +5362,7 @@ function memoTechnicals(row){
 // tab is for — one day per screen, with the longer-term observations from all three pulled together
 // at the top so trends are readable without scrolling three cards.
 let memoIdx = 0;
+let memoJump = null;     // {date, to}: set by the bell so the Memo opens on that session and scrolls to a card
 function memoDates(){
   const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
   return [...new Set(B.map(x => x.as_of))].sort().reverse();
@@ -5340,7 +5431,10 @@ async function memo(el){
     // the close note for the anchored day may not exist yet; fall back to the most recent one
     // before it, clearly labelled with its own date rather than presented as this day's
     const ev = at("evening") || B.filter(x => (x.kind||"evening") === "evening" && x.as_of < d)[0];
-    const mo = at("premarket"), un = at("universe"), te = at("technicals");
+    // the technicals note is written after the close too, so it gets the same fallback: through
+    // the trading day the page showed three notes and silently no fourth
+    const mo = at("premarket"), un = at("universe"),
+          te = at("technicals") || B.filter(x => x.kind === "technicals" && x.as_of < d)[0];
     const nav = `<span class="bnav">
       <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:var(--fs-sm)">${d}</span>
@@ -5349,9 +5443,9 @@ async function memo(el){
     el.innerHTML = head("Memo", "Market memo",
       `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
       memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
-      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te) +
+      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te, d) +
       `<div class="note" style="margin-top:14px">Four notes, each from a different point in the day:
-       the morning note is what you are walking into, the universe note covers all ~453 tracked names
+       the morning note is what you are walking into, the universe note covers all ${(D.universe || []).length || "the"} tracked names
        rather than the book, and the close note is how the day actually went, and the technicals note reads the
        setups and breakdowns the alerts engine flagged on the book after the close. Every figure in them is
        computed first and the model is told to add none of its own — commentary on what the model is
@@ -5359,7 +5453,13 @@ async function memo(el){
     el.querySelectorAll(".bbtn[data-md]").forEach(b =>
       b.onclick = () => { memoIdx += Number(b.dataset.md); draw(); });
   };
+  if(memoJump){ const i = dates.indexOf(memoJump.date); if(i >= 0) memoIdx = i; }
   draw();
+  if(memoJump){
+    const t = document.getElementById(memoJump.to); memoJump = null;
+    // after route()'s scrollTo(0,0); focus so a keyboard reader lands on the note, not the page top
+    if(t) requestAnimationFrame(() => { t.scrollIntoView({block: "start"}); t.focus({preventScroll: true}); });
+  }
 }
 
 
@@ -5895,6 +5995,22 @@ function closeDrawer(silent){ const d = document.getElementById("drawer"); const
   _drawerReturn = null; _drawerTk = null;
   if(!silent && location.hash.includes("/")) history.replaceState(null,"",location.hash.split("/")[0]); }
 document.getElementById("scrim").onclick = () => closeDrawer();
+// FOCUS STAYS IN THE DRAWER WHILE IT IS OPEN. It declares aria-modal="true", which tells a screen
+// reader the page behind is inert — but Tab walked straight out of it into the table underneath,
+// so a keyboard reader was operating rows they could not see. Tab and Shift+Tab now wrap at the
+// drawer's edges; focus that has escaped some other way (a re-render) is pulled back on next Tab.
+document.addEventListener("keydown", e => {
+  if(e.key !== "Tab") return;
+  const d = document.getElementById("drawer");
+  if(!d || !d.classList.contains("on")) return;
+  const f = [...d.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])')]
+    .filter(x => x.offsetParent !== null);
+  if(!f.length){ e.preventDefault(); return; }
+  const first = f[0], last = f[f.length - 1], at = document.activeElement;
+  if(!d.contains(at)){ e.preventDefault(); first.focus(); }
+  else if(e.shiftKey && at === first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && at === last){ e.preventDefault(); first.focus(); }
+});
 // METHOD NOTES FOLD ON THE DENSE TABS (critique, 2026-11-18). Risk was 51,000px tall and half its
 // 3,010 words were ten method notes, so the readings were buried in their own derivations. A note of
 // FOLD_MIN_WORDS or more keeps its first sentence — which in this codebase is nearly always the
