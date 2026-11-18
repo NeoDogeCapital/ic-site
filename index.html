@@ -441,7 +441,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 16:35 · 97ad8ff</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 16:38 · de0283c</div>
   </div>
 </section>
 
@@ -476,7 +476,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 16:35 · 97ad8ff</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 16:38 · de0283c</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5139,7 +5139,16 @@ function toggleBell(force){
     const d = _flagLatest(); if(d) _markSeen(d);
     renderBell();
   }
+  const wasOpen = !p.hidden;
   p.hidden = !bellOpen; btn.setAttribute("aria-expanded", String(bellOpen));
+  // KEYBOARD (2026-11-18): opening moves focus into the panel (first flag, else the panel itself);
+  // closing hands it back to the bell instead of dropping it on <body>.
+  if(bellOpen){
+    if(!p.hasAttribute("tabindex")) p.setAttribute("tabindex", "-1");
+    (p.querySelector(".bp-row, a, summary") || p).focus({preventScroll: true});
+  } else if(wasOpen && p.contains(document.activeElement) || (wasOpen && document.activeElement === document.body)){
+    btn.focus({preventScroll: true});
+  }
 }
 
 if(typeof window !== "undefined" && !window.__bellWired){
