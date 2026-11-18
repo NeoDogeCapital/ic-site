@@ -429,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:05 · b9ba37b</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:07 · 637b958</div>
   </div>
 </section>
 
@@ -464,7 +464,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:05 · b9ba37b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:07 · 637b958</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5473,9 +5473,9 @@ function overview(el){
   const er = H.filter(h=>erNext(h.next_er)).sort((a,b)=>a.next_er.localeCompare(b.next_er)).slice(0,9);
   const erUnset = H.filter(h=>!erNext(h.next_er)).length;
   document.getElementById("ovER").innerHTML = (er.length ? "" : `<p class="muted" style="margin:0">No upcoming report dates published for the book.</p>`) + er.map(h => {
-    const days = Math.round((new Date(h.next_er) - new Date()) / 864e5);
+    const days = Math.round((Date.parse(h.next_er) - Date.parse(_todayISO())) / 864e5);   // both UTC midnights
     return `<a class="li" href="#holdings/${h.tk}" style="text-decoration:none;color:inherit"><span><span class="tk">${h.tk}</span> <span class="nm">${esc(h.name)}</span></span>
-      <span class="mono muted" style="font-size:var(--fs-sm)">${h.next_er} <span class="${days<=7?'amber':''}">(${days}d)</span></span></a>`; }).join("") +
+      <span class="mono muted" style="font-size:var(--fs-sm)">${h.next_er} <span class="${days<=7?'amber':''}">(${days === 0 ? "today" : days + "d"})</span></span></a>`; }).join("") +
     (erUnset ? `<p class="muted" style="margin:8px 0 0;font-size:var(--fs-sm)">${plural(erUnset, "holding")} with no published next date.</p>` : "");
   const flags = H.map(h => { const f=[];
       if(h.comp!=null && h.comp<6.5) f.push(`composite ${num(h.comp)}`);
@@ -6081,7 +6081,7 @@ function signals(el){
     xAxis:axY({type:"value",axisLabel:{color:C.dim,fontSize:11,formatter:v=>v+"d"},name:"days away",nameLocation:"middle",nameGap:22,nameTextStyle:{color:C.dim}}),
     yAxis:axX({type:"category",data:er.map(h=>h.tk),inverse:true,axisLabel:{color:C.muted,fontSize:11}}),
     tooltip:{trigger:"item",formatter:p=>`<b>${er[p.dataIndex].tk}</b> reports ${er[p.dataIndex].next_er}`},
-    series:[{type:"bar",barWidth:"55%",data:er.map(h=>{const dd=Math.round((new Date(h.next_er)-today)/864e5);
+    series:[{type:"bar",barWidth:"55%",data:er.map(h=>{const dd=Math.round((Date.parse(h.next_er)-Date.parse(_todayISO()))/864e5);
       return {value:dd,itemStyle:{color:dd<=7?C.amber:dd<=21?C.accent:"rgba(106,166,248,.45)",borderRadius:[0,3,3,0]}};}),
       label:{show:true,position:"right",color:C.dim,fontSize:11,formatter:p=>er[p.dataIndex].next_er.slice(5)}}]
   }).on("click", p => location.hash = "#holdings/" + er[p.dataIndex].tk);
