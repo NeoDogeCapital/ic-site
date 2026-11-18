@@ -449,7 +449,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 17:24 · 9390d16</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 17:27 · 2b803e4</div>
   </div>
 </section>
 
@@ -484,7 +484,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 17:24 · 9390d16</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 17:27 · 2b803e4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -949,7 +949,7 @@ const TIMING_LBL = {BUY_ZONE:"Low in range", ACCUMULATE_OK:"Lower half", NEUTRAL
 const techLbl = v => v ? (TECH_LBL[v] || String(v).replaceAll("_", " ")) : "—";
 const timingLbl = v => v ? (TIMING_LBL[v] || String(v).replaceAll("_", " ")) : "—";
 const timingWhy = (t, pos) => (t !== "NEUTRAL" || pos == null) ? ""
-  : (+pos <= 0.5 ? "below 52w-low anchor" : "mid-range");
+  : (+pos <= 0.5 ? "below anchor" : "mid-range");     // the chip's tooltip spells out which anchor
 // THE MODEL'S OTHER CODES, IN WORDS (2026-11-18). Raw enum names reached the page — GP_LEADING,
 // GOOD_COMPOUNDER, TIER_2, ADD_ON_WEAKNESS, "Cover DEAR" — readable only to whoever wrote the
 // engine. Stored values are unchanged; only what a reader sees. An unmapped code falls back to
@@ -3175,10 +3175,13 @@ const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.gree
 // tickers would be useless.
 let gridFilter = {q:"", held:false};
 let gridFilterOpen = false;
-// MONITOR VIEW (critique run 3, 2026-11-18): 28 columns ran 2,446px in a 1,232px card. Twelve answer
+// MONITOR VIEW (critique run 3, 2026-11-18): 28 columns ran 2,446px in a 1,232px card. Eleven answer
 // "what is it, what does the model say, and why"; the rest are one toggle away and stay filterable
 // and sortable while hidden. Remembered per viewer.
-const GRID_MONITOR = ["ticker","grade","tech_rating","action","timing","quadrant","composite","p1","p2","p3","sector","grade_reason"];
+// Eleven, sized to FIT a 1,232px card with no sideways scroll (measured live: twelve with Sector ran
+// 1,594px). Sector moved to the full view — still filterable — and Why takes the remaining width.
+const GRID_MONITOR = ["ticker","grade","tech_rating","action","timing","quadrant","composite","p1","p2","p3","grade_reason"];
+const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3"};       // monitor-view headers; the tooltip keeps the full name
 let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
 // What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
 // not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
@@ -3850,7 +3853,8 @@ async function grid(el){
     // way you sorted — and sorting by Mkt cap is now a headline feature, where the tail is the point.
     // 600 clears the universe with room to grow; the "showing first N" note stays as the backstop.
     const CAP = 600, shown = rows.slice(0, CAP);
-    const cols = gAllCols ? GRID_COLS : GRID_COLS.filter(c => GRID_MONITOR.includes(c[0]));
+    const cols = gAllCols ? GRID_COLS : GRID_COLS.filter(c => GRID_MONITOR.includes(c[0]))
+      .map(c => GRID_SHORT[c[0]] ? [c[0], GRID_SHORT[c[0]], c[2], c[3] || c[1]] : c);
     // Cells keyed by column, so the monitor and full views render from one definition and a header
     // can never sit over another column's cell. One line per row: long text clips with its full
     // value in the tooltip, which took the median row from 74px to about 38.
@@ -3876,7 +3880,10 @@ async function grid(el){
         alignment: `<td>${num(r.alignment, 0)}</td>`,
         f_profile: `<td class="muted" style="font-size:var(--fs-sm)">${esc(profileLabel((u||{}).factor_profile))}</td>`,
         mcap: `<td class="fac fb0">${capCell(u, tag)}</td>`,
-        grade_reason: clip(r.grade_reason, 300),
+        // Monitor view: the last column absorbs what is left of the card (width:100% + max-width:0 is
+        // the table idiom for "fill, then clip"), so the eleven columns fit without a sideways scroll.
+        grade_reason: gAllCols ? clip(r.grade_reason, 300)
+          : `<td class="muted clip" style="width:100%;max-width:0" title="${esc(r.grade_reason || "")}">${esc(r.grade_reason || "")}</td>`,
       };
       FACTORS.forEach(f => { cell["f_" + f.k] = `<td class="fac">${facCell(u, f, tag)}</td>`; });
       return `<tr data-open="${r.ticker}" tabindex="0" style="cursor:pointer">${cols.map(([k]) => cell[k] ?? "<td>—</td>").join("")}</tr>`; }).join("");
@@ -3925,7 +3932,7 @@ async function grid(el){
           <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
           <button class="lock" id="gtoggle">${gridFilterOpen ? "Hide" : "Filter columns"}${n ? ` (${n})` : ""}</button>
           ${n ? `<button class="lock" id="gclear">Clear all</button>` : ""}
-          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: twelve columns. On: all ${GRID_COLS.length} — adds the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
+          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: eleven columns. On: all ${GRID_COLS.length} — adds sector, the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
           <span class="muted" id="sortNote" style="font-size:var(--fs-sm);margin-left:auto"></span>
         </div>
         <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
