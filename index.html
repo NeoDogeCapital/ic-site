@@ -236,6 +236,18 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
    whole Performance page to 427px on a 390px screen (measured 2026-11-17). */
 .t td.lbl{white-space:normal}
 .t tr.row{cursor:pointer;transition:background .12s} .t tr.row:hover{background:rgba(106,166,248,.06)}
+/* The ticker stays in view while a wide table scrolls sideways (2026-11-18). Opaque so the cells
+   sliding under it do not show through; the hairline marks the edge of what is pinned. */
+.t td.stick,.t th.stick{position:sticky;left:0;z-index:1;background:var(--panel-solid);box-shadow:1px 0 0 var(--line2)}
+.t th.stick{z-index:2}
+.t tr.row:hover td.stick{background:color-mix(in srgb,var(--panel-solid) 94%,#6aa6f8)}
+/* METHOD NOTES FOLD (2026-11-18): the finding stays visible, the derivation sits one click away. */
+details.howto{margin-top:10px}
+details.howto>summary{cursor:pointer;list-style:none;color:var(--muted);font-size:var(--fs-md);line-height:1.5}
+details.howto>summary::-webkit-details-marker{display:none}
+details.howto>summary .more{color:var(--accent);white-space:nowrap;margin-left:6px;font-size:var(--fs-sm)}
+details.howto[open]>summary .more{display:none}
+details.howto>.note{margin-top:8px}
 .t .r{text-align:right}
 .scroll{overflow-x:auto}
 .tk{font-weight:700;letter-spacing:.01em}
@@ -429,7 +441,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 16:00 · ceb0f3a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 16:35 · 97ad8ff</div>
   </div>
 </section>
 
@@ -464,7 +476,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 16:00 · ceb0f3a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 16:35 · 97ad8ff</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1591,12 +1603,12 @@ const INDICATORS = {
       states: S.bull.map(b => b === false ? "↓" : "↑"),
       width: 2, label: "Track line",
     }],
-    basis: "EMA-26 that flips after two closes beyond ±1.5 ATR. ⚠ It is a FITTED APPROXIMATION "
-         + "of a third-party indicator — technical_v2 tuned it to the 'Alpha Trend VIP' line on "
-         + "the SPX / NVDA / MA reference charts (2026-09-15), catching every colour change with "
-         + "0-3 weeks lag. Not an exchange or vendor definition, and not the open-source "
-         + "AlphaTrend, which is a separate toggle. technical_v2's own backtest found it does "
-         + "NOT separate drawdown risk: a trend state, never a sell trigger.",
+    // Reader copy (2026-11-18). The provenance — fitted on 2026-09-15 to a third-party "Alpha Trend
+    // VIP" line on SPX / NVDA / MA, every colour change caught with 0-3 weeks lag, distinct from the
+    // open-source AlphaTrend toggle — belongs here in the source, not in a chart footnote.
+    basis: "A 26-day EMA that flips after two closes beyond ±1.5 ATR, fitted to approximate a "
+         + "third-party trend line. In backtests it did not separate drawdown risk, so it is "
+         + "timing context — a trend state, never a sell signal.",
   },
   avwap52: {
     group: "Price",
@@ -3843,7 +3855,6 @@ async function grid(el){
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</div>` +
-    memoPointer("universe morning note") +
     card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${techLbl(t)}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${esc(codeLbl("action", a))}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
@@ -4176,7 +4187,7 @@ function regimeCard(){
 function sizingCard(){
   const B = (typeof LIVE !== "undefined" && LIVE.bridge) || null;
   if(!B) return card("Sizing", "unavailable", `<div class="note">The sizing bridge has not run.
-    ${(typeof LIVE !== "undefined" && LIVE.bridgeOk === false) ? "The view did not answer — db/033 may not be applied." : ""}</div>`);
+    ${(typeof LIVE !== "undefined" && LIVE.bridgeOk === false) ? "The sizing data could not be loaded." : ""}</div>`);
   const mult = +B.exposure_multiplier, SC = REGIME_C();
   const P = (B.positions || []).slice().sort((a, b) => (+b.gap_pct) - (+a.gap_pct));
   const mand = Object.entries(B.mandates || {});
@@ -4368,7 +4379,7 @@ function fragilityCard(){
       correlates 0.34 and the first principal component explains 31%. Concentration and factor crowding measure 0.13
       apart — a sector breach and a crowded factor are <b>separate problems needing separate fixes</b>.
       <br><br><b>Read the percentiles with care.</b> They compare this book to random draws from our own universe, and
-      a random 29-name draw across eleven sectors is more diversified than any deliberate conviction book — so a
+      a random draw of the same number of names across eleven sectors is more diversified than any deliberate conviction book — so a
       concentrated book reads high on concentration and factor <i>by construction</i>. Compare the legs to each other
       and to this book's own history as it builds; a 100th percentile here does not mean worse than other managers.
       ${(f.legs||{}).liquidity ? `<br><br>Liquidity is computed and shown but carries no weight: at ${num(+(f.legs.liquidity.raw||0),3)} days to exit
@@ -5545,6 +5556,8 @@ const kpi = (label, v, note, c="") => `<div class="kpi"><div class="caps">${labe
 /* ═══ HOLDINGS ═══════════════════════════════════════════════════════════ */
 let hSort = {k:"weight", d:-1}, hQuery = "";
 let hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
+const HOLD_MONITOR = ["tk","weight","value","pl","quad","comp","trend","timing","next_er","thesis_status"];
+let hAllCols = (() => { try { return localStorage.getItem("ic.holdings.cols") === "all"; } catch(e){ return false; } })();
 function holdings(el){
   const HD = D.holdings;
   const sel = (id, label, value, opts) => `<label class="fsel"><span>${label}</span><select id="${id}">
@@ -5552,7 +5565,6 @@ function holdings(el){
     </select></label>`;
   const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
-    memoPointer("morning and close notes") +
     `<div class="filters" style="margin-top:16px">
       ${sel("hQuad","Quad",hFilter.quad,uniq("quad"))}
       ${sel("hTrend","Trend",hFilter.trend,uniq("trend"))}
@@ -5560,6 +5572,7 @@ function holdings(el){
       ${sel("hThesis","Thesis",hFilter.thesis,uniq("thesis_status"))}
       <label class="check"><input type="checkbox" id="hFlag" ${hFilter.flagged?"checked":""}> Flagged only</label>
       <button class="lock" id="hClear">Clear</button>
+      <button class="lock" id="hCols" aria-pressed="${hAllCols}" title="Monitor view shows ten columns; all columns adds alignment, the risk range, implied growth, forward estimates, size and the six factors">${hAllCols ? "Monitor view" : "All columns"}</button>
      </div>` +
     `<div class="card" style="padding:6px 6px 2px;margin-top:16px"><div class="scroll"><table class="t" id="ht"></table></div></div>
      <div class="note" style="margin-top:10px">Click any row for the full thesis: news, guidance, catalysts, risks, and the trend chart. Composite below 6.5 and pillar-floor breaches are shown in red.</div>`;
@@ -5568,6 +5581,9 @@ function holdings(el){
     const s2 = document.getElementById(id);
     if(s2) s2.onchange = e => { hFilter[key] = e.target.value; clearCharts(); holdings(el); };
   });
+  const hcol = document.getElementById("hCols");
+  if(hcol) hcol.onclick = () => { hAllCols = !hAllCols; try { localStorage.setItem("ic.holdings.cols", hAllCols ? "all" : "monitor"); } catch(e){}
+    clearCharts(); holdings(el); };
   const fl = document.getElementById("hFlag");
   if(fl) fl.onchange = e => { hFilter.flagged = e.target.checked; clearCharts(); holdings(el); };
   const hc = document.getElementById("hClear");
@@ -5590,7 +5606,7 @@ function cashRow(ncols){
     <td><div class="tk">Cash</div><div class="nm">${esc(c.as_of || "")}</div></td>
     <td class="r mono" title="Share of the TOTAL portfolio. The weights above are shares of invested capital.">${pctOfTotal.toFixed(1)}%<span class="muted" style="font-size:var(--fs-xs)"> of total</span></td>
     <td class="r mono muted">${usd(amt)}</td>
-    <td colspan="${ncols - 3}" class="muted" style="font-size:var(--fs-sm)">${esc(c.note || "")}</td></tr>`;
+    <td colspan="${ncols - 3}" class="muted" style="font-size:var(--fs-sm)"${c.note ? ` title="${esc(c.note)}"` : ""}>recorded ${esc(c.as_of || "—")}${c.note ? " · hover for the entry" : ""}</td></tr>`;
 }
 function drawHoldings(){
   // 14 headers against 13 cells until 2026-10-16: the Timing header had no <td>, so every column
@@ -5607,6 +5623,12 @@ function drawHoldings(){
                 ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],
                 ["mcap","Mkt cap"], ...FACTORS.map(f => ["f_" + f.k, f.label]),
                 ["next_er","Next ER"],["thesis_status","Thesis"]];
+  // MONITOR VIEW BY DEFAULT (critique, 2026-11-18): 22 columns ran 2,355px in a 1,258px card, so
+  // Thesis was off-screen on a laptop and only the ticker showed on a phone. The ten that answer
+  // "how is each position doing and does it need me" lead; the rest are one toggle away. The factor
+  // columns travel as one block keyed on "mcap" (facCells renders all seven at once).
+  const shown = hAllCols ? cols.filter(([k]) => !k.startsWith("f_")) : cols.filter(([k]) => HOLD_MONITOR.includes(k));
+  const shownHead = hAllCols ? cols : shown;
   const q = hQuery.toLowerCase(), f = hFilter;
   // "Flagged" means the model has something to say against the name: composite under the 6.5
   // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
@@ -5634,26 +5656,30 @@ function drawHoldings(){
   rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
   const t = document.getElementById("ht");
-  t.innerHTML = `<thead><tr>${cols.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}"${k==="_spark"||k==="_timing"?"":` tabindex="0" aria-sort="${hSort.k===k?(hSort.d>0?"ascending":"descending"):"none"}"`}>${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
+  t.innerHTML = `<thead><tr>${shownHead.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}${k==='tk'?' stick':''}"${k==="_spark"||k==="_timing"?"":` tabindex="0" aria-sort="${hSort.k===k?(hSort.d>0?"ascending":"descending"):"none"}"`}>${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(h => {
       const floor = (h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6);
-      return `<tr class="row" data-tk="${h.tk}">
-      <td><div class="tk">${h.tk}</div><div class="nm">${esc(h.name)}</div></td>
-      <td class="r mono">${pct(h.weight,1,false)}</td>
-      <td class="r mono muted">${usd(h.value)}</td>
-      <td class="r mono ${cls(h.pl)}">${pct(h.pl)}</td>
-      <td><div class="spark" data-spark="${h.tk}"></div></td>
-      <td>${qchip(h.quad)}</td>
-      <td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor?' <span class="chip bad" title="P2 or P3 below 6.0">floor</span>':''}</td>
-      <td>${alignBar(h.align)}</td>
-      <td>${trendChip(h.trend)}</td>
-      <td>${typeof timingChip === "function" ? timingChip(h.timing, h.range_pos) : ""}</td>
-      <td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>
-      <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
-      <td class="mono muted" style="font-size:var(--fs-sm)">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
-      ${facCells({ticker: h.tk, universe_tag: null})}
-      <td class="mono muted" style="font-size:var(--fs-sm)">${erCell(h.next_er)}</td>
-      <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + cashRow(cols.length) + "</tbody>";
+      // Keyed by column, so the monitor view and the full view render from one definition and a
+      // header can never sit over another column's cell (the 2026-10-16 off-by-one, below).
+      const cell = {
+        tk: `<td class="stick"><div class="tk">${h.tk}</div><div class="nm">${esc(h.name)}</div></td>`,
+        weight: `<td class="r mono">${pct(h.weight,1,false)}</td>`,
+        value: `<td class="r mono muted">${usd(h.value)}</td>`,
+        pl: `<td class="r mono ${cls(h.pl)}">${pct(h.pl)}</td>`,
+        _spark: `<td><div class="spark" data-spark="${h.tk}"></div></td>`,
+        quad: `<td>${qchip(h.quad)}</td>`,
+        comp: `<td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor?' <span class="chip bad" title="P2 or P3 below 6.0">floor</span>':''}</td>`,
+        align: `<td>${alignBar(h.align)}</td>`,
+        trend: `<td>${trendChip(h.trend)}</td>`,
+        timing: `<td>${typeof timingChip === "function" ? timingChip(h.timing, h.range_pos) : ""}</td>`,
+        range_pos: `<td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>`,
+        implied_cagr: `<td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>`,
+        fwd_rev: `<td class="mono muted" style="font-size:var(--fs-sm)">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>`,
+        mcap: facCells({ticker: h.tk, universe_tag: null}),      // the size + six factor cells, as one block
+        next_er: `<td class="mono muted" style="font-size:var(--fs-sm)">${erCell(h.next_er)}</td>`,
+        thesis_status: `<td>${thesisChip(h.thesis_status)}</td>`,
+      };
+      return `<tr class="row" data-tk="${h.tk}">${shown.map(([k]) => cell[k] ?? "").join("")}</tr>`; }).join("") + cashRow(shownHead.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
     hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
   t.querySelectorAll("tr.row").forEach(tr => { tr.tabIndex = 0; tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; }; });
@@ -5701,9 +5727,6 @@ function briefShape(b){
     watching: b.watching || b.week_ahead || b.watch_at_open || "",
   });
 }
-const memoPointer = what => `<div class="note" style="margin:12px 0 0">The ${what} now lives on
-  <a href="#memo">Memo</a>, with all three notes for a day on one screen. It used to be repeated on
-  several tabs, which meant three places to keep in sync and no single place to read a day in sequence.</div>`;
 function briefBody(b){
   b = briefShape(b);
   const sec = (label, inner) => inner ? `<div><h4>${label}</h4><ul class="blist">${inner}</ul></div>` : "";
@@ -5747,6 +5770,34 @@ function closeDrawer(silent){ const d = document.getElementById("drawer"); const
   _drawerReturn = null; _drawerTk = null;
   if(!silent && location.hash.includes("/")) history.replaceState(null,"",location.hash.split("/")[0]); }
 document.getElementById("scrim").onclick = () => closeDrawer();
+// METHOD NOTES FOLD ON THE DENSE TABS (critique, 2026-11-18). Risk was 51,000px tall and half its
+// 3,010 words were ten method notes, so the readings were buried in their own derivations. A note of
+// FOLD_MIN_WORDS or more keeps its first sentence — which in this codebase is nearly always the
+// finding ("These are targets, not instructions. 17 positions…") — and folds the rest under "How
+// this is measured". Nothing is deleted. An observer applies it to sections that render after the
+// tab's first paint (the risk engine and factor cards arrive async). data-nofold opts a note out.
+const FOLD_TABS = new Set(["risk", "holdings"]), FOLD_MIN_WORDS = 50;
+function foldNotes(root){
+  root.querySelectorAll(".note").forEach(n => {
+    if(n.closest("details.howto") || n.hasAttribute("data-nofold")) return;
+    const text = n.textContent.replace(/\s+/g, " ").trim(), words = text.split(" ").length;
+    if(words < FOLD_MIN_WORDS) return;
+    const m = text.match(/^(.{20,220}?[.:])(?=\s|$)/), lede = m ? m[1] : text.slice(0, 160) + "…";
+    const d = document.createElement("details"); d.className = "howto";
+    d.innerHTML = `<summary>${esc(lede)}<span class="more">How this is measured · ${words} words</span></summary>`;
+    n.replaceWith(d); d.appendChild(n);
+  });
+}
+(() => {
+  const v = document.getElementById("view");
+  if(!v || typeof MutationObserver === "undefined") return;   // verify.py's harness has no observer
+  let queued = false;
+  new MutationObserver(() => {
+    if(queued) return; queued = true;
+    requestAnimationFrame(() => { queued = false;
+      if(FOLD_TABS.has((location.hash || "#").slice(1).split("/")[0])) foldNotes(v); });
+  }).observe(v, {childList: true, subtree: true});
+})();
 // KEYBOARD: rows that open a name and headers that sort were mouse-only (22 clickable rows on
 // Holdings, 0 focusable). Any element rendered with tabindex and one of these roles answers Enter
 // and Space the way it answers a click — one delegated handler rather than one per table.
@@ -6028,7 +6079,6 @@ function drawUniverseTable(){
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
-    memoPointer("universe morning note") +
   `<div class="kpis" style="grid-template-columns:repeat(5,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
       `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
