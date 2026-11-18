@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:51 · 760f792</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:53 · 884626d</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:51 · 760f792</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:53 · 884626d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5457,8 +5457,11 @@ async function memo(el){
   draw();
   if(memoJump){
     const t = document.getElementById(memoJump.to); memoJump = null;
-    // after route()'s scrollTo(0,0); focus so a keyboard reader lands on the note, not the page top
-    if(t) requestAnimationFrame(() => { t.scrollIntoView({block: "start"}); t.focus({preventScroll: true}); });
+    // After route() has finished (it scrolls to the top before drawing), and on a TIMER rather than
+    // an animation frame: a frame callback does not run in a tab that is not painting, and then the
+    // link opens the right day at the top of the page with the note three screens down. Focus goes
+    // to the card so a keyboard reader lands on the note too.
+    if(t) setTimeout(() => { t.scrollIntoView({block: "start"}); t.focus({preventScroll: true}); }, 0);
   }
 }
 
