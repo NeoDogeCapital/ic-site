@@ -14,7 +14,7 @@
 <script src="config.js"></script>
 <style>
 :root{
-  --brand:#af6452; --brand-deep:#633238; --brand-soft:rgba(175,100,82,.14);
+  --brand:#af6452; --brand-strong:#9c5544; --brand-deep:#633238; --brand-soft:rgba(175,100,82,.14);
   --bg:#0a0d12; --bg2:#0f131a; --panel:rgba(22,27,36,.72); --panel-solid:#161b24; --line:rgba(255,255,255,.07);
   --line2:rgba(255,255,255,.12); --text:#e6e9ef; --muted:#8b93a3; --dim:#7c8596;
   --accent:#6aa6f8; --accent2:#8fbcff; --gold:#d4b25c; --green:#3fcf8e; --red:#ef6464; --amber:#f0a94a; --violet:#a78bfa;
@@ -287,7 +287,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .seg button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 var(--fs-sm) var(--mono);letter-spacing:.06em;
   padding:4px 10px;border-radius:var(--r-sm)}
 .seg button:hover:not([disabled]):not(.on){color:var(--text)}
-.seg button.on{background:var(--brand);color:#fff}
+.seg button.on{background:var(--brand-strong,var(--brand));color:#fff}
 .seg button[disabled]{opacity:.32;cursor:default}
 /* daily note on the Holdings tab */
 .brief{border-color:rgba(175,100,82,.28);background:linear-gradient(180deg,rgba(175,100,82,.07),rgba(255,255,255,.012))}
@@ -374,7 +374,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:54 · 5a6a68e</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:56 · 801c635</div>
   </div>
 </section>
 
@@ -403,7 +403,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:54 · 5a6a68e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:56 · 801c635</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
