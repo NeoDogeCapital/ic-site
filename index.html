@@ -449,7 +449,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:29 · 4af106a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:44 · 2628335</div>
   </div>
 </section>
 
@@ -484,7 +484,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:29 · 4af106a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:44 · 2628335</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5817,10 +5817,14 @@ function obsList(items){
 function staleRecordMark(row, written){
   try{
     if(!["evening", "premarket"].includes(row.kind)) return "";
-    const rs = JSON.parse(((LIVE.pipeline || {}).returns_restated || {}).value || "null");
-    if(!rs || !rs.at || !(rs.max_change_bp >= 5)) return "";
-    const at = new Date(rs.at);
-    if(!(written < at) || !(row.as_of >= rs.first_date)) return "";
+    // The stamp is a LIST of restatements ({events:[…]}; the first day's single-object shape is
+    // still read). A note is marked when any material one (5bp or more on a day) came after it was
+    // written and reached its date; the largest such event is the one quoted.
+    const st = JSON.parse(((LIVE.pipeline || {}).returns_restated || {}).value || "null");
+    const hit = (st ? (st.events || [st]) : []).filter(e => e && e.at && e.max_change_bp >= 5
+      && written < new Date(e.at) && row.as_of >= e.first_date);
+    if(!hit.length) return "";
+    const rs = hit.reduce((a, b) => b.max_change_bp > a.max_change_bp ? b : a), at = new Date(rs.at);
     const when = at.toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
     return ` <span class="chip warn" title="${rs.rows} daily returns from ${esc(rs.first_date)} were restated on ${esc(when)} ET, by up to ${rs.max_change_bp}bp on a day. Period returns quoted in this note (MTD, QTD, YTD) are from the record as it stood before.">written before the return record was restated · its period returns are out of date</span>`;
   }catch(e){ return ""; }
