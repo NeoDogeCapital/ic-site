@@ -429,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:09 · 5d8ed49</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:37 · 2c95aae</div>
   </div>
 </section>
 
@@ -464,7 +464,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:09 · 5d8ed49</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:37 · 2c95aae</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5380,12 +5380,18 @@ function todayBlock(H){
   // share of TOTAL next to sector weights of INVESTED — two bases, side by side, unlabelled.
   // h.weight is a fraction of invested, so diluting by the cash fraction converts it, which is
   // what engines/book.py::dilute_for_cash does for everything server-side.
-  const cashFrac = (invested + cashAmt) > 0 ? cashAmt / (invested + cashAmt) : 0;
-  const bySec = {};
-  H.forEach(h => { if(h.sector) bySec[h.sector] = (bySec[h.sector] || 0) + (h.weight || 0) * (1 - cashFrac); });
-  const breach = Object.entries(bySec).filter(([, w]) => w > 0.28)
-    .sort((a, b) => b[1] - a[1])
-    .map(([sec, w]) => `<span class="chip bad" title="Share of total capital including cash — the basis the 28% cap is measured on">${esc(sec)} ${pct(w, 1, false)} of total &gt; 28% cap</span>`).join(" ");
+  // THE CAP IS READ, NOT RECOMPUTED (2026-11-18). This chip used to rebuild the 28% test here from
+  // live quotes, so the hard rule read 32.7% on Overview and 32.2% on Risk in the same minute. It now
+  // quotes D.cap — engines.book.cap_table(), the one definition, written by site_build — and says
+  // which close it is priced at. If the payload has no cap table the chip says so; it never falls
+  // back to a browser estimate that would look exactly like the real number.
+  const CAP = D.cap || {}, capLim = CAP.limit ?? 28;
+  const exempt = new Set(CAP.exempt || []);
+  const breach = CAP.table
+    ? Object.entries(CAP.table).filter(([sec, w]) => !exempt.has(sec) && w > capLim)
+        .sort((a, b) => b[1] - a[1])
+        .map(([sec, w]) => `<span class="chip bad" title="engines.book.cap_table — share of total capital including cash, priced at the ${esc(CAP.priced || "?")} close">${esc(sec)} ${num(w, 1)}% of total &gt; ${num(capLim, 0)}% cap · ${esc((CAP.priced || "").slice(5))} close</span>`).join(" ")
+    : `<span class="chip" title="${esc(CAP.error || "no cap table in the payload")}">sector cap: not measured</span>`;
 
   return `<div style="margin-top:16px">` + card("Today",
     n ? `${n} of ${plural(H.length,"holding")} are at a decision point · exits first, then trims, then adds at a good price`
@@ -5415,7 +5421,7 @@ function overview(el){
   </div>
   <div class="grid g-2-1">
     ${card("Growth of the portfolio vs SPY", S.key==="all" ? `since ${D.inception}` : `${pl} · ${S.from} → ${S.to}`, `<div class="chart tall" id="ovCum"></div>`)}
-    ${card("Quad mix", "holdings by stock-level quad", `<div class="chart tall" id="ovQuad"></div>`)}
+    ${card("Quad mix", "by weight of invested capital", `<div class="chart tall" id="ovQuad"></div>`)}
   </div>
   <div class="grid g2" style="margin-top:16px">
     ${card("Allocation", "weight by sector → holding · colour = P&L", `<div class="chart tall" id="ovTree"></div>`)}
@@ -5439,14 +5445,22 @@ function overview(el){
   const seg = document.getElementById("ovSeg");
   if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => {
     if(b.disabled) return; ovPeriod = b.dataset.p; clearCharts(); overview(el); });
-  const qc = {}; H.forEach(h => { const q = h.quad||"N/A"; qc[q] = (qc[q]||0) + (h.weight||0); });
+  // Two different absences used to share one "N/A" slice: an index fund, for which a quad does not
+  // apply, and stocks whose quad could not be computed. They are different facts (2026-11-18).
+  const QN = {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression", Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset / avoid"};
+  const qc = {}; H.forEach(h => {
+    const q = h.quad ? (QN[h.quad] || h.quad) : (h.sector === "Index / ETF" ? "Index fund · n/a" : "No quad · not computed");
+    qc[q] = (qc[q]||0) + (h.weight||0); });
+  const qcol = k => C.q[k.slice(0, 2)] || (k.startsWith("Index") ? "#3a4456" : C.dim);
   mk(document.getElementById("ovQuad"), {
     tooltip:{trigger:"item",valueFormatter:v=>pct(v,1,false)},
     legend:{bottom:0,textStyle:{color:C.muted},icon:"circle",itemWidth:8},
     series:[{type:"pie",radius:["55%","78%"],center:["50%","45%"],padAngle:2,itemStyle:{borderRadius:6},
-      label:{show:true,color:C.text,formatter:p=>`${p.name}\n${(p.percent).toFixed(0)}%`,fontSize:12},
-      labelLine:{lineStyle:{color:C.dim}},
-      data:Object.entries(qc).sort().map(([k,v])=>({name:k,value:v,itemStyle:{color:C.q[k]||C.dim}}))}]
+      // Wrapped, not truncated: the largest slice's label used to render as "…" (2026-11-18).
+      label:{show:true,color:C.text,formatter:p=>`${p.name.split(" · ")[0]}\n${(p.percent).toFixed(0)}%`,fontSize:12,
+             width:90,overflow:"break",lineHeight:15},
+      labelLine:{lineStyle:{color:C.dim},length:8,length2:6},
+      data:Object.entries(qc).sort().map(([k,v])=>({name:k,value:v,itemStyle:{color:qcol(k)}}))}]
   });
   const bySec = {}; H.forEach(h => { const s = h.sector||"Other"; (bySec[s] = bySec[s]||[]).push(h); });
   const plColor = p => p==null ? "#2a3342" : p>=0 ? `rgba(63,207,142,${Math.min(.9,.25+p*1.2)})` : `rgba(239,100,100,${Math.min(.9,.25-p*1.6)})`;
@@ -5980,9 +5994,17 @@ function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
     memoPointer("universe morning note") +
-  `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+  `<div class="kpis" style="grid-template-columns:repeat(5,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
       `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
+    ${(() => {
+      // THE FIFTH CARD (2026-11-18). The four quads summed to 79% of the universe and the rest —
+      // names with an undefined axis (negative trailing EPS, no forward estimate) — appeared in no
+      // card and no dot on the map. Missing must look missing, so it is counted, not inferred.
+      const none = n - ["Q1","Q2","Q3","Q4"].reduce((a, q) => a + (qc[q] || 0), 0);
+      return kpi("No quad · axis undefined", `<span style="color:${C.dim}">${none}</span>`,
+                 `${(none/n*100).toFixed(0)}% of universe · not on the map`);
+    })()}
   </div>
   <div class="card"><div class="card-h"><div><h3>Revenue momentum vs earnings momentum</h3><div class="sub">x = forward minus trailing revenue growth · y = forward minus trailing EPS growth · size = alignment · rings = holdings</div></div>
     <div class="filters" id="uf">${[["all","All"],["held","Holdings"],["watch","Watchlist"],["accum","Accumulate"]].map(([k,l])=>`<button class="fbtn ${uFilter===k?'on':''}" data-f="${k}">${l}</button>`).join("")}</div></div>
