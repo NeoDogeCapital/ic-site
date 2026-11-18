@@ -16,14 +16,14 @@
 :root{
   --brand:#af6452; --brand-deep:#633238; --brand-soft:rgba(175,100,82,.14);
   --bg:#0a0d12; --bg2:#0f131a; --panel:rgba(22,27,36,.72); --panel-solid:#161b24; --line:rgba(255,255,255,.07);
-  --line2:rgba(255,255,255,.12); --text:#e6e9ef; --muted:#8b93a3; --dim:#5d6575;
+  --line2:rgba(255,255,255,.12); --text:#e6e9ef; --muted:#8b93a3; --dim:#7c8596;
   --accent:#6aa6f8; --accent2:#8fbcff; --gold:#d4b25c; --green:#3fcf8e; --red:#ef6464; --amber:#f0a94a; --violet:#a78bfa;
   --q1:#6aa6f8; --q2:#3fcf8e; --q3:#ef6464; --q4:#f0a94a;
   --r:14px; --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
-body{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:48px 48px;background-position:-1px -1px;min-height:100vh}
+body{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:48px 48px;background-position:-1px -1px;min-height:100vh;min-height:100dvh}
 body:before{content:"";position:fixed;inset:0;background:radial-gradient(1200px 600px at 50% -10%,rgba(106,166,248,.08),transparent 60%),linear-gradient(to bottom,transparent 0,var(--bg) 85%);pointer-events:none;z-index:0}
 a{color:var(--accent)}
 .mono{font-family:var(--mono)}
@@ -32,7 +32,7 @@ a{color:var(--accent)}
 [hidden]{display:none!important}
 
 /* gate */
-#gate{position:relative;z-index:2;min-height:100vh;display:grid;place-items:center;padding:24px}
+#gate{position:relative;z-index:2;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px}
 .gate-card{width:100%;max-width:340px}
 .gate-hero{background:linear-gradient(180deg,rgba(99,50,56,.30),rgba(18,22,30,.90));border:1px solid var(--line2);border-radius:18px;padding:44px 24px 58px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
 .logo{width:48px;height:48px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,13,18,.6);display:grid;place-items:center;margin:0 auto 18px}
@@ -40,9 +40,11 @@ a{color:var(--accent)}
 .field{margin-top:34px}
 .input{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:12px 13px;font:inherit;outline:none;transition:border .15s}
 .input:focus{border-color:var(--accent)}
+.flabel{display:block;margin:0 0 6px;color:var(--muted);font-size:12px;font-weight:500}
+.flabel+.input{margin-bottom:14px}
 .check{display:flex;align-items:center;gap:9px;margin:14px 0 16px;color:var(--muted);font-size:13px}
 .check input{accent-color:var(--accent);width:15px;height:15px}
-.btn{width:100%;background:var(--brand);color:#0a1120;border:0;border-radius:10px;padding:12px;font:600 14px Inter,sans-serif;cursor:pointer;transition:filter .15s}
+.btn{width:100%;min-height:44px;background:var(--brand);color:#000;border:0;border-radius:10px;padding:12px;font:600 14px Inter,sans-serif;cursor:pointer;transition:filter .15s}
 .btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.6;cursor:wait}
 .gate-foot{border-top:1px solid var(--line);margin-top:30px;padding-top:16px;text-align:center;color:var(--dim);font-size:12px}
 .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:18px;text-align:center}
@@ -56,7 +58,7 @@ header.top{position:sticky;top:0;z-index:20;background:rgba(10,13,18,.78);backdr
 .brand b{font-weight:700;font-size:15px;white-space:nowrap}
 nav.tabs{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
-nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;font-size:13px;white-space:nowrap;transition:all .15s}
+nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;font-size:13px;white-space:nowrap;transition:color .15s,background-color .15s}
 nav.tabs a:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .navgrp{align-self:center;margin:0 2px 0 10px;padding-left:10px;border-left:1px solid var(--line);color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap;user-select:none}
 nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 0 0 1px rgba(175,100,82,.4)}
@@ -75,6 +77,17 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 .menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
 .mgrp{padding:9px 11px 3px;color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase}
 .menupanel a.on{color:var(--text);background:rgba(106,166,248,.15);box-shadow:inset 0 0 0 1px rgba(106,166,248,.28)}
+/* ⚠ THE TABS GET THEIR OWN ROW ON A DESKTOP. With the brand, the as-of line, nine tabs, two group
+   labels, the build stamp, the health badge, Menu and Sign out sharing one row, a 1440px window
+   showed five tabs: Signals was cut mid-word and Markets, Memo and Research sat off-screen in a
+   strip whose scrollbar is hidden (measured 2026-11-17: 523px visible of 855px). A section nobody
+   can see is a section that does not exist. The strip is 855px, so on its own row it fits any
+   window wide enough to show it at all; below 1150px the menu replaces it as before. */
+@media(min-width:1151px){
+  .top-in{flex-wrap:wrap;row-gap:4px;padding-bottom:6px}
+  nav.tabs{order:10;flex:1 0 100%;margin-left:-12px;overflow-x:visible}
+  .menuwrap{margin-left:auto}      /* nav no longer pushes the controls right, so this does */
+}
 @media(max-width:1150px){nav.tabs{display:none}}
 @media(min-width:1151px){.menubtn .mlabel{display:none}}
 /* The brand title is white-space:nowrap and its wrapper had no min-width:0, so on a narrow
@@ -87,6 +100,30 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
   .brand b{display:block;overflow:hidden;text-overflow:ellipsis}
   .brand #asof{display:none}
   .buildstamp{display:none}      /* a build timestamp is not worth header space on a phone */
+  /* The health badge wrapped to three lines and squeezed the name to "Inte…". It moves to its own
+     line under the brand instead of being hidden: whether last night's run passed is the one fact
+     in the header worth keeping on a phone. */
+  .top-in{flex-wrap:wrap;row-gap:6px}
+  #pipestate{order:10;flex:1 0 100%;margin-right:0!important;font-size:11px}
+}
+/* Safe area: on a phone with a notch, held sideways, the header ran under it. */
+@supports(padding:max(0px)){
+  .top-in{padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+  @media(max-width:760px){.top-in{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}}
+}
+/* ⚠ TOUCH TARGETS. On a phone almost every control measured under 44px tall (Universe 39 of 39,
+   Markets 32 of 32). Keyed to the POINTER, not the width: a narrow desktop window keeps its compact
+   controls, and a tablet held wide still gets fingertip-sized ones. */
+@media(pointer:coarse){
+  button,.btn,.lock,.fbtn,.tfb,.indchip,.bbtn,select,.menupanel a,nav.tabs a{min-height:44px}
+  button,.lock,.fbtn,.tfb,.indchip,.bbtn{display:inline-flex;align-items:center;justify-content:center}
+  .tbl th[data-sort]{height:44px}
+  .lwckx{position:relative}
+  .lwckx::before{content:"";position:absolute;inset:-12px}   /* the chip's × gets a 44px hit area */
+}
+/* Reduced motion: the site animates little, but what it does animate should rest. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
 }
 .lock{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
 main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
@@ -183,7 +220,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
 .lwcbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .tfs,.lwcopts{display:flex;gap:3px;flex-wrap:wrap}
 .tfb,.indchip{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--line);
-  border-radius:7px;padding:4px 9px;font:500 11.5px Inter,sans-serif;cursor:pointer;transition:all .13s}
+  border-radius:7px;padding:4px 9px;font:500 11.5px Inter,sans-serif;cursor:pointer;transition:color .13s,background-color .13s,border-color .13s}
 .tfb:hover,.indchip:hover{color:var(--text);background:rgba(255,255,255,.07)}
 .tfb.on,.indchip.on{color:var(--text);background:var(--brand-soft);border-color:rgba(175,100,82,.45)}
 /* An indicator that is OFF must read as off at a glance, not merely un-highlighted -- the chip row
@@ -316,15 +353,17 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
     <div class="gate-hero">
       <img src="assets/logo-wordmark-light.png" alt="Integrity Wealth Partners" style="width:min(300px,78%);height:auto;margin:0 auto 18px;display:block">
       <h1>Integrity Compounders</h1>
-      <div class="caps">Portfolio Dashboard</div>
+      <div class="caps">Portfolio analytics</div>
     </div>
     <form id="gateForm" class="field" autocomplete="on">
-      <input id="em" class="input" type="email" placeholder="Email" autocomplete="username" required>
-      <input id="pw" class="input" type="password" placeholder="Password" autocomplete="current-password" required>
+      <label class="flabel" for="em">Email</label>
+      <input id="em" class="input" type="email" autocomplete="username" inputmode="email" required>
+      <label class="flabel" for="pw">Password</label>
+      <input id="pw" class="input" type="password" autocomplete="current-password" required>
       <button id="go" class="btn" type="submit">Sign in</button>
-      <div id="err" class="err"></div>
+      <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-17 22:00 · f6f88f9</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:46 · dc784cf</div>
   </div>
 </section>
 
@@ -353,7 +392,7 @@ sup.srank{font:600 9px var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-17 22:00 · f6f88f9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:9px;opacity:.5;margin-right:10px" title="page build">2026-11-18 02:46 · dc784cf</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
