@@ -429,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:07 · 637b958</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:08 · fd17bdb</div>
   </div>
 </section>
 
@@ -464,7 +464,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:07 · 637b958</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:08 · fd17bdb</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5678,17 +5678,24 @@ function briefBody(b){
 /* ═══ HOLDING DRAWER ═════════════════════════════════════════════════════ */
 // The drawer is a dialog: it takes focus when it opens and hands it back when it closes, so a keyboard
 // or screen-reader user lands inside it rather than on <body> behind the scrim (2026-11-18).
-let _drawerReturn = null;
+let _drawerReturn = null, _drawerTk = null;
 function drawerOpened(tk){
   const d = document.getElementById("drawer");
   if(!d.contains(document.activeElement)) _drawerReturn = document.activeElement;
+  _drawerTk = tk;
   d.setAttribute("aria-label", `${tk} detail`);
   const x = d.querySelector("button.x"); if(x){ x.setAttribute("aria-label", "Close"); x.focus({preventScroll:true}); }
 }
 function closeDrawer(silent){ const d = document.getElementById("drawer"); const was = d.classList.contains("on");
   d.classList.remove("on"); document.getElementById("scrim").classList.remove("on");
-  if(was && _drawerReturn && document.contains(_drawerReturn)) _drawerReturn.focus({preventScroll:true});
-  _drawerReturn = null;
+  // Opening from a row changes the hash, which re-renders the table, so the element that had focus
+  // is often gone by now: fall back to the row for the same name in the current table.
+  if(was){
+    const back = (_drawerReturn && document.contains(_drawerReturn)) ? _drawerReturn
+      : (_drawerTk && document.querySelector(`tr[data-tk="${CSS.escape(_drawerTk)}"][tabindex], tr[data-open="${CSS.escape(_drawerTk)}"][tabindex]`));
+    if(back) back.focus({preventScroll:true});
+  }
+  _drawerReturn = null; _drawerTk = null;
   if(!silent && location.hash.includes("/")) history.replaceState(null,"",location.hash.split("/")[0]); }
 document.getElementById("scrim").onclick = () => closeDrawer();
 // KEYBOARD: rows that open a name and headers that sort were mouse-only (22 clickable rows on
