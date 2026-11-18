@@ -424,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:56 · fb81866</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:01 · 733ba3a</div>
   </div>
 </section>
 
@@ -459,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:56 · fb81866</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:01 · 733ba3a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -5368,7 +5368,7 @@ function todayBlock(H){
   H.forEach(h => { if(h.sector) bySec[h.sector] = (bySec[h.sector] || 0) + (h.weight || 0) * (1 - cashFrac); });
   const breach = Object.entries(bySec).filter(([, w]) => w > 0.28)
     .sort((a, b) => b[1] - a[1])
-    .map(([sec, w]) => `<span class="chip bad">${esc(sec)} ${pct(w, 1, false)} &gt; 28%</span>`).join(" ");
+    .map(([sec, w]) => `<span class="chip bad" title="Share of total capital including cash — the basis the 28% cap is measured on">${esc(sec)} ${pct(w, 1, false)} of total &gt; 28% cap</span>`).join(" ");
 
   return `<div style="margin-top:16px">` + card("Today",
     n ? `${n} of ${plural(H.length,"holding")} are at a decision point · exits first, then trims, then adds at a good price`
@@ -5537,7 +5537,7 @@ function drawHoldings(){
   // The size and factor block is the same one the Grid and Universe tables use, built from FAC_KEYS
   // so all three cannot disagree about how many columns there are. LIVE.suniv is loaded at boot, not
   // per tab, so Holdings needs no extra fetch for it.
-  const cols = [["tk","Holding"],["weight","Weight"],["value","Mkt value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
+  const cols = [["tk","Holding"],["weight","Weight · invested"],["value","Mkt value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
                 ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],
                 ["mcap","Mkt cap"], ...FACTORS.map(f => ["f_" + f.k, f.label]),
                 ["next_er","Next ER"],["thesis_status","Thesis"]];
