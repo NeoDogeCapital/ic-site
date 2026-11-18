@@ -73,6 +73,27 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
    past the fold were unreachable with no affordance that they existed. The menu lists every
    tab and is always available; below 1150px it replaces the strip entirely. */
 .menuwrap{position:relative;flex:0 0 auto}
+/* technical alerts bell (alerts.js) — the count is HIGH+MEDIUM flags on holdings, newest session, until opened */
+.bellwrap{position:relative;flex:0 0 auto}
+.bellbtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;position:relative}
+.bellct{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+  background:var(--red);color:#000;font-size:var(--fs-xs);font-weight:700;line-height:18px;text-align:center}
+.bellct.unk{background:var(--amber)}
+.bellpanel{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:min(420px,calc(100vw - 32px));
+  max-height:min(70vh,560px);overflow-y:auto;background:var(--panel-solid,#161b24);border:1px solid var(--line);
+  border-radius:var(--r-md);box-shadow:0 12px 40px rgba(0,0,0,.45);padding:12px}
+.bp-h{font-weight:600;font-size:var(--fs-base);margin:0 0 8px}
+.bp-g{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 0 4px}
+.bp-row{display:flex;align-items:flex-start;gap:8px;width:100%;text-align:left;background:none;border:0;color:var(--text);
+  padding:8px 6px;border-radius:var(--r-xs);cursor:pointer;font:inherit;min-height:44px}
+.bp-row:hover,.bp-row:focus-visible{background:rgba(255,255,255,.05)}
+.bp-dot{flex:0 0 8px;height:8px;border-radius:50%;margin-top:6px}
+.bp-tk{flex:0 0 52px;font-weight:600;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-md)}
+.bp-t{flex:1;font-size:var(--fs-md);line-height:1.35}
+.bp-sub{display:block;color:var(--muted);font-size:var(--fs-sm);margin-top:2px}
+.bp-low summary{cursor:pointer;color:var(--muted);font-size:var(--fs-sm);margin-top:10px;min-height:32px;display:flex;align-items:center}
+.bp-empty{font-size:var(--fs-md);margin:6px 0}
+.bp-f{border-top:1px solid var(--line);margin-top:12px;padding-top:10px;color:var(--muted);font-size:var(--fs-sm);line-height:1.45}
 .menubtn{display:inline-flex;align-items:center;gap:6px}
 .menupanel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:200px;padding:6px;
   /* --panel is rgba(...,.72) on purpose, for cards sitting over the page. A floating dropdown
@@ -391,7 +412,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:03 · a28a177</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:25 · c1aae0f</div>
   </div>
 </section>
 
@@ -415,12 +436,18 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <a href="#memo" data-v="memo">Memo</a>
       <a href="#research" data-v="research">Research</a>
     </nav>
+    <div class="bellwrap">
+      <button class="lock bellbtn" id="bellbtn" aria-haspopup="true" aria-expanded="false" aria-controls="bellpanel"
+              title="Technical alerts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bellct" id="bellct" hidden></span></button>
+      <div class="bellpanel" id="bellpanel" role="dialog" aria-label="Technical alerts" hidden></div>
+    </div>
     <div class="menuwrap">
       <button class="lock menubtn" id="menubtn" aria-haspopup="true" aria-expanded="false"
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:03 · a28a177</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:25 · c1aae0f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -521,6 +548,11 @@ async function enter(){
   try{ await loadPayload(); await loadQuotes(); LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
     LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
     LIVE.briefs = await qAll("site_daily_brief", r => r.order("as_of", {ascending:false}));
+    // Technical alerts (db/072). A failed load is NULL, never [] — the bell must say "unknown",
+    // not "quiet night" (alerts.js).
+    try{ LIVE.flags = await qAll("site_technical_flags", r => r.order("as_of", {ascending:false})); }
+    catch(e){ LIVE.flags = null; }
+    renderBell();
     LIVE.vdur = Object.fromEntries((await qAll("site_valuation_duration")).map(v => [v.ticker, v]));
     LIVE.vdurStats = null; LIVE.vdurHist = {};     // cross-section facts and per-name history are derived from it
     // WHY a name is absent from the DCF set, as recorded by valuation_duration.py for the current run
@@ -4870,6 +4902,124 @@ async function paperCard(el){
   };
   draw();
 }
+/* ═══ ALERTS — the market-technicals agent's flags, behind a bell in the header ═══════════════
+ *
+ * scripts/technical_alerts.py writes ic_technical_flags every night (engines/technical_alerts.py
+ * decides what matters; db/072 serves it as site_technical_flags). This is the surface Niko asked
+ * for: "I want to be flagged when these happen."
+ *
+ * WHAT THE BADGE COUNTS: HIGH and MEDIUM flags on HOLDINGS from the newest session, and only until
+ * you open the panel for that session. The seen marker is the session date in localStorage — a
+ * per-viewer convenience, which is what browser storage is for here; losing it just shows the
+ * badge again. LOW flags and watchlist setups are in the panel but never in the count: a badge that
+ * lights up every night for a 35-day EMA flap trains people to ignore it.
+ *
+ * ⚠ "COULD NOT LOAD" IS NOT "NO ALERTS". LIVE.flags is null when the view failed, and the bell says
+ * so rather than showing an empty panel that reads as a quiet night — missing information must look
+ * missing. An empty ARRAY is a genuine quiet night.
+ *
+ * ⚠ THIS IS TIMING, NOT THESIS (V12.1). The panel's own footer says so; a breakdown here is a reason
+ * to look at the thesis and the timing field, never a sell instruction.
+ */
+const FLAG_SEEN_KEY = "ic.flags.seen";
+let bellOpen = false;
+
+const _flagLatest = () => (LIVE.flags && LIVE.flags.length) ? LIVE.flags[0].as_of : null;
+const _flagDay = d => (LIVE.flags || []).filter(f => f.as_of === d);
+const _flagCount = d => _flagDay(d).filter(f => f.scope === "holding" && f.severity >= 2).length;
+const _seen = () => { try { return localStorage.getItem(FLAG_SEEN_KEY); } catch(e){ return null; } };
+const _markSeen = d => { try { localStorage.setItem(FLAG_SEEN_KEY, d); } catch(e){} };
+
+const FLAG_TAG = {whipsaw: "whipsaw", trend_filter_veto: "trend filter: no new position"};
+const _tagText = t => t.startsWith("confluence:") ? `${t.split(":")[1]} signals agree` : (FLAG_TAG[t] || t);
+const _lvlCol = l => l === "high" ? C.red : l === "medium" ? C.amber : C.dim;
+const _kindWord = k => k === "breakdown" ? "breakdown" : k === "extension" ? "extended" : "setup";
+
+function renderBell(){
+  const btn = document.getElementById("bellbtn"), ct = document.getElementById("bellct");
+  if(!btn || !ct) return;
+  if(LIVE.flags === null || LIVE.flags === undefined){
+    ct.hidden = false; ct.textContent = "?"; ct.className = "bellct unk";
+    btn.title = "Technical alerts could not be loaded"; return;
+  }
+  const d = _flagLatest(), n = d ? _flagCount(d) : 0;
+  const unseen = d && _seen() !== d && n > 0;
+  ct.hidden = !unseen; ct.textContent = n > 9 ? "9+" : String(n); ct.className = "bellct";
+  btn.title = d ? `Technical alerts · ${d} · ${plural(n, "flag")} on holdings` : "Technical alerts · none recorded yet";
+  btn.setAttribute("aria-label", btn.title);
+}
+
+function bellPanelHTML(){
+  if(LIVE.flags === null || LIVE.flags === undefined)
+    return `<div class="bp-h">Technical alerts</div><p class="muted bp-empty">The alerts could not be loaded, so
+      this is not a quiet night — it is an unknown one. Reload, or check the pipeline badge.</p>`;
+  const d = _flagLatest();
+  if(!d) return `<div class="bp-h">Technical alerts</div><p class="muted bp-empty">None recorded yet. The
+    agent runs after the close.</p>`;
+  const day = _flagDay(d);
+  const row = f => `<button class="bp-row" data-tk="${esc(f.ticker)}" title="Open ${esc(f.ticker)}">
+      <span class="bp-dot" style="background:${_lvlCol(f.level)}"></span>
+      <span class="bp-tk">${esc(f.ticker)}</span>
+      <span class="bp-t">${esc(f.title)}<span class="bp-sub">${esc(_kindWord(f.kind))}${
+        f.context && f.context.grade ? ` · grade ${esc(f.context.grade)}` : ""}${
+        f.context && f.context.action ? ` · ${esc(String(f.context.action).replaceAll("_"," ").toLowerCase())}` : ""}${
+        (f.tags||[]).map(t => ` · ${esc(_tagText(t))}`).join("")}</span></span>
+    </button>`;
+  const hold = day.filter(f => f.scope === "holding").sort((a,b) => b.severity - a.severity || a.ticker.localeCompare(b.ticker));
+  const top = hold.filter(f => f.severity >= 2), low = hold.filter(f => f.severity < 2);
+  const watch = day.filter(f => f.scope === "watchlist");
+  return `<div class="bp-h">Technical alerts <span class="muted">· ${esc(d)}</span></div>
+    ${top.length ? `<div class="bp-g">Holdings</div>${top.map(row).join("")}`
+                 : `<p class="muted bp-empty">No high or medium flags on holdings this session.</p>`}
+    ${watch.length ? `<div class="bp-g">Watchlist setups <span class="muted">· names the grid wants to buy</span></div>${watch.map(row).join("")}` : ""}
+    ${low.length ? `<details class="bp-low"><summary>${plural(low.length, "low-level flag")} on holdings</summary>${low.map(row).join("")}</details>` : ""}
+    <div class="bp-f">Timing and confirmation, never thesis: a flag is a reason to look at the thesis and
+      the timing field, not an instruction to trade. <a href="#memo">Read the technicals note →</a></div>`;
+}
+
+function toggleBell(force){
+  const p = document.getElementById("bellpanel"), btn = document.getElementById("bellbtn");
+  if(!p || !btn) return;
+  bellOpen = force === undefined ? !bellOpen : force;
+  if(bellOpen){
+    p.innerHTML = bellPanelHTML();
+    p.querySelectorAll(".bp-row[data-tk]").forEach(b => b.onclick = () => { toggleBell(false); openName(b.dataset.tk); });
+    p.querySelectorAll('a[href="#memo"]').forEach(a => a.onclick = () => toggleBell(false));
+    const d = _flagLatest(); if(d) _markSeen(d);
+    renderBell();
+  }
+  p.hidden = !bellOpen; btn.setAttribute("aria-expanded", String(bellOpen));
+}
+
+if(typeof window !== "undefined" && !window.__bellWired){
+  window.__bellWired = true;
+  document.addEventListener("click", e => {
+    if(e.target.closest && e.target.closest("#bellbtn")){ toggleBell(); return; }
+    if(bellOpen && !(e.target.closest && e.target.closest("#bellpanel"))) toggleBell(false);
+  });
+  document.addEventListener("keydown", e => { if(e.key === "Escape" && bellOpen) toggleBell(false); });
+}
+
+/* The Memo tab's fourth note. Same card as the others; tickers open the drawer like everywhere else. */
+function memoTechnicals(row){
+  if(!row || !row.payload) return "";
+  const b = row.payload;
+  const li = xs => (xs||[]).map(x => `<li><a href="#grid/${esc(x.ticker)}" class="tk"
+      style="text-decoration:none">${esc(x.ticker)}</a> — ${esc(x.read)}</li>`).join("");
+  const hold = li(b.holdings), watch = li(b.watchlist);
+  return `<div class="card brief technicals">
+    <div class="bhead"><div><div class="caps">Technicals note · setups and breakdowns · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
+      <h3>${esc(b.headline||"")}</h3></div></div>
+    <div class="bgrid">
+      ${hold ? `<div><h4>Holdings</h4><ul class="blist">${hold}</ul></div>` : ""}
+      ${watch ? `<div><h4>Watchlist setups</h4><ul class="blist">${watch}</ul></div>` : ""}
+    </div>
+    ${b.quiet ? `<p class="muted" style="margin:10px 0 0">${esc(b.quiet)}</p>` : ""}
+    ${b.watch_next ? `<p class="blede" style="margin-top:10px"><b>Next session.</b> ${esc(b.watch_next)}</p>` : ""}
+    <div class="note" style="margin-top:10px">Written from flags a deterministic engine ranked first
+      (engines/technical_alerts.py). Momentum is timing and confirmation, never thesis.</div>
+  </div>`;
+}
 /* ═══ MARKET MEMO (all three daily notes, one day at a time) ══════════════ */
 // The three notes answer three different questions and were scattered across two tabs: the morning
 // note and the evening close note on Holdings, the universe note on Grid and Universe. Read in
@@ -4945,19 +5095,20 @@ async function memo(el){
     // the close note for the anchored day may not exist yet; fall back to the most recent one
     // before it, clearly labelled with its own date rather than presented as this day's
     const ev = at("evening") || B.filter(x => (x.kind||"evening") === "evening" && x.as_of < d)[0];
-    const mo = at("premarket"), un = at("universe");
+    const mo = at("premarket"), un = at("universe"), te = at("technicals");
     const nav = `<span class="bnav">
       <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:var(--fs-sm)">${d}</span>
       <button class="bbtn" data-md="-1" ${memoIdx<=0?"disabled":""} title="Later">→</button></span>`;
-    const have = [mo && "morning", un && "universe", ev && "close"].filter(Boolean).join(" · ");
+    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals"].filter(Boolean).join(" · ");
     el.innerHTML = head("Memo", "Market memo",
       `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
       memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
-      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) +
-      `<div class="note" style="margin-top:14px">Three notes, each from a different point in the day:
+      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te) +
+      `<div class="note" style="margin-top:14px">Four notes, each from a different point in the day:
        the morning note is what you are walking into, the universe note covers all ~453 tracked names
-       rather than the book, and the close note is how the day actually went. Every figure in them is
+       rather than the book, and the close note is how the day actually went, and the technicals note reads the
+       setups and breakdowns the alerts engine flagged on the book after the close. Every figure in them is
        computed first and the model is told to add none of its own — commentary on what the model is
        showing, not advice or a forecast. Use ← → to read back through earlier days.</div>`;
     el.querySelectorAll(".bbtn[data-md]").forEach(b =>
