@@ -429,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:37 · 2c95aae</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:48 · bb9b36e</div>
   </div>
 </section>
 
@@ -464,7 +464,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:37 · 2c95aae</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:48 · bb9b36e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -752,7 +752,12 @@ const erCell = d => !d ? "—" : erNext(d) ? esc(d)
 const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const qchip = q => q ? `<span class="chip ${q.toLowerCase()}">${q}</span>` : `<span class="chip">—</span>`;
+// A bare "Q3" in red on a name growing 39% reads as an error; the chip says what the quad means
+// where there is room (drawers), and keeps the short code with a tooltip in dense tables.
+const QUAD_NAME = {Q1:"Full compounders", Q2:"Margin compression", Q3:"Full deterioration", Q4:"Reset / avoid"};
+const qchip = (q, long = false) => q
+  ? `<span class="chip ${q.toLowerCase()}" title="${QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}">${long && QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}</span>`
+  : `<span class="chip" title="Quad not computed">—</span>`;
 
 /* ═══ size + factor cells (shared by the Grid and the Universe table) ═══════════════
    site_universe carries market cap and six factor percentiles for every active name. factor_scorer.py
@@ -836,16 +841,19 @@ function facCell(u, f, tag){
 // disagree: on 2026-10-15 NEM was NEUTRAL to v1 and BULLISH to v2, AVGO NEUTRAL and BEARISH. A
 // reader seeing "Up" on one tab and "Down" on another for the same name deserves to know they are
 // different measurements rather than a contradiction.
+// The measure is now IN the label, not only in a tooltip (2026-11-18): APH read "Uptrend" in the
+// grid and "▼ Bear" in its own drawer, and only a hover told a reader they were two measurements.
+// Hover is invisible to keyboard and touch, so it cannot carry the distinction.
 const TREND_LOOK = {
-  UPTREND:   ["up",   "▲ Up",   "200-day trend (drives the grid)"],
-  DOWNTREND: ["down", "▼ Down", "200-day trend (drives the grid)"],
-  NEUTRAL:   ["flat", "■ Flat", "200-day trend (drives the grid)"],
-  BULLISH:   ["up",   "▲ Bull", "track line (technical v2)"],
-  BEARISH:   ["down", "▼ Bear", "track line (technical v2)"],
+  UPTREND:   ["up",   "200d ▲ Up",     "200-day trend: price and averages (drives the grid)"],
+  DOWNTREND: ["down", "200d ▼ Down",   "200-day trend: price and averages (drives the grid)"],
+  NEUTRAL:   ["flat", "200d ■ Flat",   "200-day trend: price and averages (drives the grid)"],
+  BULLISH:   ["up",   "Track ▲ Bull",  "Track line (technical v2): timing context, not the grid's trend"],
+  BEARISH:   ["down", "Track ▼ Bear",  "Track line (technical v2): timing context, not the grid's trend"],
 };
 const trendChip = t => { if(!t) return "—";
   const [cls, label, title] = TREND_LOOK[t] || ["flat", t, ""];
-  return `<span class="chip ${cls}" title="${title}">${label}</span>`; };
+  return `<span class="chip ${cls}" title="${title}" aria-label="${title.split(":")[0]}: ${label.replace(/^\S+ /, "")}">${label}</span>`; };
 const alignBar = (v, b) => { if(v==null) return "—"; const col = v>=65?C.green:v<35?C.red:C.accent;
   return `<span class="bar"><i style="width:${Math.max(3,Math.min(100,v))}%;background:${col}"></i></span> <span class="mono" style="font-size:var(--fs-sm);color:${col}">${v.toFixed(0)}</span>`; };
 const thesisChip = s => !s ? `<span class="chip">—</span>` : `<span class="chip ${s==='BROKEN'||s==='REVIEW'?'bad':s==='WATCH'?'warn':'ok'}">${s}</span>`;
@@ -915,7 +923,34 @@ const TIMING_LBL = {BUY_ZONE:"Low in range", ACCUMULATE_OK:"Lower half", NEUTRAL
                     AVOID_EXTENDED:"Upper, below anchor", NO_DATA:"No data"};   // technical_v2.timing_frame
 const techLbl = v => v ? (TECH_LBL[v] || String(v).replaceAll("_", " ")) : "—";
 const timingLbl = v => v ? (TIMING_LBL[v] || String(v).replaceAll("_", " ")) : "—";
-const ENUM_LBL = {tech_rating: techLbl, timing: timingLbl};
+// THE MODEL'S OTHER CODES, IN WORDS (2026-11-18). Raw enum names reached the page — GP_LEADING,
+// GOOD_COMPOUNDER, TIER_2, ADD_ON_WEAKNESS, "Cover DEAR" — readable only to whoever wrote the
+// engine. Stored values are unchanged; only what a reader sees. An unmapped code falls back to
+// sentence case of itself, so a new value is still visible rather than blank.
+const CODE_LBL = {
+  earnings_quality: {EPS_CONFIRMED:"EPS confirmed by gross profit", EPS_ENGINEERED:"EPS engineered",
+                     GP_LEADING:"Gross profit leading", NEUTRAL:"Neutral", DATA_INCOMPLETE:"Data incomplete"},
+  qgs_tier:         {RARE_ELITE:"Rare elite", EXCEPTIONAL:"Exceptional", GOOD_COMPOUNDER:"Good compounder",
+                     AVERAGE:"Average", LOW_QUALITY:"Low quality"},
+  quality_profile:  {FULL_COMPOUNDER:"Full compounder", QUALITY_WATCH:"Quality watch", DEVELOPING:"Developing",
+                     QUALITY_CONCERN:"Quality concern", DATA_INCOMPLETE:"Data incomplete"},
+  score_tier:       {TIER_1:"Tier 1 · composite ≥ 8.0", TIER_2:"Tier 2 · composite 6.5–7.9",
+                     WATCHLIST:"Watchlist · composite 5.0–6.4", DNQ:"Does not qualify · under 5.0"},
+  bucket:           {ACCUMULATE:"Accumulate", HOLD:"Hold", DISTRIBUTE:"Distribute"},
+  ext:              {OVEREXTENDED:"Overextended", HEALTHY:"Healthy", OVERSOLD:"Oversold"},
+  cost:             {CHEAP:"Cheap", NEUTRAL:"Fair", DEAR:"Expensive"},   // market_regime.cost_state
+  quad:             {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression",
+                     Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset / avoid"},
+  trend:            {UPTREND:"200d uptrend", DOWNTREND:"200d downtrend", NEUTRAL:"200d no trend",
+                     BULLISH:"Track line bullish", BEARISH:"Track line bearish"},
+};
+const sentenceCase = v => { const s = String(v).replaceAll("_", " ").toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+const codeLbl = (field, v) => (v == null || v === "") ? "—"
+  : ((CODE_LBL[field] || {})[v] ?? (field === "tech_rating" ? techLbl(v) : field === "timing" ? timingLbl(v) : sentenceCase(v)));
+const ENUM_LBL = {tech_rating: techLbl, timing: timingLbl, action: v => codeLbl("action", v),
+                  qgs_tier: v => codeLbl("qgs_tier", v), quadrant: v => codeLbl("quad", v),
+                  earnings_quality: v => codeLbl("earnings_quality", v), trend: v => codeLbl("trend", v),
+                  quality_profile: v => codeLbl("quality_profile", v)};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4,
                     HOLD_WAIT_TREND:5, HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9,
                     REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
@@ -1141,7 +1176,7 @@ const SIG_COLS = [
   // grade and quad come from the decision matrix, not from technicals_v2 -- this table joins the
   // two so the technical read sits beside what the model thinks of the business.
   ["grade","Grade","ord"], ["quad","Quad","ord"],
-  ["trend","Trend line","ord"], ["range_pos","Timing","ord"],
+  ["trend","Track line","ord"], ["range_pos","Timing","ord"],
   ["trade_mid","Trade range (1w)","num"], ["trend_mid","Trend range (1m)","num"], ["rsi","RSI","num"],
   ["rvol","Rel vol","num"], ["above_52w_low_avwap","52w-low VWAP","ord"], ["td","TD b/s","num"],
   ["range_move","Range moving","ord"],
@@ -2867,7 +2902,7 @@ async function openName(tk){
   document.getElementById("drIn").innerHTML = `
     <div class="dr-top"><div><div class="caps">${esc(m.sector||"")}</div><h2>${esc(tk)}</h2>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-        ${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${qchip(m.quadrant)}${trendChip(v2.trend)}
+        ${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${qchip(m.quadrant, true)}${trendChip(m.trend)}${trendChip(v2.trend)}
         ${held?'<span class="chip">held</span>':""}</div></div>
       <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
@@ -3275,7 +3310,7 @@ function pillarBlock(m){
              : comp >= 5 ? "WATCHLIST — under the 6.5 line" : "DNQ — under 5.0";
   const anchors = [["Moat durability", m.p1_moat], ["Economics (ROIC level)", m.p1_economics],
                    ["Reinvestment quality", m.p1_reinvestment]].filter(([,v]) => v != null);
-  return `<div class="sec"><h4>Pillars${m.score_tier ? ` <span class="chip">${esc(m.score_tier)}</span>` : ""}</h4>
+  return `<div class="sec"><h4>Pillars${m.score_tier ? ` <span class="chip">${esc(codeLbl("score_tier", m.score_tier))}</span>` : ""}</h4>
     ${tbl(["Pillar","Weight","Score","Floor"], [
       ["<b>P1</b> Business quality", "40%", cell(m.p1, false), note(m.p1, false)],
       ["<b>P2</b> Management",       "35%", cell(m.p2, true),  note(m.p2, true)],
@@ -3777,11 +3812,11 @@ async function grid(el){
     document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" tabindex="0" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc(techLbl(r.tech_rating))}</td>
-      <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
+      <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>
       <td>${timingChip(r.timing, r.range_pos)}</td>
       <td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>
       <td>${esc(r.guidance||"")}</td>
-      <td>${esc(r.quadrant||"—")}</td><td>${esc(r.qgs_tier||"—")}</td><td>${num(r.composite)}</td>
+      <td title="${esc(codeLbl("quad", r.quadrant))}">${esc(r.quadrant||"—")}</td><td>${esc(codeLbl("qgs_tier", r.qgs_tier))}</td><td>${num(r.composite)}</td>
       <td>${pillarCell(r, "p1")}</td><td>${pillarCell(r, "p2")}</td><td>${pillarCell(r, "p3")}</td>
       <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
       <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>
@@ -3811,7 +3846,7 @@ async function grid(el){
     memoPointer("universe morning note") +
     card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${techLbl(t)}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
-        return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
+        return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${esc(codeLbl("action", a))}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
     }</tbody></table></div>`) +
     `<div style="margin-top:16px">` + card("Names", `<span id="gridN"></span>`,
       (() => {
@@ -3927,7 +3962,7 @@ async function proposal(el){
   if(!LIVE.proposal) LIVE.proposal = await qAll("site_proposal");
   const P = LIVE.proposal, by = s => P.filter(r => r.status===s);
   const sect = (s, sub) => card(`${s} (${by(s).length})`, sub, tbl(["Ticker","Grade","Action","Technical","Composite","Sector","Reason"],
-    by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc((r.action||"").replaceAll("_"," ")), esc(techLbl(r.tech_rating)), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
+    by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc(codeLbl("action", r.action)), esc(techLbl(r.tech_rating)), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</div>` +
     sect("KEEP", "held and supported by the grid") + `<div style="margin-top:16px">${sect("ADD","ranked on fundamentals, within sector and correlation limits")}</div>` +
     `<div style="margin-top:16px">${sect("EXIT","grid no longer supports ownership, or a limit forces it out")}</div>`;
@@ -4080,12 +4115,12 @@ function regimeStrip(){
   const bits = [];
   if(r) bits.push(cell("Market", `${(+r.mfi).toFixed(1)} · ${esc(r.state)}`, SC[r.state] || C.text),
                   cell("Protection budget", pct(+r.protection_budget_pct,1,false), SC[r.state] || C.text),
-                  cell("Cover", esc(r.cost_state||"—"), r.cost_state==="CHEAP"?C.green:r.cost_state==="EXPENSIVE"?C.red:C.text));
+                  cell("Cost of cover", esc(codeLbl("cost", r.cost_state)), r.cost_state==="CHEAP"?C.green:r.cost_state==="DEAR"?C.red:C.text));
   const bg = (typeof LIVE !== "undefined" && LIVE.bridge) || null;
   // Only shown when it is not 1.00: a multiplier of one is not news and would just be noise on a
   // strip whose job is to be glanceable.
   if(bg && +bg.exposure_multiplier !== 1)
-    bits.push(cell("Equity exposure", "×" + (+bg.exposure_multiplier).toFixed(2), C.amber));
+    bits.push(cell("Equity sleeve sized at", (+bg.exposure_multiplier * 100).toFixed(0) + "% of normal", C.amber));
   if(f) bits.push(cell("Book fragility", (+f.pfi).toFixed(1), fragC(+f.pfi)),
                   cell("Effective bets by risk", (f.diagnostics||{}).effective_n_risk == null ? "—" : num(+f.diagnostics.effective_n_risk,1)));
   return `<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;margin:0 0 16px;padding:11px 14px;
@@ -4112,7 +4147,7 @@ function regimeCard(){
     (dmove == null ? "" : ` · ${dmove >= 0 ? "+" : "−"}${Math.abs(dmove).toFixed(1)} on the day`) + ` · as of ${esc(String(r.as_of))}`,
     `<div class="kvs">
       <div class="kv"><span class="muted">Protection budget</span><b style="color:${SC[r.state]||C.text}">${pct(+r.protection_budget_pct,1,false)}</b></div>
-      <div class="kv"><span class="muted">Cost of protection</span><b style="color:${r.cost_state==="CHEAP"?C.green:r.cost_state==="EXPENSIVE"?C.red:C.text}">${esc(r.cost_state||"—")}</b></div>
+      <div class="kv"><span class="muted">Cost of protection</span><b style="color:${r.cost_state==="CHEAP"?C.green:r.cost_state==="DEAR"?C.red:C.text}">${esc(codeLbl("cost", r.cost_state))}</b></div>
       <div class="kv"><span class="muted">3-month VIX / spot</span><b>${r.cost_gauge == null ? "—" : num(+r.cost_gauge,4)}</b></div>
       <div class="kv"><span class="muted">Previous state</span><b>${esc(r.state_prev||"—")}</b></div>
      </div>
@@ -4501,7 +4536,7 @@ function anDrawRegime(){
     host.previousElementSibling.innerHTML = fragBtns(mfiRange, "mfirange", RH.length, last);
   mk(host, {
     tooltip:{trigger:"axis", formatter:ps => { const i = ps[0].dataIndex, x = RH[i];
-      return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cover ${x.cost_state||"—"}`; }},
+      return `${x.as_of}<br><b>${(+x.mfi).toFixed(1)}</b> · ${x.state}<br>budget ${(100*+x.protection_budget_pct).toFixed(0)}% · cost of cover ${codeLbl("cost", x.cost_state).toLowerCase()}`; }},
     grid:{left:34,right:14,top:14,bottom:26},
     xAxis:{type:"category", data:RH.map(x=>x.as_of), axisLabel:{color:C.muted}},
     yAxis:{type:"value", min:0, max:100, axisLabel:{color:C.muted}, splitLine:{lineStyle:{color:C.line}}},
@@ -5067,7 +5102,7 @@ function bellPanelHTML(){
       <span class="bp-tk">${esc(f.ticker)}</span>
       <span class="bp-t">${esc(f.title)}<span class="bp-sub">${esc(_kindWord(f.kind))}${
         f.context && f.context.grade ? ` · grade ${esc(f.context.grade)}` : ""}${
-        f.context && f.context.action ? ` · ${esc(String(f.context.action).replaceAll("_"," ").toLowerCase())}` : ""}${
+        f.context && f.context.action ? ` · ${esc(codeLbl("action", f.context.action).toLowerCase())}` : ""}${
         (f.tags||[]).map(t => ` · ${esc(_tagText(t))}`).join("")}</span></span>
     </button>`;
   const hold = day.filter(f => f.scope === "holding").sort((a,b) => b.severity - a.severity || a.ticker.localeCompare(b.ticker));
@@ -5513,7 +5548,7 @@ let hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
 function holdings(el){
   const HD = D.holdings;
   const sel = (id, label, value, opts) => `<label class="fsel"><span>${label}</span><select id="${id}">
-      <option value="">All</option>${opts.map(o => `<option value="${esc(o)}"${o===value?" selected":""}>${esc(String(o).replaceAll("_"," "))}</option>`).join("")}
+      <option value="">All</option>${opts.map(o => `<option value="${esc(o)}"${o===value?" selected":""}>${esc(id==="hTrend" ? codeLbl("trend", o) : id==="hQuad" ? codeLbl("quad", o) : String(o).replaceAll("_"," "))}</option>`).join("")}
     </select></label>`;
   const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
   el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
@@ -5731,7 +5766,7 @@ function openHolding(tk){
   const cellv = (label, v, bad) => `<div><small>${label}</small><b class="${bad?'neg':''}">${v}</b></div>`;
   document.getElementById("drIn").innerHTML = `
     <div class="dr-top"><div><div class="caps">${esc(h.sector||"")} · ${esc(h.sleeve||"")}</div><h2>${h.tk} <span class="muted" style="font-weight:500;font-size:var(--fs-lg)">${esc(h.name)}</span></h2>
-      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${qchip(h.quad)} ${trendChip(h.trend)} ${thesisChip(h.thesis_status)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${h.eq}</span>`:""}</div></div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${qchip(h.quad, true)} ${trendChip(h.trend)} ${trendChip((LIVE.v2[h.tk]||{}).trend)} ${thesisChip(h.thesis_status)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${esc(codeLbl("earnings_quality", h.eq))}</span>`:""}</div></div>
       <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
       <div><span class="caps">Price</span><b>${usd(h.price,2)}</b></div>
@@ -5742,8 +5777,8 @@ function openHolding(tk){
     ${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}${cardBlock(h.tk)}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
-      ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
-      ${cellv("Alignment", `${num(h.align,0)} ${h.bucket||""}`, h.bucket==="DISTRIBUTE")}${cellv("Extension", h.ext||"—")}
+      ${cellv("QGS tier", esc(codeLbl("qgs_tier", h.tier)))}${cellv("Quality", esc(codeLbl("quality_profile", h.profile)))}
+      ${cellv("Alignment", `${num(h.align,0)} ${h.bucket ? esc(codeLbl("bucket", h.bucket)) : ""}`, h.bucket==="DISTRIBUTE")}${cellv("Extension", esc(codeLbl("ext", h.ext)))}
       ${cellv("12-1 mom (risk adj)", num(h.mom))}${cellv("Fwd rev / EPS", `${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}`)}
       ${cellv("ROIC", h.roic!=null?num(h.roic,1)+"%":"—")}${cellv("FCF margin", h.fcfm!=null?num(h.fcfm,1)+"%":"—")}
       ${cellv("Net debt / EBITDA", h.nde!=null?num(h.nde,1)+"×":"—")}${cellv("FCF / EV", h.fcfev!=null?pct(h.fcfev,1,false):"—")}
