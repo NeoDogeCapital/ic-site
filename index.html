@@ -344,8 +344,13 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(3,5,8,.55);backdrop-filter:blur(2px);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
 .scrim.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,100vw);background:#0d1118;border-left:1px solid var(--line2);z-index:41;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto}
-.drawer.on{transform:none}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,100vw);background:#0d1118;border-left:1px solid var(--line2);z-index:41;transform:translateX(100%);overflow-y:auto;
+  /* ⚠ Closed = hidden, not just off-screen. Slid away with translateX alone, a drawer that had shown a
+     name kept its links and chart buttons in the Tab order: keyboard users tabbed into controls they
+     could not see. visibility:hidden drops it from the Tab order and the accessibility tree; the
+     visibility change waits out the 250ms slide so the exit still animates. */
+  visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s}
+.drawer.on{transform:none;visibility:visible;transition:transform .25s ease,visibility 0s}
 .dr-in{padding:22px 26px 60px}
 .dr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .dr-top h2{margin:4px 0 2px;font-size:var(--fs-2xl);letter-spacing:-.02em}
@@ -386,7 +391,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:01 · ae15827</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:03 · a28a177</div>
   </div>
 </section>
 
@@ -415,7 +420,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:01 · ae15827</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:03 · a28a177</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
