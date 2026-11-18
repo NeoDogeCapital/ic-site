@@ -227,6 +227,14 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
    the first column stays put while the rest scrolls under it. Opt-in per table. */
 .tbl.stickfirst th:first-child,.tbl.stickfirst td:first-child{position:sticky;left:0;z-index:2;background:var(--panel-solid);box-shadow:1px 0 0 var(--line)}
 .tbl.stickfirst th:first-child{z-index:3}
+/* THE DECISION GRID READS PAST ITS FIRST SCREEN (critique run 3, 2026-11-18). `.tbl th` was already
+   position:sticky, but sticky needs a scrolling ancestor with a bounded height and this wrapper had
+   none, so the header left with the first screen of a 51,000px table and the horizontal scrollbar
+   sat at its far end. Bounded to the viewport: header pinned, both scrollbars always in reach. */
+.table-wrap.gridwrap{max-height:calc(100dvh - 150px);min-height:320px}
+.tbl.dense td{white-space:nowrap;vertical-align:middle;padding-top:7px;padding-bottom:7px}
+.tbl.dense td.clip{overflow:hidden;text-overflow:ellipsis}
+.lock[aria-pressed="true"]{color:var(--text);border-color:var(--brand,var(--accent));background:var(--brand-soft,rgba(106,166,248,.12))}
 @media(max-width:700px){.tbl.stickfirst td:first-child .nm{max-width:96px}}   /* a pinned column must leave room to scroll past it */
 .pill{display:inline-block;font:500 var(--fs-xs) var(--mono);letter-spacing:.09em;text-transform:uppercase;
   padding:2px 6px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);vertical-align:1px}
@@ -441,7 +449,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 16:38 · de0283c</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 17:24 · 9390d16</div>
   </div>
 </section>
 
@@ -476,7 +484,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 16:38 · de0283c</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 17:24 · 9390d16</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -930,11 +938,18 @@ const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, 
 // NEUTRAL appears in both enums with different meanings, so the label is always looked up by FIELD.
 const TECH_LBL = {STRONG_BUY:"Strong uptrend", BUY:"Uptrend", NEUTRAL:"No trend", SELL:"Downtrend",
                   STRONG_SELL:"Strong downtrend"};            // technical_engine.rating_v2: 200-day trend + MA stack
-const TIMING_LBL = {BUY_ZONE:"Low in range", ACCUMULATE_OK:"Lower half", NEUTRAL:"Mid-range",
+// NEUTRAL IS "NO ZONE", NOT "MID-RANGE" (2026-11-18, same day it was mislabelled). The engine's
+// NEUTRAL is the default when no zone qualified, and 186 of 270 NEUTRAL names sat in the LOWER half
+// of their range — every one of them below the 52-week-low anchored VWAP, which is the condition
+// the low zones require (technical_v2.timing_frame). "Mid-range −15%" contradicted its own number.
+// timingWhy() states the reason, which is exact from the rule: lower half ⇒ below the anchor.
+const TIMING_LBL = {BUY_ZONE:"Low in range", ACCUMULATE_OK:"Lower half", NEUTRAL:"No zone",
                     WAIT_FOR_LOW_END:"Upper third", TRIM_ZONE:"Top of range",
                     AVOID_EXTENDED:"Upper, below anchor", NO_DATA:"No data"};   // technical_v2.timing_frame
 const techLbl = v => v ? (TECH_LBL[v] || String(v).replaceAll("_", " ")) : "—";
 const timingLbl = v => v ? (TIMING_LBL[v] || String(v).replaceAll("_", " ")) : "—";
+const timingWhy = (t, pos) => (t !== "NEUTRAL" || pos == null) ? ""
+  : (+pos <= 0.5 ? "below 52w-low anchor" : "mid-range");
 // THE MODEL'S OTHER CODES, IN WORDS (2026-11-18). Raw enum names reached the page — GP_LEADING,
 // GOOD_COMPOUNDER, TIER_2, ADD_ON_WEAKNESS, "Cover DEAR" — readable only to whoever wrote the
 // engine. Stored values are unchanged; only what a reader sees. An unmapped code falls back to
@@ -3061,8 +3076,10 @@ async function markets(el){
 /* ═══ timing (technical v2) ═══════════════════════════════════════════════ */
 const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
-const timingChip = (t, pos) => !t ? "—" :
-  `<span style="color:${TIMING_COL[t]||C.text}">${esc(timingLbl(t))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
+const timingChip = (t, pos) => { if(!t) return "—";
+  const why = timingWhy(t, pos);
+  return `<span style="white-space:nowrap"><span style="color:${TIMING_COL[t]||C.text}"${why ? ` title="No timing zone qualified: ${why === "mid-range" ? "price is in the middle of its range" : "price is in the lower half of its range but below the VWAP anchored at its 52-week low"}"` : ""}>${esc(timingLbl(t))}</span>${
+    pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}${why ? ` <span class="muted" style="font-size:var(--fs-xs)">· ${why}</span>` : ""}</span>`; };
 // The risk range as one scannable cell: the 1-week band's low and high with a marker for where the
 // price sits in it. Timing already names the zone; this shows the distance to each edge, which is
 // what you need to size an entry or a trim, and it belongs on any row you scroll rather than only
@@ -3158,6 +3175,18 @@ const ACT_COL = {ACCUMULATE:C.green, ADD_ON_WEAKNESS:C.green, STARTER_ADD:C.gree
 // tickers would be useless.
 let gridFilter = {q:"", held:false};
 let gridFilterOpen = false;
+// MONITOR VIEW (critique run 3, 2026-11-18): 28 columns ran 2,446px in a 1,232px card. Twelve answer
+// "what is it, what does the model say, and why"; the rest are one toggle away and stay filterable
+// and sortable while hidden. Remembered per viewer.
+const GRID_MONITOR = ["ticker","grade","tech_rating","action","timing","quadrant","composite","p1","p2","p3","sector","grade_reason"];
+let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
+// What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
+// not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
+// "All" for a column showing 31 profiles.
+function gridText(r, key){
+  if(key === "f_profile") return profileLabel(((typeof LIVE !== "undefined" && LIVE.suniv || {})[r.ticker] || {}).factor_profile) || "";
+  return r[key];
+}
 const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
 // Numeric columns whose value lives in LIVE (the duration tables) rather than on the matrix row, so
 // the filter and the sort must both resolve them through gridKey().
@@ -3176,7 +3205,7 @@ const FILTER_DP = Object.fromEntries(FACTORS.map(f => ["f_" + f.k, 0]));
 function colControl(key, type, rows){
   if(type === "num") return "num";
   if(FREE_TEXT_COLS.has(key)) return "text";
-  return new Set(rows.map(r => r[key]).filter(Boolean)).size <= 30 ? "select" : "text";
+  return new Set(rows.map(r => gridText(r, key)).filter(Boolean)).size <= 30 ? "select" : "text";
 }
 function matchesFilters(r, rows){
   const f = gridFilter;
@@ -3203,7 +3232,7 @@ function matchesFilters(r, rows){
         if(hi !== "" && hi != null && cmp > +hi * k) return false;
       }
     } else if(f[key]){
-      const v = (r[key] ?? "").toString();
+      const v = (gridText(r, key) ?? "").toString();
       if(ctl === "select"){ if(v !== f[key]) return false; }
       else if(!v.toLowerCase().includes(f[key].toLowerCase())) return false;
     }
@@ -3217,7 +3246,7 @@ function activeFilterCount(){
 // Build each dropdown's options from the data actually present, ordered by the model's own ranking
 // where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
 function filterOpts(rows, key, order){
-  const seen = [...new Set(rows.map(r => r[key]).filter(Boolean))];
+  const seen = [...new Set(rows.map(r => gridText(r, key)).filter(Boolean))];
   return order ? seen.sort((a,b) => (order[a] ?? 99) - (order[b] ?? 99)) : seen.sort();
 }
 const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_ORD",
@@ -3821,23 +3850,41 @@ async function grid(el){
     // way you sorted — and sorting by Mkt cap is now a headline feature, where the tail is the point.
     // 600 clears the universe with room to grow; the "showing first N" note stays as the backstop.
     const CAP = 600, shown = rows.slice(0, CAP);
-    document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" tabindex="0" style="cursor:pointer">
-      <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
-      <td>${esc(techLbl(r.tech_rating))}</td>
-      <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>
-      <td>${timingChip(r.timing, r.range_pos)}</td>
-      <td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>
-      <td>${esc(r.guidance||"")}</td>
-      <td title="${esc(codeLbl("quad", r.quadrant))}">${esc(r.quadrant||"—")}</td><td>${esc(codeLbl("qgs_tier", r.qgs_tier))}</td><td>${num(r.composite)}</td>
-      <td>${pillarCell(r, "p1")}</td><td>${pillarCell(r, "p2")}</td><td>${pillarCell(r, "p3")}</td>
-      <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
-      <td>${trendChip(r.trend)}</td><td class="muted">${esc(r.sector||"")}</td>
-      <td>${num(r.alignment, 0)}</td><td class="muted" style="font-size:var(--fs-sm)">${esc(profileLabel((LIVE.suniv[r.ticker]||{}).factor_profile))}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
+    const cols = gAllCols ? GRID_COLS : GRID_COLS.filter(c => GRID_MONITOR.includes(c[0]));
+    // Cells keyed by column, so the monitor and full views render from one definition and a header
+    // can never sit over another column's cell. One line per row: long text clips with its full
+    // value in the tooltip, which took the median row from 74px to about 38.
+    const clip = (v, w) => `<td class="muted clip" style="max-width:${w}px" title="${esc(v || "")}">${esc(v || "")}</td>`;
+    document.getElementById("gridRows").innerHTML = shown.map(r => {
+      const u = LIVE.suniv[r.ticker] || null, tag = r.universe_tag;
+      const cell = {
+        ticker: `<td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td>`,
+        grade: `<td>${r.grade}</td>`,
+        tech_rating: `<td>${esc(techLbl(r.tech_rating))}</td>`,
+        action: `<td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>`,
+        timing: `<td>${timingChip(r.timing, r.range_pos)}</td>`,
+        range_pos: `<td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>`,
+        guidance: clip(r.guidance, 260),
+        quadrant: `<td title="${esc(codeLbl("quad", r.quadrant))}">${esc(r.quadrant||"—")}</td>`,
+        qgs_tier: `<td>${esc(codeLbl("qgs_tier", r.qgs_tier))}</td>`,
+        composite: `<td>${num(r.composite)}</td>`,
+        p1: `<td>${pillarCell(r, "p1")}</td>`, p2: `<td>${pillarCell(r, "p2")}</td>`, p3: `<td>${pillarCell(r, "p3")}</td>`,
+        implied_cagr: `<td>${impliedCell(r.ticker)}</td>`, vis_pct: `<td>${visCell(r.ticker)}</td>`,
+        rate_beta: `<td>${rateCell(r.ticker)}</td>`,
+        trend: `<td>${trendChip(r.trend)}</td>`,
+        sector: clip(r.sector, 190),
+        alignment: `<td>${num(r.alignment, 0)}</td>`,
+        f_profile: `<td class="muted" style="font-size:var(--fs-sm)">${esc(profileLabel((u||{}).factor_profile))}</td>`,
+        mcap: `<td class="fac fb0">${capCell(u, tag)}</td>`,
+        grade_reason: clip(r.grade_reason, 300),
+      };
+      FACTORS.forEach(f => { cell["f_" + f.k] = `<td class="fac">${facCell(u, f, tag)}</td>`; });
+      return `<tr data-open="${r.ticker}" tabindex="0" style="cursor:pointer">${cols.map(([k]) => cell[k] ?? "<td>—</td>").join("")}</tr>`; }).join("");
     // Header and row are built from two lists and had drifted before (a cell added without its header
     // renders every column to its right under the wrong name). Say so loudly if it happens again.
     { const first = document.querySelector("#gridRows tr");
-      if(first && first.children.length !== GRID_COLS.length)
-        console.error("grid: " + GRID_COLS.length + " headers but " + first.children.length + " cells per row"); }
+      if(first && first.children.length !== cols.length)
+        console.error("grid: " + cols.length + " headers but " + first.children.length + " cells per row"); }
     // The count used to read the full row count while the table rendered only the first 400, so 56
     // names — under the default grade sort, the tail of the D grades — were invisible with nothing
     // saying so. Held names can fall in that tail.
@@ -3847,7 +3894,7 @@ async function grid(el){
     document.getElementById("gridN").textContent = rows.length + " names"
       + (nMicro ? ` (${rows.length - nMicro} core + ${nMicro} micro)` : "")
       + (rows.length > CAP ? ` · showing first ${CAP}, filter or sort to reach the rest` : "");
-    document.getElementById("gridHead").innerHTML = sortHeadHTML(GRID_COLS, gridSort,
+    document.getElementById("gridHead").innerHTML = sortHeadHTML(cols, gridSort,
       k => FAC_KEYS.includes(k) ? " fac" + (k === "mcap" ? " fb0" : "") : "");
     bindSortHead("gridHead", GRID_COLS, () => gridSort, l => { gridSort = l; }, draw);
     renderSortNote("sortNote", "sortClear", GRID_COLS, () => gridSort,
@@ -3878,14 +3925,14 @@ async function grid(el){
           <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
           <button class="lock" id="gtoggle">${gridFilterOpen ? "Hide" : "Filter columns"}${n ? ` (${n})` : ""}</button>
           ${n ? `<button class="lock" id="gclear">Clear all</button>` : ""}
+          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: twelve columns. On: all ${GRID_COLS.length} — adds the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
           <span class="muted" id="sortNote" style="font-size:var(--fs-sm);margin-left:auto"></span>
         </div>
         <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
       })() +
-      `<div class="note" style="margin-bottom:6px">Click any row for the chart: trend line, risk-range bands, 52-week-low VWAP and RSI.
-         Between Sector and Why sit size and the six factors: market cap, then Value, Momentum, Quality, Low vol, Smallness and Growth as percentiles
-         (0-100, high = more of the factor). <b>Smallness is the size factor, so high means small</b>; Low vol high means calm. Micro-sleeve names are not scored (dash).</div>
-       <div class="table-wrap"><table class="tbl stickfirst"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
+      `<div class="note" style="margin-bottom:6px">Click any row for the chart. Every column can be filtered and sorted whether or not it is shown.
+         Factor columns are percentiles, 0–100, high = more of the factor; <b>Smallness high means small</b>, Low vol high means calm. Micro-sleeve names are not scored (dash).</div>
+       <div class="table-wrap gridwrap"><table class="tbl stickfirst dense"><thead><tr id="gridHead"></tr></thead><tbody id="gridRows"></tbody></table></div>`) + `</div>`;
   // This set gridFilter.act, but matchesFilters iterates GRID_COLS where the key is "action" — so
   // nothing read it and clicking a cell silently did nothing, while the filter badge counted it as
   // an active filter. Set the key the filter actually uses, and re-render so the dropdown shows it.
@@ -3897,6 +3944,9 @@ async function grid(el){
   document.getElementById("gq").oninput = e => { gridFilter.q = e.target.value; draw(); };
   document.getElementById("gheld").onchange = e => { gridFilter.held = e.target.checked; grid(el); };
   document.getElementById("gtoggle").onclick = () => { gridFilterOpen = !gridFilterOpen; grid(el); };
+  document.getElementById("gcols").onclick = () => { gAllCols = !gAllCols;
+    try { localStorage.setItem("ic.grid.cols", gAllCols ? "all" : "monitor"); } catch(e){}
+    grid(el); };
   // Dropdowns and number boxes re-render the view so their own state persists; free-text boxes
   // redraw only the rows, so typing does not lose focus mid-word.
   GRID_COLS.forEach(([key, , type]) => {
@@ -5401,7 +5451,9 @@ function todayBlock(H){
 
   take(h => ACT_NOW.has(h.action), "Exit / trim review", "bad");
   take(h => h.timing === "TRIM_ZONE", "Top of range", "warn");
-  take(h => ADD_ACT.has(h.action) && (h.timing === "BUY_ZONE" || h.timing === "ACCUMULATE_OK"), "Add · low in range", "good");
+  // One chip per zone: "low in range" used to cover ACCUMULATE_OK too, beside a row saying "lower half".
+  take(h => ADD_ACT.has(h.action) && h.timing === "BUY_ZONE", "Add · low in range", "good");
+  take(h => ADD_ACT.has(h.action) && h.timing === "ACCUMULATE_OK", "Add · lower half", "good");
 
   const n = rows.length;
   // Everything else the model has something against is the "Needs attention" card below. Including
@@ -5581,7 +5633,7 @@ function holdings(el){
       ${sel("hThesis","Thesis",hFilter.thesis,uniq("thesis_status"))}
       <label class="check"><input type="checkbox" id="hFlag" ${hFilter.flagged?"checked":""}> Flagged only</label>
       <button class="lock" id="hClear">Clear</button>
-      <button class="lock" id="hCols" aria-pressed="${hAllCols}" title="Monitor view shows ten columns; all columns adds alignment, the risk range, implied growth, forward estimates, size and the six factors">${hAllCols ? "Monitor view" : "All columns"}</button>
+      <button class="lock" id="hCols" aria-pressed="${hAllCols}" title="Off: ten columns. On: all 22 — adds alignment, the risk range, implied growth, forward estimates, size and the six factors">All columns</button>
      </div>` +
     `<div class="card" style="padding:6px 6px 2px;margin-top:16px"><div class="scroll"><table class="t" id="ht"></table></div></div>
      <div class="note" style="margin-top:10px">Click any row for the full thesis: news, guidance, catalysts, risks, and the trend chart. Composite below 6.5 and pillar-floor breaches are shown in red.</div>`;
