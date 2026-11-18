@@ -111,7 +111,12 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
      line under the brand instead of being hidden: whether last night's run passed is the one fact
      in the header worth keeping on a phone. */
   .top-in{flex-wrap:wrap;row-gap:6px}
-  #pipestate{order:10;flex:1 0 100%;margin-right:0!important;font-size:var(--fs-sm)}
+  /* ⚠ flex-basis 0 on the brand, or wrapping goes wrong. Allowing the row to wrap (so the badge can
+     drop to its own line) let SIGN OUT wrap first instead of the name shortening: three rows, a
+     142px sticky header, 17% of a phone screen (measured 2026-11-17). With a zero basis the name
+     yields its width before anything wraps, so only the badge, at flex-basis 100%, moves down. */
+  .brand{flex:1 1 0%}
+  #pipestate{order:10;flex:1 0 100%;margin-right:0!important;font-size:var(--fs-xs)}
 }
 /* Safe area: on a phone with a notch, held sideways, the header ran under it. */
 @supports(padding:max(0px)){
@@ -283,7 +288,11 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .lwcfoot{color:var(--dim);font-size:var(--fs-xs);line-height:1.55;margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
 @media(max-width:700px){.fsel{width:100%}.fsel select{flex:1;max-width:none}}
 /* period segmented control (Overview) */
-.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(255,255,255,.03);margin-left:12px}
+.seg{display:inline-flex;flex-wrap:wrap;max-width:100%;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(255,255,255,.03);margin-left:12px}
+/* A card header's text block must be allowed to shrink, or a long segmented control (the Models
+   card's four model names, then its periods) pushes the whole page sideways on a phone: 408px of
+   content on a 375px screen, measured 2026-11-17. With min-width:0 the .seg above wraps instead. */
+.card-h>div{min-width:0}
 .seg button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 var(--fs-sm) var(--mono);letter-spacing:.06em;
   padding:4px 10px;border-radius:var(--r-sm)}
 .seg button:hover:not([disabled]):not(.on){color:var(--text)}
@@ -374,7 +383,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:56 · 801c635</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:59 · 952e433</div>
   </div>
 </section>
 
@@ -403,7 +412,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:56 · 801c635</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:59 · 952e433</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
