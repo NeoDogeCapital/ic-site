@@ -33,6 +33,11 @@ html,body{margin:0;background:var(--bg);color:var(--text);font:var(--fs-base)/1.
 body{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:48px 48px;background-position:-1px -1px;min-height:100vh;min-height:100dvh}
 body:before{content:"";position:fixed;inset:0;background:radial-gradient(1200px 600px at 50% -10%,rgba(106,166,248,.08),transparent 60%),linear-gradient(to bottom,transparent 0,var(--bg) 85%);pointer-events:none;z-index:0}
 a{color:var(--accent)}
+/* One focus ring for everything the keyboard can reach — rows and sort headers became focusable on
+   2026-11-18, and the browser default ring belongs to no design system. Inset on table rows so it is
+   not clipped by the scroll container. */
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:4px}
+tr:focus-visible,th:focus-visible{outline-offset:-2px;border-radius:0}
 .mono{font-family:var(--mono)}
 .caps{font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
 .muted{color:var(--muted)} .pos{color:var(--green)} .neg{color:var(--red)} .amber{color:var(--amber)}
@@ -424,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:01 · 733ba3a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:05 · b9ba37b</div>
   </div>
 </section>
 
@@ -459,13 +464,13 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:01 · 733ba3a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:05 · b9ba37b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
 
 <div class="scrim" id="scrim"></div>
-<aside class="drawer" id="drawer"><div class="dr-in" id="drIn"></div></aside>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Name detail"><div class="dr-in" id="drIn"></div></aside>
 
 <script>
 "use strict";
@@ -1205,7 +1210,7 @@ async function signalsV2(el){
       (a, b) => a.ticker.localeCompare(b.ticker));
     document.getElementById("sigRows").innerHTML = rows.map(v => {
       const m = M[v.ticker] || {};
-      return `<tr data-open="${v.ticker}" style="cursor:pointer">
+      return `<tr data-open="${v.ticker}" tabindex="0" style="cursor:pointer">
         <td><b>${held.has(v.ticker) ? "★ " : ""}${esc(v.ticker)}</b></td>
         <td>${usd(v.close,2)}</td>
         <td>${esc(m.grade || "\u2014")}</td>
@@ -1234,7 +1239,7 @@ async function signalsV2(el){
                    l => { sigSort = l; }, draw);
   };
   const ev = LIVE.events.slice(0, 120);
-  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${plural(V.length,"name")} · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
+  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${plural(V.length,"name")} incl. micro sleeve and held ETFs · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
   `<div class="kpis">
     ${kpi("Trend line bullish", T_COUNT.BULLISH, `${T_COUNT.BEARISH} bearish`, T_COUNT.BULLISH>T_COUNT.BEARISH?"pos":"neg")}
     ${kpi("Low in range", count("timing","BUY_ZONE"), "lower third, above the 52-week-low anchor", "pos")}
@@ -2864,22 +2869,24 @@ async function openName(tk){
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
         ${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${qchip(m.quadrant)}${trendChip(v2.trend)}
         ${held?'<span class="chip">held</span>':""}</div></div>
-      <button class="x" onclick="closeDrawer()">✕</button></div>
+      <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
       <div><span class="caps">Price</span><b>${usd(v2.close,2)}</b></div>
       <div><span class="caps">Timing</span><b style="font-size:var(--fs-md)">${timingChip(v2.timing, v2.range_pos)}</b></div>
       <div><span class="caps">Guidance</span><b style="font-size:var(--fs-md)">${esc(m.guidance||"—")}</b></div>
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
+    ${held ? thesisBlock(tk, true) + cardBlock(tk) : ""}
     ${pillarBlock(m)}
     <div class="card" style="padding:12px"><div id="nmChart"></div></div>
-    ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${cardBlock(tk)}${thesisBlock(tk, true)}
+    ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${held ? "" : cardBlock(tk) + thesisBlock(tk, true)}
     ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
       [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
     ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
       .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "")}`;
   document.getElementById("scrim").classList.add("on");
   document.getElementById("drawer").classList.add("on");
+  drawerOpened(tk);
   loadFundaHist(tk);                      // fills the Change column once the history arrives
   loadVdurHist(tk);                       // fills the visible-share history once it arrives
   document.getElementById("drawer").scrollTop = 0;
@@ -3767,7 +3774,7 @@ async function grid(el){
     // way you sorted — and sorting by Mkt cap is now a headline feature, where the tail is the point.
     // 600 clears the universe with room to grow; the "showing first N" note stays as the backstop.
     const CAP = 600, shown = rows.slice(0, CAP);
-    document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
+    document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" tabindex="0" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
       <td>${esc(techLbl(r.tech_rating))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
@@ -3787,7 +3794,11 @@ async function grid(el){
     // The count used to read the full row count while the table rendered only the first 400, so 56
     // names — under the default grade sort, the tail of the D grades — were invisible with nothing
     // saying so. Held names can fall in that tail.
+    // Say what the count is made of: 474 core + 42 micro read as "516" here and "474" on the Quad map,
+    // with nothing to reconcile them (critique, 2026-11-18).
+    const nMicro = rows.filter(r => r.universe_tag === "micro").length;
     document.getElementById("gridN").textContent = rows.length + " names"
+      + (nMicro ? ` (${rows.length - nMicro} core + ${nMicro} micro)` : "")
       + (rows.length > CAP ? ` · showing first ${CAP}, filter or sort to reach the rest` : "");
     document.getElementById("gridHead").innerHTML = sortHeadHTML(GRID_COLS, gridSort,
       k => FAC_KEYS.includes(k) ? " fac" + (k === "mcap" ? " fb0" : "") : "");
@@ -3925,6 +3936,9 @@ async function proposal(el){
 
 
 /* ═══ ANALYTICS (movers · benchmarks · income · vol regimes · geography · fundamentals · news) ═══ */
+// Jensen's alpha, matching engines.stats.jensen_alpha: the intercept on EXCESS returns. A constant
+// daily risk-free rate (the record's mean bill rate) leaves beta unchanged and moves the intercept by
+// −(1 − β)·rf; regressing raw returns read ~2.5pp/yr more negative for a beta-1.6 book (2026-11-18).
 function regress(y, x){
   const n = Math.min(y.length, x.length); if(n < 30) return null;
   const my = y.reduce((a,b)=>a+b,0)/n, mx = x.reduce((a,b)=>a+b,0)/n;
@@ -3933,7 +3947,9 @@ function regress(y, x){
   const ex = y.map((v,i) => v - x[i]), me = ex.reduce((a,b)=>a+b,0)/n;
   const te = Math.sqrt(ex.reduce((a,b)=>a+(b-me)**2,0)/(n-1)) * Math.sqrt(252);
   const res = y.map((v,i) => v - alpha - beta*x[i]), sr = Math.sqrt(res.reduce((a,b)=>a+b*b,0)/(n-2));
-  return {beta, alpha_ann: alpha*252, t_alpha: alpha/(sr/Math.sqrt(n)), te, ir: te ? me*252/te : null,
+  const rf = (typeof D !== "undefined" && D.perf && D.perf.rf_mean != null) ? D.perf.rf_mean / 252 : 0;
+  const alphaEx = alpha - (1 - beta) * rf;
+  return {beta, alpha_ann: alphaEx*252, t_alpha: alphaEx/(sr/Math.sqrt(n)), te, ir: te ? me*252/te : null,
           cum: y.reduce((a,v)=>a*(1+v),1)-1, bench_cum: x.reduce((a,v)=>a*(1+v),1)-1};
 }
 /* book-level valuation duration: how much of what we own is terminal value */
@@ -4365,7 +4381,7 @@ function anMoversCard(X){
     `<div class="grid g2">${tbl(["Top","Day","$"], X.movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], X.movers.slice(-5).reverse().map(mv))}</div>`);
 }
 function anSkillCard(X){
-  return card("Skill vs benchmark", "daily returns since inception · alpha = return not explained by beta",
+  return card("Skill vs benchmark", "daily returns since inception · Jensen alpha on excess returns, rf = the record's mean bill rate",
     tbl(["Benchmark","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"],
       Object.entries(X.stats).filter(([,st])=>st).map(([k,st]) =>
         [k, pct(st.cum), pct(st.bench_cum), num(st.beta), `<span class="${cls(st.alpha_ann)}">${pct(st.alpha_ann)}</span>`,
@@ -5212,7 +5228,8 @@ function route(){
   const v = (location.hash || "#overview").slice(1).split("/")[0];
   const fn = VIEWS[v] || overview;
   const active = VIEWS[v] ? v : "overview";
-  document.querySelectorAll("#tabs a, #menupanel a").forEach(a => a.classList.toggle("on", a.dataset.v === active));
+  document.querySelectorAll("#tabs a, #menupanel a").forEach(a => { const on = a.dataset.v === active;
+    a.classList.toggle("on", on); if(on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   setMenu(false);
   clearCharts(); closeDrawer(true);
   const el = document.getElementById("view"); el.innerHTML = ""; window.scrollTo(0,0);
@@ -5568,7 +5585,7 @@ function drawHoldings(){
   rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
   const t = document.getElementById("ht");
-  t.innerHTML = `<thead><tr>${cols.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}">${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
+  t.innerHTML = `<thead><tr>${cols.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}"${k==="_spark"||k==="_timing"?"":` tabindex="0" aria-sort="${hSort.k===k?(hSort.d>0?"ascending":"descending"):"none"}"`}>${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(h => {
       const floor = (h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6);
       return `<tr class="row" data-tk="${h.tk}">
@@ -5590,7 +5607,7 @@ function drawHoldings(){
       <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + cashRow(cols.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
     hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
-  t.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; });
+  t.querySelectorAll("tr.row").forEach(tr => { tr.tabIndex = 0; tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; }; });
   t.querySelectorAll("[data-spark]").forEach(el => { const h = D.holdings.find(x=>x.tk===el.dataset.spark);
     const pts = (h.px||[]).map(p=>p[1]); if(pts.length>2) sparkline(el, pts, pts[pts.length-1]>=pts[0]?C.green:C.red); });
 }
@@ -5659,9 +5676,29 @@ function briefBody(b){
     ${b.watching ? `<div class="bahead"><div class="caps">What we're watching next</div><p>${esc(b.watching)}</p></div>` : ""}`;
 }
 /* ═══ HOLDING DRAWER ═════════════════════════════════════════════════════ */
-function closeDrawer(silent){ document.getElementById("drawer").classList.remove("on"); document.getElementById("scrim").classList.remove("on");
+// The drawer is a dialog: it takes focus when it opens and hands it back when it closes, so a keyboard
+// or screen-reader user lands inside it rather than on <body> behind the scrim (2026-11-18).
+let _drawerReturn = null;
+function drawerOpened(tk){
+  const d = document.getElementById("drawer");
+  if(!d.contains(document.activeElement)) _drawerReturn = document.activeElement;
+  d.setAttribute("aria-label", `${tk} detail`);
+  const x = d.querySelector("button.x"); if(x){ x.setAttribute("aria-label", "Close"); x.focus({preventScroll:true}); }
+}
+function closeDrawer(silent){ const d = document.getElementById("drawer"); const was = d.classList.contains("on");
+  d.classList.remove("on"); document.getElementById("scrim").classList.remove("on");
+  if(was && _drawerReturn && document.contains(_drawerReturn)) _drawerReturn.focus({preventScroll:true});
+  _drawerReturn = null;
   if(!silent && location.hash.includes("/")) history.replaceState(null,"",location.hash.split("/")[0]); }
 document.getElementById("scrim").onclick = () => closeDrawer();
+// KEYBOARD: rows that open a name and headers that sort were mouse-only (22 clickable rows on
+// Holdings, 0 focusable). Any element rendered with tabindex and one of these roles answers Enter
+// and Space the way it answers a click — one delegated handler rather than one per table.
+document.addEventListener("keydown", e => {
+  if(e.key !== "Enter" && e.key !== " ") return;
+  const el = e.target.closest && e.target.closest('tr.row[tabindex], tr[data-open][tabindex], th[data-k][tabindex]');
+  if(el && el === e.target){ e.preventDefault(); el.click(); }
+});
 document.addEventListener("keydown", e => { if(e.key==="Escape") closeDrawer(); });
 function ema(a, n){ const k=2/(n+1); let e=null; return a.map(v=>{ e = e==null ? v : v*k + e*(1-k); return e; }); }
 function sma(a, n){ return a.map((_,i)=> i<n-1 ? null : a.slice(i-n+1,i+1).reduce((s,v)=>s+v,0)/n); }
@@ -5674,14 +5711,14 @@ function openHolding(tk){
   document.getElementById("drIn").innerHTML = `
     <div class="dr-top"><div><div class="caps">${esc(h.sector||"")} · ${esc(h.sleeve||"")}</div><h2>${h.tk} <span class="muted" style="font-weight:500;font-size:var(--fs-lg)">${esc(h.name)}</span></h2>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${qchip(h.quad)} ${trendChip(h.trend)} ${thesisChip(h.thesis_status)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${h.eq}</span>`:""}</div></div>
-      <button class="x" onclick="closeDrawer()">✕</button></div>
+      <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
       <div><span class="caps">Price</span><b>${usd(h.price,2)}</b></div>
       <div><span class="caps">P&amp;L</span><b class="${cls(h.pl)}">${pct(h.pl)}</b></div>
       <div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
       <div><span class="caps">Next ER</span><b style="font-size:var(--fs-base)">${erCell(h.next_er)}</b></div>
     </div>
-    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${fundaBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
+    ${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}${cardBlock(h.tk)}
     <div class="sec"><h4>Model read</h4><div class="mtab">
       ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
       ${cellv("QGS tier", h.tier||"—")}${cellv("Quality", h.profile||"—")}
@@ -5690,7 +5727,7 @@ function openHolding(tk){
       ${cellv("ROIC", h.roic!=null?num(h.roic,1)+"%":"—")}${cellv("FCF margin", h.fcfm!=null?num(h.fcfm,1)+"%":"—")}
       ${cellv("Net debt / EBITDA", h.nde!=null?num(h.nde,1)+"×":"—")}${cellv("FCF / EV", h.fcfev!=null?pct(h.fcfev,1,false):"—")}
     </div></div>
-    ${(g.statements||[]).length ? `<div class="sec"><h4>Management guidance${g.call?` · ${esc(g.call)}`:""}</h4><ul>${g.statements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${fundaBlock(h.tk)}${(g.statements||[]).length ? `<div class="sec"><h4>Management guidance${g.call?` · ${esc(g.call)}`:""}</h4><ul>${g.statements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
     ${(r.quarters||[]).length ? `<div class="sec"><h4>Reported results</h4><div class="chart sm" id="drQ"></div></div>` : ""}
     <div class="grid g2" style="margin-top:4px">
       ${(r.catalysts_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.green}">Catalysts ahead</h4><ul>${r.catalysts_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
@@ -5702,6 +5739,7 @@ function openHolding(tk){
       ${(ins.notable||[]).length?`<ul>${ins.notable.slice(0,3).map(s=>`<li class="muted">${esc(s)}</li>`).join("")}</ul>`:""}</div>` : ""}
     <div class="sec"><h4>Position</h4><p class="muted mono" style="font-size:var(--fs-md)">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)}</p></div>`;
   document.getElementById("drawer").classList.add("on"); document.getElementById("scrim").classList.add("on");
+  drawerOpened(tk);
   if(typeof loadFundaHist === "function") loadFundaHist(tk);   // fills the Change column
   if(typeof loadVdurHist === "function") loadVdurHist(tk);     // fills the visible-share history
   document.getElementById("drawer").scrollTop = 0;
@@ -5770,7 +5808,7 @@ function performanceView(el){
   </div>
   <div class="grid g2" style="margin-top:16px">
     ${card("Risk & ratios", "", `<div class="table-wrap"><table class="t">${[
-      ["Beta", num(m.beta)],["Alpha (annualized)", pct(m.alpha)],["Value at Risk 95% / 99% (daily)", `${pct(m.var95)} / ${pct(m.var99)}`],
+      ["Beta", num(m.beta)],["Alpha (Jensen, annualized, since inception)", pct(m.alpha)],["Value at Risk 95% / 99% (daily)", `${pct(m.var95)} / ${pct(m.var99)}`],
       ["Conditional VaR 95%", pct(m.cvar95)],["Omega ratio", num(m.omega)],["Monthly win rate", `${pct(m.monthly_win,0,false)} of ${m.months||"—"} months`],
       ["Avg winning / losing allocation", `${pct(T.avg_win)} / ${pct(T.avg_loss)}`],["Win / loss ratio", num(T.wl)],["Expectancy per allocation", pct(T.expectancy)]
     ].map(([a,b])=>`<tr><td class="muted lbl">${a}</td><td class="r mono">${b}</td></tr>`).join("")}</table></div>`)}
@@ -5933,7 +5971,7 @@ function drawUniverseTable(){
 }
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
-  el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} tracked names</span>`) +
+  el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
     memoPointer("universe morning note") +
   `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
