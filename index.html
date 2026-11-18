@@ -449,7 +449,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 17:27 · 2b803e4</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 17:35 · 1a50bb1</div>
   </div>
 </section>
 
@@ -484,7 +484,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 17:27 · 2b803e4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 17:35 · 1a50bb1</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1369,7 +1369,7 @@ function slugCard(){
   return `<div class="kpis" style="margin-top:16px">
       ${kpi("Slugging — monthly", mSlug ? num(mSlug) + "×" : "—", "avg up month ÷ avg down month", mSlug>1?"pos":"neg")}
       ${kpi("Slugging — positions", T.slug ? num(T.slug) + "×" : "—", `avg win ${pct(T.avg_win,1)} vs ${pct(T.avg_loss,1)}`, T.slug>1?"pos":"neg")}
-      ${kpi("Batting average", pct(m.monthly_win,0,false), "share of up months")}
+      ${kpi("Monthly win rate", pct(m.monthly_win,0,false), "share of up months · not the allocation batting average")}
       ${kpi("Win / loss ratio", T.wl ? num(T.wl) + "×" : "—", `${T.n||0} allocations`)}
       ${kpi("Up / down capture", `${num(m.up_capture)} / ${num(m.down_capture)}`, `ratio ${num(m.updown)}`)}
       ${kpi("Expectancy", pct(T.expectancy,1), "per allocation", T.expectancy>0?"pos":"neg")}
@@ -3984,14 +3984,16 @@ async function risk(el){
   const toggle = `<div class="seg">${["current","proposal"].map(b => `<button class="lock ${b===riskBook?"on":""}" data-b="${b}">${b==="current"?"Current book":"Proposal"}</button>`).join(" ")}</div>`;
   if(!R){ el.innerHTML = sectionHead("Risk", toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
   const m = R.metrics||{}, mc = (R.monte_carlo||{}).drawdown_1y||{}, co = R.concentration||{}, rc = R.risk_contrib||{};
-  const passTag = ok => `<span style="color:${ok?C.green:C.red}">${ok?"PASS":"FAIL"}</span>`;
+  const passTag = ok => ok == null ? `<span class="muted">not measured</span>`
+    : `<span class="chip ${ok ? "ok" : "bad"}">${ok ? "PASS" : "FAIL"}</span>`;
+  const gates = R.gate_breaches || [];
   el.innerHTML = sectionHead("Risk", `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
   `<div class="kpis">
-    ${kpi("Beta vs SPY", num(m.beta_spy), "1-year daily")}
+    ${kpi("Beta vs SPY", num(m.beta_spy), "1-year daily · today's weights")}
     ${kpi("Volatility", pct(m.ann_vol,1,false), `ex-ante ${pct(rc.exante_vol,1,false)}`)}
-    ${kpi("1-yr drawdown P50", pct(mc.p50,1,false), `limit ${pct(mc.p50_limit,0,false)} · ${passTag(mc.p50_pass)}`)}
-    ${kpi("1-yr drawdown P95", pct(mc.p95,1,false), `limit ${pct(mc.p95_limit,0,false)} · ${passTag(mc.p95_pass)}`)}
-    ${kpi("Effective N", num(co.effective_n,1), `top 5 = ${pct(co.top5,0,false)}`)}
+    ${kpi("1-yr drawdown · median path", pct(mc.p50,1,false), `limit ${pct(mc.p50_limit,0,false)} ${passTag(mc.p50_pass)}`)}
+    ${kpi("1-yr drawdown · worst 1-in-20", pct(mc.p95,1,false), `limit ${pct(mc.p95_limit,0,false)} ${passTag(mc.p95_pass)}`)}
+    ${kpi("Effective N", num(co.effective_n,1), `all lines incl. the index fund · top 5 = ${pct(co.top5,0,false)}`)}
     ${kpi("Daily VaR 95", pct(m.var95_daily), `Sharpe ${num(m.sharpe)} · today's weights, 1y`)}
   </div>
   <div class="grid g2">
@@ -4003,8 +4005,9 @@ async function risk(el){
           reader has no way to tell that, and the obvious inference — that the number is unreliable
           — is exactly the wrong one. */""}
     ${card("Limit breaches",
-      `${(co.breaches||[]).length} flagged · weights include cash · priced ${esc(R.as_of)}`,
-      `<ul class="list">${(co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||"<li class='muted'>None</li>"}</ul>`)}
+      `${(co.breaches||[]).length + gates.length} flagged · weights include cash · priced ${esc(R.as_of)}`,
+      `<ul class="list">${gates.map(b=>`<li><b>${esc(b)}</b> <span class="muted">· simulated at today's weights</span></li>`).join("")}${
+        (co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||(gates.length ? "" : "<li class='muted'>None</li>")}</ul>`)}
     ${card("Risk concentration", "weight vs share of risk", `<ul class="list">${(rc.callouts||[]).map(b=>`<li>${esc(b)}</li>`).join("")}</ul><div class="chart" id="rkRc"></div>`)}
   </div>
   <div class="grid g2" style="margin-top:16px">
@@ -4258,7 +4261,7 @@ function sizingCard(){
         <b${m.target_equity_pct < m.base_equity_pct ? ` style="color:${C.amber}"` : ""}>${(+m.target_equity_pct).toFixed(0)}% equity</b>
         <span class="muted" style="font-size:var(--fs-sm)">${(+m.defensive_core_pct).toFixed(0)}% Defensive Core</span></div>`).join("")}
      </div>
-     ${tbl(["Holding","Now","Tier","Target","Gap","Model flags"], P.map(p => [
+     ${tbl(["Holding","Now · % of total","Tier","Target · % of total","Gap","Model flags"], P.map(p => [
         `<b>${esc(p.ticker)}</b>`, `${(+p.weight_now_pct).toFixed(2)}%`, `${(+p.tier_pct).toFixed(0)}%`,
         `${(+p.target_pct).toFixed(2)}%`,
         `<span class="${+p.gap_pct >= 0 ? "" : "muted"}">${(+p.gap_pct >= 0 ? "+" : "")}${(+p.gap_pct).toFixed(2)}%</span>`,
@@ -4413,7 +4416,7 @@ function fragilityCard(){
   return card("Portfolio fragility",
     `PFI <b style="color:${fragC(+f.pfi)}">${(+f.pfi).toFixed(1)}</b> · ${g.effective_n_risk ? `${num(+g.effective_n_risk,1)} effective bets by risk` : ""} · as of ${esc(String(f.as_of))}`,
     `<div class="kvs">
-      <div class="kv"><span class="muted">Effective bets — equal weight</span><b>${g.effective_n_arithmetic == null ? "—" : num(+g.effective_n_arithmetic,1)}</b></div>
+      <div class="kv"><span class="muted" title="1 / sum of squared weights across the stocks the risk model covers; the index fund and cash are left out">Effective bets — by weight, stocks only</span><b>${g.effective_n_arithmetic == null ? "—" : num(+g.effective_n_arithmetic,1)}</b></div>
       <div class="kv"><span class="muted">Effective bets — by risk</span><b style="color:${C.amber}">${g.effective_n_risk == null ? "—" : num(+g.effective_n_risk,1)}</b></div>
       <div class="kv"><span class="muted">One factor explains</span><b style="color:${fragC(100*(+g.pc1_share||0)/0.4)}">${g.pc1_share == null ? "—" : pct(+g.pc1_share,1,false)}</b></div>
       <div class="kv"><span class="muted">Largest single-name risk</span><b>${g.max_name_risk_share == null ? "—" : `${esc(g.max_name_risk_ticker||"")} ${pct(+g.max_name_risk_share,1,false)}`}</b></div>
@@ -4468,7 +4471,12 @@ async function anLoad(){
   const retOn = (px) => { const out = []; let prev = null; P.dates.forEach(d => { const v = px[d]; out.push(prev && v ? v/prev-1 : null); if(v) prev = v; }); return out; };
   const pairs = (b) => { const y=[], x=[]; P.daily_p.forEach((v,i) => { if(v!=null && b[i]!=null){ y.push(v); x.push(b[i]); } }); return {y, x}; };
   const benches = {SPY: P.daily_b, QQQ: retOn(LIVE.benchPx.QQQ||{}), IWM: retOn(LIVE.benchPx.IWM||{})};
-  const stats = Object.fromEntries(Object.entries(benches).map(([k,b]) => { const {y,x} = pairs(b); return [k, regress(y,x)]; }));
+  // Each row's WINDOW travels with it (2026-11-18): "Book" read +13.1% against SPY and +10.4% against
+  // QQQ and IWM under one "since inception" caption, because a benchmark with fewer bars shortens
+  // the days both series exist. Same book, different windows — now stated per row.
+  const stats = Object.fromEntries(Object.entries(benches).map(([k,b]) => { const {y,x} = pairs(b);
+    const st = regress(y,x); if(st){ st.n = y.length; st.from = P.dates[P.daily_p.findIndex((v,i) => v!=null && b[i]!=null)] || null; }
+    return [k, st]; }));
   const H = D.holdings.slice();
   return {HA, B, P, benches, stats, pairs, H,
     movers: H.filter(h => h.day!=null).sort((a,b) => b.day-a.day),
@@ -4484,10 +4492,10 @@ function anMoversCard(X){
     `<div class="grid g2">${tbl(["Top","Day","$"], X.movers.slice(0,5).map(mv))}${tbl(["Bottom","Day","$"], X.movers.slice(-5).reverse().map(mv))}</div>`);
 }
 function anSkillCard(X){
-  return card("Skill vs benchmark", "daily returns since inception · Jensen alpha on excess returns, rf = the record's mean bill rate",
-    tbl(["Benchmark","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"],
+  return card("Skill vs benchmark", "daily returns over the days both series have · Jensen alpha on excess returns, rf = the record's mean bill rate",
+    tbl(["Benchmark","From","Days","Book","Bench","Beta","Alpha/yr","t(alpha)","Tracking err","Info ratio"],
       Object.entries(X.stats).filter(([,st])=>st).map(([k,st]) =>
-        [k, pct(st.cum), pct(st.bench_cum), num(st.beta), `<span class="${cls(st.alpha_ann)}">${pct(st.alpha_ann)}</span>`,
+        [k, `<span class="muted">${esc(st.from || "—")}</span>`, st.n ?? "—", pct(st.cum), pct(st.bench_cum), num(st.beta), `<span class="${cls(st.alpha_ann)}">${pct(st.alpha_ann)}</span>`,
          num(st.t_alpha), pct(st.te,1,false), num(st.ir)])) +
     `<div class="chart" id="anScatter"></div><div class="note">|t| ≥ 2 is the usual bar for alpha distinguishable from luck.</div>`);
 }
@@ -4880,7 +4888,7 @@ const PAPER_LABEL = {grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Str
   ls_a_buy_vs_q4_weak:"Long A+Buy / Short weak Q4", ls_a_buy_vs_cd_sell:"Long A+Buy / Short C-D Sell",
   grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
   quad_q1:"Q1 names", quad_q2:"Q2 names", quad_q3:"Q3 names", quad_q4:"Q4 names", universe_ew:"Universe EW",
-  proposal:"Proposal", actual_book:"Actual book", spy:"SPY",
+  proposal:"Proposal", actual_book:"Today's book, paper", spy:"SPY",
   // Duration. "Modelled" = the DCF split of a price into visible cash flows and terminal value; "Measured" = each name's
   // observed beta to TLT with SPY held constant. The basis is in the label because the two L/S books read as opposites
   // and are not (see PAPER_NOTES.duration), and the side each one holds is in the label for the same reason.
@@ -4951,7 +4959,10 @@ async function paperDurationOverlap(){
   }catch(e){ return null; }
 }
 const PAPER_NOTES = {
-  model: () => `Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
+  model: () => `<b>"Today's book, paper" is not the fund's recorded performance.</b> It is the names held today at their
+       current dollar weights, re-locked monthly and marked from the first day in view, with no cash and none of the positions
+       since sold. The recorded return, cash and past holdings included, is on <a href="#performance">Performance</a>.
+       Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
        one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
        returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
        unreliable regardless.`,
@@ -5474,7 +5485,7 @@ function todayBlock(H){
     </span>
     <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:baseline">
       ${flags.slice(0,3).map(x => `<span class="chip ${/floor|broken|engineered|reversed/.test(x) ? "bad" : "warn"}">${x}</span>`).join("")}
-      <span class="mono muted" style="font-size:var(--fs-sm)">${pct(h.weight, 1, false)}</span>
+      <span class="mono muted" style="font-size:var(--fs-sm)" title="Share of invested capital (cash excluded)">${pct(h.weight, 1, false)}</span>
     </span></a>`;
 
   // Dry powder. Position weights are weights of INVESTED capital (db/023), so cash is shown as its
@@ -5507,12 +5518,20 @@ function todayBlock(H){
         .map(([sec, w]) => `<span class="chip bad" title="engines.book.cap_table — share of total capital including cash, priced at the ${esc(CAP.priced || "?")} close">${esc(sec)} ${num(w, 1)}% of total &gt; ${num(capLim, 0)}% cap · ${esc((CAP.priced || "").slice(5))} close</span>`).join(" ")
     : `<span class="chip" title="${esc(CAP.error || "no cap table in the payload")}">sector cap: not measured</span>`;
 
+  // The two drawdown gates, quoted from the risk engine's row (D.gates). A FAIL is a chip on the first
+  // screen; a missing row says "not measured" and never reads as a pass.
+  const G = D.gates || {}, g1 = G.drawdown_1y;
+  const gateChip = g1
+    ? [["p50", "median path"], ["p95", "worst 1-in-20 path"]].filter(([k]) => g1[k + "_pass"] === false)
+        .map(([k, w]) => `<span class="chip bad" title="Monte Carlo, 10,000 one-year paths at today's weights · risk engine ${esc(G.as_of || "")}">1-yr drawdown, ${w} ${num(g1[k] * 100, 1)}% &gt; ${num(g1[k + "_limit"] * 100, 0)}% limit</span>`).join(" ")
+    : `<span class="chip" title="${esc(G.error || "no gate data in the payload")}">drawdown gates: not measured</span>`;
+
   return `<div style="margin-top:16px">` + card("Today",
-    n ? `${n} of ${plural(H.length,"holding")} are at a decision point · exits first, then trims, then adds at a good price`
+    n ? `${n} of ${plural(H.length,"holding")} are at a decision point · exits first, then trims, then adds at a good price · weights are % of invested capital`
         + (alsoFlagged ? ` · ${alsoFlagged} more flagged below` : "")
       : "nothing in the book is at a decision point"
         + (alsoFlagged ? ` · ${alsoFlagged} flagged below` : ""),
-    (breach || cashChip ? `<div class="todaybreach">${breach}${cashChip}</div>` : "") +
+    (breach || gateChip || cashChip ? `<div class="todaybreach">${breach}${gateChip ? " " + gateChip : ""}${cashChip}</div>` : "") +
     (n ? `<div class="list">${rows.map(line).join("")}</div>`
        : `<div class="muted">No exits, trims or buy-zone adds today.</div>`)) + `</div>`;
 }
@@ -5530,7 +5549,7 @@ function overview(el){
     ${kpi(`${pl} vs SPY`, pct(S.excess), `${S.from} → ${S.to}`, cls(S.excess))}
     ${kpi("Days ahead of SPY", pct(S.beat_days,0,false), `of ${plural(S.days,"trading day")}`)}
     ${kpi(`${pl} worst drawdown`, pct(S.max_dd), "peak to trough in window", "neg")}
-    ${kpi("Sharpe", num(m.sharpe), [rangeNote(m.sharpe, m.n || (D.perf.dates||[]).length), `Sortino ${num(m.sortino)}`].filter(Boolean).join(" · "))}
+    ${kpi("Sharpe", num(m.sharpe), ["since inception", rangeNote(m.sharpe, m.n || (D.perf.dates||[]).length), `Sortino ${num(m.sortino)}`].filter(Boolean).join(" · "))}
     ${kpi("Alpha (ann.)", pct(m.alpha), `since inception · beta ${num(m.beta)}`, cls(m.alpha))}
   </div>
   <div class="grid g-2-1">
@@ -5772,13 +5791,30 @@ function obsList(items){
 // When a note was actually written, not just which day it is about. The pre-open note on
 // 2026-10-14 was generated at 15:12 ET — five hours into the session — and read identically to one
 // written before the bell. created_at ships in site_daily_brief and was never rendered.
+// A NOTE OLDER THAN THE RECORD IT QUOTES SAYS SO (2026-11-18). ic_analytics stamps
+// ic_pipeline_state('returns_restated') whenever it changes a stored daily return. A book note
+// written before that stamp, about a date the restatement reached, quotes returns the record no
+// longer holds — the 11-17 close note said YTD 12.45% vs SPY 10.44% against a record of 10.13% vs
+// 8.25%. Only material restatements (5bp or more on some day) and only the two notes that quote the
+// book's returns. If the stamp cannot be read nothing is claimed either way.
+function staleRecordMark(row, written){
+  try{
+    if(!["evening", "premarket"].includes(row.kind)) return "";
+    const rs = JSON.parse(((LIVE.pipeline || {}).returns_restated || {}).value || "null");
+    if(!rs || !rs.at || !(rs.max_change_bp >= 5)) return "";
+    const at = new Date(rs.at);
+    if(!(written < at) || !(row.as_of >= rs.first_date)) return "";
+    const when = at.toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
+    return ` <span class="chip warn" title="${rs.rows} daily returns from ${esc(rs.first_date)} were restated on ${esc(when)} ET, by up to ${rs.max_change_bp}bp on a day. Period returns quoted in this note (MTD, QTD, YTD) are from the record as it stood before.">written before the return record was restated · its period returns are out of date</span>`;
+  }catch(e){ return ""; }
+}
 function writtenAt(row){
   if(!row || !row.created_at) return "";
   try{
     const d = new Date(row.created_at);
     const t = d.toLocaleTimeString("en-US", {hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
     const day = d.toLocaleDateString("en-CA", {timeZone:"America/New_York"});
-    return `<span class="muted" style="font-size:var(--fs-sm)">written ${day === row.as_of ? "" : day + " "}${t} ET</span>`;
+    return `<span class="muted" style="font-size:var(--fs-sm)">written ${day === row.as_of ? "" : day + " "}${t} ET</span>` + staleRecordMark(row, d);
   }catch(e){ return ""; }
 }
 function briefShape(b){
@@ -6275,9 +6311,9 @@ function factors(el){
   el.innerHTML = sectionHead("Factors & concentration", `<span class="muted">${F.snapshot_date?"snapshot "+F.snapshot_date:""}</span>`) +
   `<div class="kpis">
     ${kpi("IT sector", pct((F.it_sector_pct||0)/100,1,false), "cap 28%", (F.it_sector_pct||0)>28?"neg":"")}
-    ${kpi("Effective N", num(F.effective_n,1), `${plural(H.length,"position")}`)}
+    ${kpi("Effective N", num(F.effective_n,1), "stocks only · the index fund is left out")}
     ${kpi("Avg pairwise corr.", num(F.avg_pairwise_correlation), "limit 0.65", (F.avg_pairwise_correlation||0)>.65?"neg":"")}
-    ${kpi("Wtd beta", num(F.wtd_avg_beta), "")}
+    ${kpi("Wtd beta", num(F.wtd_avg_beta), "average of vendor betas, by weight")}
     ${kpi("Wtd ROIC", F.wtd_avg_roic!=null?num(F.wtd_avg_roic,1)+"%":"—", "")}
     ${kpi("Top-5 weight", F.top5_concentration_pct!=null?num(F.top5_concentration_pct,1)+"%":"—", "")}
   </div>
