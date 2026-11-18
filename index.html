@@ -449,7 +449,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:00 · 1a50bb1</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 20:29 · 4af106a</div>
   </div>
 </section>
 
@@ -484,7 +484,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:00 · 1a50bb1</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 20:29 · 4af106a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3977,17 +3977,17 @@ async function grid(el){
 
 /* ═══ RISK (live) ═══════════════════════════════════════════════════════════ */
 let riskBook = "current";
-async function risk(el){
-  el.innerHTML = sectionHead("Risk", `<span class="muted">loading…</span>`);
+async function risk(el, title="Risk"){
+  el.innerHTML = sectionHead(title, `<span class="muted">loading…</span>`);
   if(!LIVE.risk) LIVE.risk = Object.fromEntries((await q("site_risk")).map(r => [r.book, r]));
   const R = LIVE.risk[riskBook]?.payload;
   const toggle = `<div class="seg">${["current","proposal"].map(b => `<button class="lock ${b===riskBook?"on":""}" data-b="${b}">${b==="current"?"Current book":"Proposal"}</button>`).join(" ")}</div>`;
-  if(!R){ el.innerHTML = sectionHead("Risk", toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
+  if(!R){ el.innerHTML = sectionHead(title, toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
   const m = R.metrics||{}, mc = (R.monte_carlo||{}).drawdown_1y||{}, co = R.concentration||{}, rc = R.risk_contrib||{};
   const passTag = ok => ok == null ? `<span class="muted">not measured</span>`
     : `<span class="chip ${ok ? "ok" : "bad"}">${ok ? "PASS" : "FAIL"}</span>`;
   const gates = R.gate_breaches || [];
-  el.innerHTML = sectionHead("Risk", `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
+  el.innerHTML = sectionHead(title, `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
   `<div class="kpis">
     ${kpi("Beta vs SPY", num(m.beta_spy), "1-year daily · today's weights")}
     ${kpi("Volatility", pct(m.ann_vol,1,false), `ex-ante ${pct(rc.exante_vol,1,false)}`)}
@@ -4099,10 +4099,10 @@ function bookRateBeta(){
       <div><div class="caps" style="margin-bottom:6px">Longest duration · highest rate beta</div>${side(byBeta.slice(0, k))}</div>
       <div><div class="caps" style="margin-bottom:6px">Shortest duration · lowest rate beta</div>${side(byBeta.slice(-k).reverse())}</div>
     </div>` : ""}
-    <div class="note" style="margin-top:10px">Measured, not modelled: each stock's daily return regressed on SPY and TLT over the last
-      ${rows[0].b.window_sessions || 252} sessions, so the rate coefficient is the part of its move that tracks long Treasuries once the
-      market move is removed. Positive = rallies when long yields fall (long duration); negative = rallies when they rise (short
-      duration). A t-stat inside ±2 is labelled neutral whatever the point estimate. The book figure is the position-value-weighted
+    <div class="note" style="margin-top:10px">A positive rate beta means the stock rallies when long yields fall (long duration);
+      a negative one, when they rise (short duration). It is measured, not modelled: each stock's daily return regressed on SPY and
+      TLT over the last ${rows[0].b.window_sessions || 252} sessions, so the rate coefficient is the part of its move that tracks
+      long Treasuries once the market move is removed. A t-stat inside ±2 is labelled neutral whatever the point estimate. The book figure is the position-value-weighted
       average of the holdings' betas. The two lists are ordered by signed beta, so the second is the most negative, not the smallest
       in magnitude.${spread}</div>`;
 }
@@ -4134,11 +4134,11 @@ function vdurCard(){
         `<span style="color:${+x.v.implied_fcf_cagr >= 1 ? C.red : +x.v.implied_fcf_cagr >= .5 ? C.amber : C.text}">${pct(+x.v.implied_fcf_cagr,0)}</span>`,
         x.v.value_gap == null ? "—" : `<span class="${+x.v.value_gap > 0 ? "neg" : "pos"}">${(+x.v.value_gap >= 0 ? "+" : "")}${(+x.v.value_gap*100).toFixed(0)} pts</span>`,
         pct(+x.v.shock_100bp,1)]))}
-     <div class="note" style="margin-top:10px">Bond floor vs growth option (Kao). The floor is the present value of
-      free cash flow inside a ${a0.assumptions ? a0.assumptions.horizon_years : 5}-year horizon, discounted at the
-      10-year Treasury plus a ${pct(+a0.erp,2,false)} equity risk premium; everything beyond it is terminal value.
-      <b>Implied FCF growth is what today's price requires</b> — compare it to the consensus revenue forecast, not to
-      zero. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so for a
+     <div class="note" style="margin-top:10px"><b>Implied FCF growth is what today's price requires</b>, so compare
+      it to the consensus revenue forecast, not to zero. The split is Kao's bond floor vs growth option: the floor is
+      the present value of free cash flow inside a ${a0.assumptions ? a0.assumptions.horizon_years : 5}-year horizon,
+      discounted at the 10-year Treasury plus a ${pct(+a0.erp,2,false)} equity risk premium; everything beyond it is
+      terminal value. The floor share itself is mostly a function of the horizon (~18% of value at 3 years, ~47% at 15), so for a
       single name it appears only beside its cross-sectional percentile (Grid, name drawer).</div>${rb}`);
 }
 /* ═══ REGIME DASHBOARD — how much protection, and against what ═══════════
@@ -4506,13 +4506,27 @@ function anIncomeCard(X){
       [`<b>${r.tk}</b>`, usd(r.annual_income), usd(r.fwd_rate,2), pct(r.yield,2,false), pct(r.yield_on_cost,2,false),
        esc(r.ex_date||"—"), r.last_payment ? `${r.last_payment.date} · ${usd(r.last_payment.amount,2)}` : "—"])));
 }
+// THE LONG-RUN LEVEL IS ABSENT WHEN THE FIT CANNOT IDENTIFY IT. It is omega / (1 - persistence), so
+// as persistence nears 1 it divides by almost nothing: HALO printed 317% against a 45% sample
+// volatility and, on a price series carrying an unadjusted split, KLAC printed 2,185%. The engine
+// now stores null with long_run_basis = "not_identified" past a persistence of 0.99
+// (engines.stats.garch_long_run_vol) and this says so instead of printing a percentage. A payload
+// written before 2026-11-18 has no basis field, so the same cut is applied to its persistence here.
+function volLongRun(v, d=0){
+  const unid = v.long_run_basis ? v.long_run_basis !== "garch" : (v.persistence != null && v.persistence >= 0.99);
+  if(v.long_run_vol != null && !unid) return pct(v.long_run_vol, d, false);
+  return `<span class="muted" title="Not identified: shocks to this name's volatility barely decay (persistence ${
+    v.persistence == null ? "—" : num(v.persistence, 3)}), so the fit has no stable level to return to. Use the sample column.">n/a</span>`;
+}
 function anVolCard(X){
   const V = X.B.vol || {};
-  return card("Volatility regimes", `book: <b style="color:${VOL_C[V.regime]||C.muted}">${V.regime||"—"}</b> · conditional vol ${pct(V.cond_vol,1,false)} vs long-run ${pct(V.long_run_vol,1,false)} · GARCH(1,1)`,
-    `<div class="chart" id="anVol"></div>` + tbl(["Holding","Regime","Cond. vol","Long-run","20d realized","Pctile"],
+  const hasSample = X.vols.some(v => v.sample_vol != null), unid = X.vols.filter(v => /n\/a/.test(volLongRun(v))).map(v => v.tk);
+  return card("Volatility regimes", `book: <b style="color:${VOL_C[V.regime]||C.muted}">${V.regime||"—"}</b> · conditional vol ${pct(V.cond_vol,1,false)} vs long-run ${volLongRun(V,1)} · GARCH(1,1)`,
+    `<div class="chart" id="anVol"></div>` + tbl(["Holding","Regime","Cond. vol","Long-run"].concat(hasSample ? ["2y sample"] : [], ["20d realized","Pctile"]),
       X.vols.sort((a,b)=>b.vol_percentile-a.vol_percentile).map(v =>
-        [`<b>${v.tk}</b>`, `<span style="color:${VOL_C[v.regime]}">${v.regime}</span>`, pct(v.cond_vol,0,false),
-         pct(v.long_run_vol,0,false), pct(v.realized_20d,0,false), pct(v.vol_percentile,0,false)])));
+        [`<b>${v.tk}</b>`, `<span style="color:${VOL_C[v.regime]}">${v.regime}</span>`, pct(v.cond_vol,0,false), volLongRun(v)]
+          .concat(hasSample ? [pct(v.sample_vol,0,false)] : [], [pct(v.realized_20d,0,false), pct(v.vol_percentile,0,false)]))) +
+    (unid.length ? `<div class="note" style="margin-top:8px">Long-run is n/a for ${esc(unid.join(", "))}: shocks to ${unid.length > 1 ? "their" : "its"} volatility barely decay, so the fit has no stable level to report. Read the 2-year sample column for ${unid.length > 1 ? "them" : "it"}.</div>` : ""));
 }
 const anGeoCard = () => card("Geography", "by headquarters country · a concentration read", `<div class="chart" id="anGeo"></div>`);
 function anValuationCard(X){
@@ -4666,13 +4680,16 @@ function anDrawFragility(){
    A section is just another view rendered into an appended div. Every one is wrapped so a single
    failing section degrades to a named message instead of taking the tab with it — the sections
    read different Supabase views and any one of them can be the thing that is missing. */
-async function section(el, title, fn, right=""){
+async function section(el, title, fn, right="", ownHead=false){
   // THE BOX IS APPENDED BEFORE fn RUNS, and fn writes into it directly. Building the HTML in a
   // detached div and copying innerHTML across looks equivalent and is not: every one of these views
   // sets innerHTML and then calls mk() to draw its charts by element id, so the chart would bind to
   // a node that never reaches the document and the card would render as an empty box. The header is
   // its own sibling element because fn overwrites whatever is in its own.
-  const h = document.createElement("div"); h.innerHTML = sectionHead(title, right); el.appendChild(h);
+  // ownHead: the view writes its own heading (it needs its toggle or as-of in it), so the wrapper
+  // must not add a second one. Risk carried "Risk engine — equity sleeve only" directly above a
+  // second "Risk", and "Factor exposure & concentration" above "Factors & concentration".
+  if(!ownHead){ const h = document.createElement("div"); h.innerHTML = sectionHead(title, right); el.appendChild(h); }
   const box = document.createElement("div"); el.appendChild(box);
   try{ await fn(box); }
   catch(e){ box.innerHTML = `<div class="note">${esc(title)} unavailable: ${esc(e.message||e)}</div>`; }
@@ -4785,13 +4802,13 @@ async function riskAll(el){
         const was = modelSel; modelSel = n; const h = modelRiskCard(); modelSel = was; return h; }).join("")}</div>`;
   const bkb = document.createElement("div"); el.appendChild(bkb);
   bkb.innerHTML = sectionHead("The brake, tested", `<span class="muted">what applying the multiplier would have done</span>`) + brakeCard();
-  await section(el, "Risk engine — equity sleeve only", b => risk(b));
-  await section(el, "Factor exposure & concentration", b => factors(b));
+  await section(el, "Risk engine — equity sleeve only", b => risk(b, "Risk engine — equity sleeve only"), "", true);
+  await section(el, "Factor exposure & concentration", b => factors(b, "Factor exposure & concentration"), "", true);
   let X = null;
   try{ X = await anLoad(); }catch(e){}
   if(X){
     const box = document.createElement("div"); el.appendChild(box);
-    box.innerHTML = sectionHead("Volatility, duration & concentration") +
+    box.innerHTML = sectionHead("Volatility, geography & duration") +
       `<div class="grid g2">${anVolCard(X)}${anGeoCard()}</div>
        <div style="margin-top:16px">${vdurCard()}</div>`;
     anDrawVol(X); anDrawGeo(X);
@@ -4804,7 +4821,7 @@ async function holdingsAll(el){
   try{ X = await anLoad(); }catch(e){}
   if(X){
     const box = document.createElement("div"); el.appendChild(box);
-    box.innerHTML = sectionHead("Valuation & profitability") + anValuationCard(X);
+    box.innerHTML = sectionHead("Fundamentals") + anValuationCard(X);
   }
   await section(el, "The book through time", b => historyView(b));
 }
@@ -5886,7 +5903,11 @@ function foldNotes(root){
     if(n.closest("details.howto") || n.hasAttribute("data-nofold")) return;
     const text = n.textContent.replace(/\s+/g, " ").trim(), words = text.split(" ").length;
     if(words < FOLD_MIN_WORDS) return;
-    const m = text.match(/^(.{20,220}?[.:])(?=\s|$)/), lede = m ? m[1] : text.slice(0, 160) + "…";
+    // THE LEDE ENDS AT A FULL STOP, NEVER AT A COLON (critique run 3). The pattern used to accept
+    // either, so "Where the fragility actually is: factor." folded to "Where the fragility
+    // actually is:" — the label shown, the finding hidden, on 3 of the 8 Risk notes. A note whose
+    // first sentence is a definition rather than a finding is reworded at its source instead.
+    const m = text.match(/^(.{20,260}?[.!?])(?=\s|$)/), lede = m ? m[1] : text.slice(0, 160) + "…";
     const d = document.createElement("details"); d.className = "howto";
     d.innerHTML = `<summary>${esc(lede)}<span class="more">How this is measured · ${words} words</span></summary>`;
     n.replaceWith(d); d.appendChild(n);
@@ -6306,11 +6327,15 @@ function signals(el){
 }
 
 /* ═══ FACTORS ════════════════════════════════════════════════════════════ */
-function factors(el){
+function factors(el, title="Factors & concentration"){
   const F = D.factor_snapshot || {}, FS = D.factor_scores, H = D.holdings;
-  el.innerHTML = sectionHead("Factors & concentration", `<span class="muted">${F.snapshot_date?"snapshot "+F.snapshot_date:""}</span>`) +
+  el.innerHTML = sectionHead(title, `<span class="muted">${F.snapshot_date?"snapshot "+F.snapshot_date:""}</span>`) +
   `<div class="kpis">
-    ${kpi("IT sector", pct((F.it_sector_pct||0)/100,1,false), "cap 28%", (F.it_sector_pct||0)>28?"neg":"")}
+    ${(() => { /* the one cap table (D.cap), not the factor snapshot's own copy: this tile read a
+                    third IT weight from a different date, and printed 0.0% when the field was missing */
+      const CAP = D.cap || {}, w = (CAP.table || {})["Information Technology"], lim = CAP.limit ?? 28;
+      return kpi("IT sector", w == null ? "—" : num(w,1) + "%",
+        w == null ? "cap table not in the payload" : `of total · cap ${num(lim,0)}% · ${esc((CAP.priced||"").slice(5))} close`, w > lim ? "neg" : ""); })()}
     ${kpi("Effective N", num(F.effective_n,1), "stocks only · the index fund is left out")}
     ${kpi("Avg pairwise corr.", num(F.avg_pairwise_correlation), "limit 0.65", (F.avg_pairwise_correlation||0)>.65?"neg":"")}
     ${kpi("Wtd beta", num(F.wtd_avg_beta), "average of vendor betas, by weight")}
