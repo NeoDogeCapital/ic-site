@@ -424,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:52 · 3899f1c</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:56 · fb81866</div>
   </div>
 </section>
 
@@ -459,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:52 · 3899f1c</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:56 · fb81866</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -898,6 +898,19 @@ const GRADE_ORD  = {A:0, B:1, C:2, D:3};
 const TECH_ORD   = {STRONG_BUY:0, BUY:1, NEUTRAL:2, SELL:3, STRONG_SELL:4};
 const TIMING_ORD = {BUY_ZONE:0, ACCUMULATE_OK:1, NEUTRAL:2, WAIT_FOR_LOW_END:3, TRIM_ZONE:4,
                     AVOID_EXTENDED:5, NO_DATA:6};
+// DISPLAY LABELS for the two technical enums — states, never orders (Niko, 2026-11-18). The stored
+// values stay as the engines write them (STRONG_BUY, BUY_ZONE…) because the grid, the sorts and the
+// filters key on them; only what a reader sees changes. "Strong buy" on a 200-day trend state read as
+// an instruction, which V12.1 rules out: technicals are timing and confirmation, never thesis.
+// NEUTRAL appears in both enums with different meanings, so the label is always looked up by FIELD.
+const TECH_LBL = {STRONG_BUY:"Strong uptrend", BUY:"Uptrend", NEUTRAL:"No trend", SELL:"Downtrend",
+                  STRONG_SELL:"Strong downtrend"};            // technical_engine.rating_v2: 200-day trend + MA stack
+const TIMING_LBL = {BUY_ZONE:"Low in range", ACCUMULATE_OK:"Lower half", NEUTRAL:"Mid-range",
+                    WAIT_FOR_LOW_END:"Upper third", TRIM_ZONE:"Top of range",
+                    AVOID_EXTENDED:"Upper, below anchor", NO_DATA:"No data"};   // technical_v2.timing_frame
+const techLbl = v => v ? (TECH_LBL[v] || String(v).replaceAll("_", " ")) : "—";
+const timingLbl = v => v ? (TIMING_LBL[v] || String(v).replaceAll("_", " ")) : "—";
+const ENUM_LBL = {tech_rating: techLbl, timing: timingLbl};
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4,
                     HOLD_WAIT_TREND:5, HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9,
                     REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
@@ -1053,18 +1066,18 @@ function about(el){
   step(6, "Technicals — timing, never thesis", `
     Technicals decide <i>when</i>, never <i>what</i>:
     <ul class="list">
-      <li><b>Trend rating</b> (Strong Buy → Strong Sell) from the 200-day trend. Its job is risk: names in an
+      <li><b>Trend rating</b> (Strong uptrend → Strong downtrend) from the 200-day trend. Its job is risk: names in an
           uptrend have had a materially lower chance of a large drawdown. We don't initiate into a downtrend.</li>
       <li><b>Timing</b> from where price sits in its expected range, whether buyers since the 52-week low and
           since the last earnings report are in profit, and recent bottom or reversal signals. It reads
-          Buy zone → Trim zone and paces entries and exits.</li>
+          Low in range → Top of range: a position, not an instruction, read beside the action.</li>
     </ul>
     Each piece was backtested before use; what failed — a second trend line, RSI regimes, exhaustion counts
     alone — was left out.`) +
   step(7, "The decision grid", `
     Grade × trend rating gives the action (accumulate, starter, hold, review, trim, reduce, exit) and timing
-    paces it. "Accumulate · BUY NOW" is a qualified name at the low end of its range; "Accumulate · WAIT for
-    range low" is the same company, extended. The grid is a default, not a cage — discretionary overrides are
+    paces it. "Accumulate · low in range" is a qualified name at the low end of its range; "Accumulate ·
+    upper third of range" is the same company, extended. The grid is a default, not a cage — discretionary overrides are
     allowed and documented.`) +
   step(8, "Building the portfolio", `
     <ul class="list">
@@ -1206,7 +1219,7 @@ async function signalsV2(el){
         <td>${v.above_52w_low_avwap ? '<span style="color:'+C.green+'">above</span>' : '<span class="muted">below</span>'}</td>
         <td class="muted" style="font-size:var(--fs-sm)">${v.td_buy_count||0} / ${v.td_sell_count||0}</td>
         <td>${rangeCell(v.ticker)}</td>
-        <td>${esc(m.tech_rating ? m.tech_rating.replace("_"," ") : "—")}</td></tr>`;
+        <td>${esc(techLbl(m.tech_rating))}</td></tr>`;
     }).join("");
     // Header and row are built from two lists. The grid has carried this guard since a cell was
     // added without its header and every column to the right rendered under the wrong name;
@@ -1224,10 +1237,10 @@ async function signalsV2(el){
   el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${plural(V.length,"name")} · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
   `<div class="kpis">
     ${kpi("Trend line bullish", T_COUNT.BULLISH, `${T_COUNT.BEARISH} bearish`, T_COUNT.BULLISH>T_COUNT.BEARISH?"pos":"neg")}
-    ${kpi("Buy zone", count("timing","BUY_ZONE"), "at the low end of range", "pos")}
-    ${kpi("Accumulate OK", count("timing","ACCUMULATE_OK"), "below mid-range")}
-    ${kpi("Trim zone", count("timing","TRIM_ZONE"), "at the high end", "neg")}
-    ${kpi("Wait / extended", count("timing","WAIT_FOR_LOW_END") + count("timing","AVOID_EXTENDED"), "do not chase", "neg")}
+    ${kpi("Low in range", count("timing","BUY_ZONE"), "lower third, above the 52-week-low anchor", "pos")}
+    ${kpi("Lower half", count("timing","ACCUMULATE_OK"), "below mid-range")}
+    ${kpi("Top of range", count("timing","TRIM_ZONE"), "top fifth of the range", "neg")}
+    ${kpi("Upper third", count("timing","WAIT_FOR_LOW_END") + count("timing","AVOID_EXTENDED"), "incl. below the 52-week-low anchor", "neg")}
     ${kpi("Above 52w-low VWAP", V.filter(v=>v.above_52w_low_avwap).length, "buyers since the low in profit")}
   </div>
   ` + (reversals.length ? `<div style="margin-top:16px">` + card("Risk range reversed direction",
@@ -1246,7 +1259,7 @@ async function signalsV2(el){
       <input class="search" id="sq" placeholder="Ticker or sector" value="${esc(sigFilter.q)}">
       <select class="input" id="strend" style="width:auto"><option value="">Any trend</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>
       <select class="input" id="stiming" style="width:auto">${["","BUY_ZONE","ACCUMULATE_OK","NEUTRAL","WAIT_FOR_LOW_END","TRIM_ZONE","AVOID_EXTENDED"]
-        .map(v => `<option value="${v}">${v ? v.replaceAll("_"," ") : "Any timing"}</option>`).join("")}</select>
+        .map(v => `<option value="${v}">${v ? timingLbl(v) : "Any timing"}</option>`).join("")}</select>
       <label class="check"><input type="checkbox" id="sheld" ${sigFilter.held?"checked":""}> Holdings only</label></div>
      <div class="table-wrap" style="max-height:640px;overflow:auto"><table class="tbl"><thead><tr id="sigHead"></tr></thead>
        <tbody id="sigRows"></tbody></table></div>`) + `</div>
@@ -2995,7 +3008,7 @@ async function markets(el){
 const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
 const timingChip = (t, pos) => !t ? "—" :
-  `<span style="color:${TIMING_COL[t]||C.text}">${esc(t.replaceAll("_"," "))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
+  `<span style="color:${TIMING_COL[t]||C.text}">${esc(timingLbl(t))}</span>${pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}`;
 // The risk range as one scannable cell: the 1-week band's low and high with a marker for where the
 // price sits in it. Timing already names the zone; this shows the distance to each edge, which is
 // what you need to size an entry or a trim, and it belongs on any row you scroll rather than only
@@ -3012,7 +3025,7 @@ function rangeBand(lo, hi, pos, timing){
   const cl = p == null ? 0.5 : Math.max(0, Math.min(1, p));
   const out = p != null && (p < 0 || p > 1);
   const dp = H < 10 ? 2 : 0;
-  const tip = (timing ? timing.replaceAll("_", " ") + " · " : "")
+  const tip = (timing ? timingLbl(timing) + " · " : "")
     + (p == null ? "position in band unknown"
        : out ? `price is ${Math.abs(Math.round((p < 0 ? -p : p - 1) * 100))}% of a band-width `
                + `${p < 0 ? "BELOW the low" : "ABOVE the high"}`
@@ -3066,7 +3079,7 @@ function rangeMove(tk){
 function rangeBar(v2){
   if(!v2 || v2.trade_low == null) return "";
   const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
-  return `<div class="sec"><h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing?.replaceAll("_"," ")||"")}</span></h4>
+  return `<div class="sec"><h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing ? timingLbl(v2.timing) : "")}</span></h4>
     <div style="position:relative;height:26px;margin:10px 0;background:linear-gradient(90deg,rgba(63,207,142,.25),rgba(255,255,255,.05),rgba(240,169,74,.25));border-radius:var(--r-xs)">
       <div style="position:absolute;left:${p*100}%;top:-4px;width:2px;height:34px;background:${C.text}"></div></div>
     <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm)" class="muted"><span>${usd(lo,2)} low</span><span>${usd(px,2)}</span><span>${usd(hi,2)} high</span></div>
@@ -3157,10 +3170,10 @@ const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_
                    action: "ACTION_ORD", qgs_tier: "QGS_ORD"};
 // Build each dropdown's options from the data actually present, ordered by the model's own ranking
 // where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
-function selectEl(id, label, value, opts){
+function selectEl(id, label, value, opts, key){
   return `<label class="fsel"><span>${label}</span><select id="${id}">
     <option value="">All</option>${opts.map(o =>
-      `<option value="${esc(o)}"${o===value?" selected":""}>${esc(String(o).replaceAll("_"," "))}</option>`).join("")}
+      `<option value="${esc(o)}"${o===value?" selected":""}>${esc(ENUM_LBL[key] ? ENUM_LBL[key](o) : String(o).replaceAll("_"," "))}</option>`).join("")}
   </select></label>`;
 }
 // Multi-key sort: an ordered list, first key wins and later keys break ties. Click a header to
@@ -3756,7 +3769,7 @@ async function grid(el){
     const CAP = 600, shown = rows.slice(0, CAP);
     document.getElementById("gridRows").innerHTML = shown.map(r => `<tr data-open="${r.ticker}" style="cursor:pointer">
       <td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td><td>${r.grade}</td>
-      <td>${esc((r.tech_rating||"—").replace("_"," "))}</td>
+      <td>${esc(techLbl(r.tech_rating))}</td>
       <td><span style="color:${ACT_COL[r.action]||C.text}">${esc(r.action.replaceAll("_"," "))}</span></td>
       <td>${timingChip(r.timing, r.range_pos)}</td>
       <td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>
@@ -3785,7 +3798,7 @@ async function grid(el){
   };
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</div>` +
     memoPointer("universe morning note") +
-    card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${t.replace("_"," ")}</th>`).join("")}</tr></thead><tbody>${
+    card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${techLbl(t)}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${a.replaceAll("_"," ")}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
     }</tbody></table></div>`) +
@@ -3799,7 +3812,7 @@ async function grid(el){
             <input class="fnum" id="fx_${key}_min" type="number" step="any" placeholder="min${FILTER_UNITS[key] ? " " + FILTER_UNITS[key].hint : ""}" value="${esc(gridFilter[key+"_min"] ?? "")}">
             <input class="fnum" id="fx_${key}_max" type="number" step="any" placeholder="max${FILTER_UNITS[key] ? " " + FILTER_UNITS[key].hint : ""}" value="${esc(gridFilter[key+"_max"] ?? "")}"></label>`;
           if(ctl === "select") return selectEl(`fx_${key}`, label, gridFilter[key] || "",
-            filterOpts(M, key, ORD[COL_ORDER[key]]));
+            filterOpts(M, key, ORD[COL_ORDER[key]]), key);
           return `<label class="fsel"><span>${label}</span>
             <input class="fnum wide" id="fx_${key}" placeholder="contains" value="${esc(gridFilter[key] || "")}"></label>`;
         }).join("");
@@ -3903,7 +3916,7 @@ async function proposal(el){
   if(!LIVE.proposal) LIVE.proposal = await qAll("site_proposal");
   const P = LIVE.proposal, by = s => P.filter(r => r.status===s);
   const sect = (s, sub) => card(`${s} (${by(s).length})`, sub, tbl(["Ticker","Grade","Action","Technical","Composite","Sector","Reason"],
-    by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc((r.action||"").replaceAll("_"," ")), esc((r.tech_rating||"—").replace("_"," ")), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
+    by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc((r.action||"").replaceAll("_"," ")), esc(techLbl(r.tech_rating)), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</div>` +
     sect("KEEP", "held and supported by the grid") + `<div style="margin-top:16px">${sect("ADD","ranked on fundamentals, within sector and correlation limits")}</div>` +
     `<div style="margin-top:16px">${sect("EXIT","grid no longer supports ownership, or a limit forces it out")}</div>`;
@@ -5286,7 +5299,7 @@ function periodStats(key){
 }
 // ── TODAY ────────────────────────────────────────────────────────────────────
 // The grid has always computed one plain-English instruction per holding — pace(action, timing)
-// in decision_matrix.py, e.g. "Accumulate · BUY NOW", "Exit Review · TRIM ON STRENGTH" — and it
+// in decision_matrix.py, e.g. "Accumulate · low in range", "Exit Review · top of range" — and it
 // was reachable only inside the Grid table and a drawer. The answer to "what do I do today" was
 // computed nightly and buried two tabs deep. site_build now carries it onto each holdings row,
 // so this can sit above everything else.
@@ -5314,9 +5327,9 @@ function todayBlock(H){
     .sort((a, b) => (b.value || 0) - (a.value || 0))
     .forEach(h => { seen.add(h.tk); rows.push({h, bucket, tone, flags: flagsFor(h)}); });
 
-  take(h => ACT_NOW.has(h.action), "Act", "bad");
-  take(h => h.timing === "TRIM_ZONE", "Trim zone", "warn");
-  take(h => ADD_ACT.has(h.action) && (h.timing === "BUY_ZONE" || h.timing === "ACCUMULATE_OK"), "Buy zone", "good");
+  take(h => ACT_NOW.has(h.action), "Exit / trim review", "bad");
+  take(h => h.timing === "TRIM_ZONE", "Top of range", "warn");
+  take(h => ADD_ACT.has(h.action) && (h.timing === "BUY_ZONE" || h.timing === "ACCUMULATE_OK"), "Add · low in range", "good");
 
   const n = rows.length;
   // Everything else the model has something against is the "Needs attention" card below. Including
