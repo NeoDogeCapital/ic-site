@@ -429,7 +429,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:48 · bb9b36e</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 15:50 · ceb0f3a</div>
   </div>
 </section>
 
@@ -464,7 +464,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:48 · bb9b36e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 15:50 · ceb0f3a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3819,7 +3819,7 @@ async function grid(el){
       <td title="${esc(codeLbl("quad", r.quadrant))}">${esc(r.quadrant||"—")}</td><td>${esc(codeLbl("qgs_tier", r.qgs_tier))}</td><td>${num(r.composite)}</td>
       <td>${pillarCell(r, "p1")}</td><td>${pillarCell(r, "p2")}</td><td>${pillarCell(r, "p3")}</td>
       <td>${impliedCell(r.ticker)}</td><td>${visCell(r.ticker)}</td><td>${rateCell(r.ticker)}</td>
-      <td>${esc(r.trend||"—")}</td><td class="muted">${esc(r.sector||"")}</td>
+      <td>${trendChip(r.trend)}</td><td class="muted">${esc(r.sector||"")}</td>
       <td>${num(r.alignment, 0)}</td><td class="muted" style="font-size:var(--fs-sm)">${esc(profileLabel((LIVE.suniv[r.ticker]||{}).factor_profile))}</td>${facCells(r)}<td class="muted" style="max-width:340px">${esc(r.grade_reason||"")}</td></tr>`).join("");
     // Header and row are built from two lists and had drifted before (a cell added without its header
     // renders every column to its right under the wrong name). Say so loudly if it happens again.
