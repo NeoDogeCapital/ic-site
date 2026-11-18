@@ -24,7 +24,9 @@
      these eight. The floor is 11px, and only the uppercase letter-spaced micro-labels sit on it:
      tracked caps at 11px read about as large as lowercase at 12. Add a step here, never a literal. */
   --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-base:14px; --fs-lg:16px; --fs-xl:20px; --fs-2xl:24px; --fs-3xl:26px;
-  --r:14px; --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  /* The radius scale, one home (2026-11-17): 15 values across 39 declarations collapse to five steps.
+     999px (pill) and 50% (circle) are shapes, not sizes, and stay literal. */
+  --r:14px; --r-xs:3px; --r-sm:8px; --r-md:12px; --r-lg:var(--r); --r-xl:18px; --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:var(--fs-base)/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
@@ -39,17 +41,17 @@ a{color:var(--accent)}
 /* gate */
 #gate{position:relative;z-index:2;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px}
 .gate-card{width:100%;max-width:340px}
-.gate-hero{background:linear-gradient(180deg,rgba(99,50,56,.30),rgba(18,22,30,.90));border:1px solid var(--line2);border-radius:18px;padding:44px 24px 58px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
-.logo{width:48px;height:48px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,13,18,.6);display:grid;place-items:center;margin:0 auto 18px}
+.gate-hero{background:linear-gradient(180deg,rgba(99,50,56,.30),rgba(18,22,30,.90));border:1px solid var(--line2);border-radius:var(--r-xl);padding:44px 24px 58px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.logo{width:48px;height:48px;border-radius:var(--r-md);border:1px solid var(--line2);background:rgba(10,13,18,.6);display:grid;place-items:center;margin:0 auto 18px}
 .gate-hero h1{margin:0 0 10px;font-size:var(--fs-xl);font-weight:700;letter-spacing:-.01em}
 .field{margin-top:34px}
-.input{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:12px 13px;font:inherit;outline:none;transition:border .15s}
+.input{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:var(--r-md);padding:12px 13px;font:inherit;outline:none;transition:border .15s}
 .input:focus{border-color:var(--accent)}
 .flabel{display:block;margin:0 0 6px;color:var(--muted);font-size:var(--fs-sm);font-weight:500}
 .flabel+.input{margin-bottom:14px}
 .check{display:flex;align-items:center;gap:9px;margin:14px 0 16px;color:var(--muted);font-size:var(--fs-md)}
 .check input{accent-color:var(--accent);width:15px;height:15px}
-.btn{width:100%;min-height:44px;background:var(--brand);color:#000;border:0;border-radius:10px;padding:12px;font:600 var(--fs-base) Inter,sans-serif;cursor:pointer;transition:filter .15s}
+.btn{width:100%;min-height:44px;background:var(--brand);color:#000;border:0;border-radius:var(--r-md);padding:12px;font:600 var(--fs-base) Inter,sans-serif;cursor:pointer;transition:filter .15s}
 .btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.6;cursor:wait}
 .gate-foot{border-top:1px solid var(--line);margin-top:30px;padding-top:16px;text-align:center;color:var(--dim);font-size:var(--fs-sm)}
 .err{color:var(--red);font-size:var(--fs-md);margin-top:10px;min-height:18px;text-align:center}
@@ -59,11 +61,11 @@ a{color:var(--accent)}
 header.top{position:sticky;top:0;z-index:20;background:rgba(10,13,18,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .top-in{max-width:1320px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
-.brand .logo{width:34px;height:34px;margin:0;border-radius:9px}
+.brand .logo{width:34px;height:34px;margin:0;border-radius:var(--r-sm)}
 .brand b{font-weight:700;font-size:var(--fs-lg);white-space:nowrap}
 nav.tabs{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
-nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;font-size:var(--fs-md);white-space:nowrap;transition:color .15s,background-color .15s}
+nav.tabs a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:var(--r-sm);font-weight:500;font-size:var(--fs-md);white-space:nowrap;transition:color .15s,background-color .15s}
 nav.tabs a:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .navgrp{align-self:center;margin:0 2px 0 10px;padding-left:10px;border-left:1px solid var(--line);color:var(--dim);font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.13em;text-transform:uppercase;white-space:nowrap;user-select:none}
 nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 0 0 1px rgba(175,100,82,.4)}
@@ -75,9 +77,9 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 .menupanel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:200px;padding:6px;
   /* --panel is rgba(...,.72) on purpose, for cards sitting over the page. A floating dropdown
      has to be opaque or the background grid reads straight through the labels. */
-  background:#161b24;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:10px;
+  background:var(--panel-solid);border:1px solid var(--line,rgba(255,255,255,.12));border-radius:var(--r-md);
   box-shadow:0 10px 32px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:1px}
-.menupanel a{display:block;padding:8px 11px;border-radius:7px;color:var(--muted);text-decoration:none;
+.menupanel a{display:block;padding:8px 11px;border-radius:var(--r-sm);color:var(--muted);text-decoration:none;
   font-size:var(--fs-md);font-weight:500;white-space:nowrap}
 .menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
 .mgrp{padding:9px 11px 3px;color:var(--dim);font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.13em;text-transform:uppercase}
@@ -130,7 +132,7 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
 }
-.lock{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)}
+.lock{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:var(--r-sm);padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)}
 main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
 .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 22px;flex-wrap:wrap}
 .pagehead h2{margin:6px 0 0;font-size:var(--fs-3xl);font-weight:700;letter-spacing:-.02em}
@@ -147,7 +149,7 @@ main{max-width:1320px;margin:0 auto;padding:26px 24px 80px}
 
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}} @media(max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 14px 12px}
 .kpi .v{font-size:var(--fs-2xl);font-weight:700;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
 .kpi .n{color:var(--dim);font-size:var(--fs-sm);margin-top:3px}
 
@@ -161,7 +163,7 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
    Risk, Proposal, Analytics and the drawers — and had NO rules at all, so six tabs including the
    decision grid rendered as browser-default tables. Match .t, which the template's own tables use,
    so the two table systems look like one product. */
-.table-wrap{overflow:auto;border-radius:10px;border:1px solid var(--line)}
+.table-wrap{overflow:auto;border-radius:var(--r-md);border:1px solid var(--line)}
 .tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:var(--fs-md)}
 .tbl th{text-align:left;font:500 var(--fs-xs) var(--mono);letter-spacing:.12em;text-transform:uppercase;
   color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;
@@ -192,33 +194,33 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .scroll{overflow-x:auto}
 .tk{font-weight:700;letter-spacing:.01em}
 .nm{color:var(--dim);font-size:var(--fs-sm);max-width:180px;overflow:hidden;text-overflow:ellipsis}
-.chip{display:inline-flex;align-items:center;gap:5px;font:500 var(--fs-sm) var(--mono);padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;font:500 var(--fs-sm) var(--mono);padding:3px 7px;border-radius:var(--r-sm);background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
 .chip.q1{color:var(--q1);border-color:rgba(106,166,248,.3)} .chip.q2{color:var(--q2);border-color:rgba(63,207,142,.3)}
 .chip.q3{color:var(--q3);border-color:rgba(239,100,100,.3)} .chip.q4{color:var(--q4);border-color:rgba(240,169,74,.3)}
 .chip.up{color:var(--green)} .chip.down{color:var(--red)} .chip.flat{color:var(--muted)}
 .chip.bad{color:var(--red);border-color:rgba(239,100,100,.35)} .chip.warn{color:var(--amber);border-color:rgba(240,169,74,.35)} .chip.ok{color:var(--green);border-color:rgba(63,207,142,.3)}
-.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.06);width:84px;position:relative;overflow:hidden;display:inline-block;vertical-align:middle}
-.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.bar{height:6px;border-radius:var(--r-xs);background:rgba(255,255,255,.06);width:84px;position:relative;overflow:hidden;display:inline-block;vertical-align:middle}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-xs)}
 .spark{width:96px;height:26px;display:inline-block;vertical-align:middle}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
-.fbtn{background:rgba(255,255,255,.03);border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:6px 10px;font:500 var(--fs-sm) Inter;cursor:pointer}
+.fbtn{background:rgba(255,255,255,.03);border:1px solid var(--line2);color:var(--muted);border-radius:var(--r-sm);padding:6px 10px;font:500 var(--fs-sm) Inter;cursor:pointer}
 .fbtn.on{color:var(--text);border-color:rgba(106,166,248,.45);background:rgba(106,166,248,.12)}
-.search{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:var(--fs-md);outline:none;width:180px}
+.search{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:var(--r-sm);padding:6px 10px;font:inherit;font-size:var(--fs-md);outline:none;width:180px}
 .list{display:flex;flex-direction:column}
 /* filter rows on the Grid and Holdings tabs */
 .filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .fsel{display:flex;align-items:center;gap:6px;font:500 var(--fs-sm) var(--mono);letter-spacing:.08em;
   text-transform:uppercase;color:var(--dim)}
 .fsel select{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);
-  border-radius:7px;padding:5px 8px;font:500 var(--fs-sm) var(--sans,inherit);text-transform:none;letter-spacing:0;
+  border-radius:var(--r-sm);padding:5px 8px;font:500 var(--fs-sm) var(--sans,inherit);text-transform:none;letter-spacing:0;
   max-width:190px}
 .fsel select:hover{border-color:var(--brand)}
 .fsel select:focus{outline:none;border-color:var(--brand)}
-.fnum{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);border-radius:7px;
+.fnum{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);border-radius:var(--r-sm);
   padding:5px 7px;font:500 var(--fs-sm) var(--mono);width:74px;text-transform:none;letter-spacing:0}
 .fnum.wide{width:124px}
 .fnum:focus{outline:none;border-color:var(--brand)}
-.colfilters{padding:11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);
+.colfilters{padding:11px;border:1px solid var(--line);border-radius:var(--r-md);background:rgba(255,255,255,.02);
   margin-bottom:12px;gap:11px 14px}
 .colfilters[hidden]{display:none}
 th.sorted{color:var(--text)}
@@ -229,7 +231,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .lwcbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .tfs,.lwcopts{display:flex;gap:3px;flex-wrap:wrap}
 .tfb,.indchip{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--line);
-  border-radius:7px;padding:4px 9px;font:500 var(--fs-sm) Inter,sans-serif;cursor:pointer;transition:color .13s,background-color .13s,border-color .13s}
+  border-radius:var(--r-sm);padding:4px 9px;font:500 var(--fs-sm) Inter,sans-serif;cursor:pointer;transition:color .13s,background-color .13s,border-color .13s}
 .tfb:hover,.indchip:hover{color:var(--text);background:rgba(255,255,255,.07)}
 .tfb.on,.indchip.on{color:var(--text);background:var(--brand-soft);border-color:rgba(175,100,82,.45)}
 /* An indicator that is OFF must read as off at a glance, not merely un-highlighted -- the chip row
@@ -252,11 +254,11 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
    lines and reported only the symbol's own OHLC. */
 .lwckey{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
 .lwckc{display:inline-flex;align-items:center;gap:5px;font:500 var(--fs-sm) Inter,sans-serif;color:var(--text);
-  background:var(--card2,rgba(255,255,255,.04));border:1px solid var(--line);border-radius:11px;padding:2px 4px 2px 8px}
+  background:var(--card2,rgba(255,255,255,.04));border:1px solid var(--line);border-radius:var(--r-md);padding:2px 4px 2px 8px}
 .lwckx{background:none;border:0;color:var(--dim);cursor:pointer;font:600 var(--fs-md) Inter,sans-serif;
   line-height:1;padding:1px 4px;border-radius:50%}
 .lwckx:hover{color:var(--text);background:rgba(255,255,255,.1)}
-.lwcsw{display:inline-block;width:10px;height:2px;border-radius:1px;vertical-align:middle;flex:0 0 auto}
+.lwcsw{display:inline-block;width:10px;height:2px;border-radius:var(--r-xs);vertical-align:middle;flex:0 0 auto}
 /* pointer-events:none so the legend never eats a crosshair move or a drag on the pane beneath it */
 /* ⚠ max-width keeps the key clear of the price axis, and the VALUES row wraps.
    At drawer width (570px) a single nowrap line fitted four of eleven overlays and cut the rest
@@ -281,9 +283,9 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .lwcfoot{color:var(--dim);font-size:var(--fs-xs);line-height:1.55;margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
 @media(max-width:700px){.fsel{width:100%}.fsel select{flex:1;max-width:none}}
 /* period segmented control (Overview) */
-.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.03);margin-left:12px}
+.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(255,255,255,.03);margin-left:12px}
 .seg button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 var(--fs-sm) var(--mono);letter-spacing:.06em;
-  padding:4px 10px;border-radius:6px}
+  padding:4px 10px;border-radius:var(--r-sm)}
 .seg button:hover:not([disabled]):not(.on){color:var(--text)}
 .seg button.on{background:var(--brand);color:#fff}
 .seg button[disabled]{opacity:.32;cursor:default}
@@ -293,12 +295,12 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .brief.universe{border-color:rgba(63,207,142,.28);background:linear-gradient(180deg,rgba(63,207,142,.06),rgba(255,255,255,.012));margin-bottom:16px}
 .brief.morning{border-color:rgba(106,166,248,.3);background:linear-gradient(180deg,rgba(106,166,248,.07),rgba(255,255,255,.012));margin-bottom:16px}
 .memotag{display:inline-block;font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.1em;text-transform:uppercase;
-  border:1px solid;border-radius:3px;padding:1px 5px;margin-right:7px;vertical-align:1px}
+  border:1px solid;border-radius:var(--r-xs);padding:1px 5px;margin-right:7px;vertical-align:1px}
 .memolt>li{margin-bottom:11px}
 .brief h4{margin:0 0 7px;font-size:var(--fs-sm);font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .bnav{display:flex;align-items:center;gap:8px;flex:none}
-.bbtn{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted);border-radius:6px;cursor:pointer;
+.bbtn{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted);border-radius:var(--r-sm);cursor:pointer;
   font:600 var(--fs-sm) var(--mono);padding:3px 8px}
 .bbtn:hover:not([disabled]){color:var(--text);border-color:var(--brand)}
 .bbtn[disabled]{opacity:.3;cursor:default}
@@ -312,7 +314,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 @media(max-width:700px){.bgrid{grid-template-columns:1fr}.brief h3{font-size:var(--fs-lg)}}
 /* plain-English thesis layer: the readable version, with the full record behind a toggle */
 .kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.kv{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.02)}
+.kv{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(255,255,255,.02)}
 .kv span{font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase}
 .kv b{font-size:var(--fs-base)}
 .thesis-full{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
@@ -324,7 +326,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
 .li:last-child{border-bottom:0}
 .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:var(--fs-sm)}
-.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:var(--r-xs);margin-right:6px;vertical-align:-1px}
 .note{color:var(--dim);font-size:var(--fs-sm);line-height:1.55}
 
 /* drawer */
@@ -335,15 +337,15 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .dr-in{padding:22px 26px 60px}
 .dr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .dr-top h2{margin:4px 0 2px;font-size:var(--fs-2xl);letter-spacing:-.02em}
-.x{background:none;border:1px solid var(--line2);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:var(--fs-lg)}
+.x{background:none;border:1px solid var(--line2);color:var(--muted);width:32px;height:32px;border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-lg)}
 .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
-.mini div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mini div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px}
 .mini b{display:block;font-size:var(--fs-lg);margin-top:4px;font-variant-numeric:tabular-nums}
 .sec{margin-top:22px}
 .sec h4{margin:0 0 9px;font:500 var(--fs-xs) var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
 .sec p{margin:0;color:#cdd3de;line-height:1.6}
 .sec ul{margin:0;padding-left:18px;color:#cdd3de} .sec li{margin:5px 0;line-height:1.5}
-.mtab{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.mtab{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
 .mtab div{background:#11161e;padding:9px 11px} .mtab small{display:block;color:var(--dim);font:500 var(--fs-xs) var(--mono);letter-spacing:.1em;text-transform:uppercase} .mtab b{font-size:var(--fs-base);font-variant-numeric:tabular-nums}
 .news{display:flex;flex-direction:column;gap:10px}
 .news div{border-left:2px solid var(--line2);padding:2px 0 2px 12px}
@@ -372,7 +374,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:52 · 8bec6b3</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 02:54 · 5a6a68e</div>
   </div>
 </section>
 
@@ -401,7 +403,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:52 · 8bec6b3</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 02:54 · 5a6a68e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2897,9 +2899,9 @@ function rangeBand(lo, hi, pos, timing){
   return `<div style="min-width:92px" title="${esc(tip)}">
     <div class="mono" style="font-size:var(--fs-xs);color:${C.muted};display:flex;justify-content:space-between;gap:8px">
       <span>${usd(L, dp)}</span><span>${usd(H, dp)}</span></div>
-    <div style="position:relative;height:4px;border-radius:2px;background:${C.line};margin-top:3px">
+    <div style="position:relative;height:4px;border-radius:var(--r-xs);background:${C.line};margin-top:3px">
       <span style="position:absolute;left:${(cl * 100).toFixed(1)}%;transform:translateX(-50%);top:-3px;
-        width:3px;height:10px;border-radius:1px;background:${out ? C.red : col};
+        width:3px;height:10px;border-radius:var(--r-xs);background:${out ? C.red : col};
         ${out ? "box-shadow:0 0 0 1px " + C.red : ""}"></span></div></div>`;
 }
 // Which way the risk range is moving, and whether it is widening. The levels alone say where the
@@ -2943,7 +2945,7 @@ function rangeBar(v2){
   if(!v2 || v2.trade_low == null) return "";
   const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
   return `<div class="sec"><h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing?.replaceAll("_"," ")||"")}</span></h4>
-    <div style="position:relative;height:26px;margin:10px 0;background:linear-gradient(90deg,rgba(63,207,142,.25),rgba(255,255,255,.05),rgba(240,169,74,.25));border-radius:4px">
+    <div style="position:relative;height:26px;margin:10px 0;background:linear-gradient(90deg,rgba(63,207,142,.25),rgba(255,255,255,.05),rgba(240,169,74,.25));border-radius:var(--r-xs)">
       <div style="position:absolute;left:${p*100}%;top:-4px;width:2px;height:34px;background:${C.text}"></div></div>
     <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm)" class="muted"><span>${usd(lo,2)} low</span><span>${usd(px,2)}</span><span>${usd(hi,2)} high</span></div>
     ${tbl(["Range","Direction","Low","High"], [["Trade (1 week)", esc(v2.trade_dir), usd(v2.trade_low,2), usd(v2.trade_high,2)],
@@ -3320,7 +3322,7 @@ function vdurSplit(v, h, tk){
   const rho = x => x == null ? "—" : signedNum(x);
   const tight = st.rhoGrowth != null && Math.abs(st.rhoGrowth) >= 0.99;
   return head + `
-    <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin:0 0 10px" role="img"
+    <div style="display:flex;height:8px;border-radius:var(--r-xs);overflow:hidden;margin:0 0 10px" role="img"
          aria-label="${pc1(s_)} visible, ${pc1(1 - s_)} terminal">
       <i style="width:${(s_ * 100).toFixed(1)}%;background:var(--accent)"></i><i style="flex:1;background:var(--violet)"></i></div>
     <div class="kvs">
@@ -3936,7 +3938,7 @@ function regimeStrip(){
   if(f) bits.push(cell("Book fragility", (+f.pfi).toFixed(1), fragC(+f.pfi)),
                   cell("Effective bets by risk", (f.diagnostics||{}).effective_n_risk == null ? "—" : num(+f.diagnostics.effective_n_risk,1)));
   return `<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;margin:0 0 16px;padding:11px 14px;
-    border:1px solid var(--line);border-radius:10px;background:rgba(106,166,248,.05)">
+    border:1px solid var(--line);border-radius:var(--r-md);background:rgba(106,166,248,.05)">
     ${bits.join("")}
     <a href="#analytics" class="muted" style="font-size:var(--fs-sm);margin-left:auto;align-self:center">Regime dashboard →</a>
    </div>`;
