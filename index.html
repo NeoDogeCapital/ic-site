@@ -424,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:34 · 33c19f4</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:49 · 1d390c9</div>
   </div>
 </section>
 
@@ -459,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:34 · 33c19f4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:49 · 1d390c9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1303,6 +1303,8 @@ function attributionCard(){
                   ["Interaction", t.interaction, "both at once"],
                   ["Benchmark proxy gap", w.proxy_gap, "sector funds vs SPY itself"],
                   ["Record gap", w.record_gap, "stored return vs full-day bars"]];
+  if((w.unattributed_days || []).length)
+    bridge.push(["Unattributed days", w.unattributed, w.unattributed_days.map(x => `${x.date}: ${x.reason}`).join("; ")]);
   const maxAbs = Math.max(1e-9, ...w.segments.map(r => Math.abs(r.total)));
   const bar = v => { const pc = Math.min(50, Math.abs(v) / maxAbs * 50);
     return `<span class="attr-bar"><span style="${v >= 0 ? `left:50%` : `right:50%`};width:${pc}%;background:${v >= 0 ? C.green : C.red}"></span></span>`; };
