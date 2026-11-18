@@ -73,6 +73,18 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
    past the fold were unreachable with no affordance that they existed. The menu lists every
    tab and is always available; below 1150px it replaces the strip entirely. */
 .menuwrap{position:relative;flex:0 0 auto}
+/* attribution card (performance.js) */
+.attr-top{display:flex;justify-content:flex-end;margin:-4px 0 10px}
+.attr-head{font-size:var(--fs-base);margin:0 0 8px}
+.attr-bridge{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0 0 14px}
+.attr-bridge>div{border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px}
+.attr-bridge .v{font-size:var(--fs-lg);font-weight:600;font-variant-numeric:tabular-nums;margin:2px 0}
+.attr-bridge .n{color:var(--muted);font-size:var(--fs-sm)}
+.attr-tot{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.attr-bar{position:relative;display:inline-block;width:64px;height:8px;background:rgba(255,255,255,.04);border-radius:2px}
+.attr-bar>span{position:absolute;top:0;bottom:0;border-radius:2px}
+.attr-names{display:grid;gap:6px;margin-top:12px;font-size:var(--fs-md)}
+.attr-names .caps{margin-right:8px}
 /* technical alerts bell (alerts.js) — the count is HIGH+MEDIUM flags on holdings, newest session, until opened */
 .bellwrap{position:relative;flex:0 0 auto}
 .bellbtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;position:relative}
@@ -412,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:25 · c1aae0f</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 03:34 · 33c19f4</div>
   </div>
 </section>
 
@@ -447,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:25 · c1aae0f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 03:34 · 33c19f4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1273,6 +1285,65 @@ function slugCard(){
     `<div style="margin-top:16px">` + card("Win / loss profile", "slugging = average gain in up periods ÷ average loss in down periods",
       tbl(["Period","Up periods","Avg up","Avg down","Slugging"], rows)) + `</div>`;
 }
+/* WHERE THE RETURN CAME FROM — Brinson-Fachler by sector vs SPY (engines/attribution.py, payload
+ * key "attribution"). The two gap lines are shown as lines on purpose: an attribution that
+ * reconciles by folding its residual into "selection" would be the defaulting this repo refuses. */
+let attrPeriod = "ytd";
+function attributionCard(){
+  const A = D.attribution;
+  if(!A) return `<div class="note">No attribution in this payload yet — it is computed by the nightly site build.</div>`;
+  if(A.error) return `<div class="note">Attribution could not be computed: ${esc(A.error)}</div>`;
+  const W = A.windows || {}, w = W[attrPeriod] || W.all;
+  if(!w || !w.n) return `<div class="note">No attributable days in this window.</div>`;
+  const t = w.totals, sp = (v, d=2) => pct(v, d);
+  const seg = `<span class="seg" id="attrSeg">${PERIODS.map(([k,l]) =>
+      `<button data-p="${k}" class="${W[k] === w ? "on" : ""}" ${W[k] && W[k].n ? "" : "disabled"}>${l}</button>`).join("")}</span>`;
+  const bridge = [["Allocation", t.allocation, "which sectors we were in"],
+                  ["Selection", t.selection, "which names, against their sector fund"],
+                  ["Interaction", t.interaction, "both at once"],
+                  ["Benchmark proxy gap", w.proxy_gap, "sector funds vs SPY itself"],
+                  ["Record gap", w.record_gap, "stored return vs full-day bars"]];
+  const maxAbs = Math.max(1e-9, ...w.segments.map(r => Math.abs(r.total)));
+  const bar = v => { const pc = Math.min(50, Math.abs(v) / maxAbs * 50);
+    return `<span class="attr-bar"><span style="${v >= 0 ? `left:50%` : `right:50%`};width:${pc}%;background:${v >= 0 ? C.green : C.red}"></span></span>`; };
+  const rows = w.segments.map(r => [
+    `${esc(r.segment)}${r.outside_benchmark ? ` <span class="muted">· not in SPY</span>` : ""}`,
+    `${pct(r.w_p,1,false)} <span class="muted">/ ${r.outside_benchmark ? "—" : pct(r.w_b,1,false)}</span>`,
+    `${r.r_p == null ? "—" : pct(r.r_p,1)} <span class="muted">/ ${r.r_b == null ? "—" : pct(r.r_b,1)}</span>`,
+    `<span class="${cls(r.allocation)}">${sp(r.allocation)}</span>`,
+    `<span class="${cls(r.selection)}">${r.outside_benchmark ? "—" : sp(r.selection)}</span>`,
+    `<span class="${cls(r.interaction)}">${r.outside_benchmark ? "—" : sp(r.interaction)}</span>`,
+    `<span class="attr-tot"><b class="${cls(r.total)}">${sp(r.total)}</b>${bar(r.total)}</span>`]);
+  const nm = w.names || [], pick = xs => xs.map(x =>
+    `<a href="#grid/${esc(x.ticker)}" class="tk" style="text-decoration:none">${esc(x.ticker)}</a> <span class="${cls(x.selection)}">${sp(x.selection)}</span>`).join(" · ");
+  const m = A.meta || {};
+  return card("Where the return came from",
+    `${esc(w.start)} → ${esc(w.end)} · ${plural(w.n, "trading day")} · Brinson-Fachler by sector vs SPY, linked daily (Carino)`,
+    `<div class="attr-top">${seg}</div>
+     <div class="attr-head">Book <b class="${cls(w.r_book)}">${pct(w.r_book)}</b> · SPY <b>${pct(w.r_spy)}</b> ·
+       active <b class="${cls(w.active)}">${sp(w.active)}</b> =</div>
+     <div class="attr-bridge">${bridge.map(([l, v, n]) =>
+       `<div><div class="caps">${l}</div><div class="v ${cls(v)}">${sp(v)}</div><div class="n">${n}</div></div>`).join("")}</div>
+     ${tbl(["Sector", "Weight book / SPY", "Return book / sector fund", "Allocation", "Selection", "Interaction", "Total"], rows)}
+     ${nm.length ? `<div class="attr-names"><div><span class="caps">Best picks</span> ${pick(nm.slice(0,5))}</div>
+       <div><span class="caps">Worst picks</span> ${pick(nm.slice(-5).reverse())}</div></div>` : ""}
+     <div class="note" style="margin-top:10px">Weights are the recorded snapshot weights, cash included; average
+       weights over the window. Sector returns are the Select Sector SPDRs and SPY's sector weights are its
+       ${esc(m.benchmark_anchor || "")} composition (read through ${esc(m.benchmark_proxy || "KSPY")}, which holds SPY)
+       drifted by those funds — the <b>benchmark proxy gap</b> is how far that reconstruction misses SPY. The sector
+       funds cap their largest names, so when mega-caps lag they beat SPY and selection measured against them reads
+       worse by about that gap. Cash and the index fund sit outside SPY, so their whole effect is allocation (cash
+       drag in a rising market). A name's pick score is its weight times its return over its sector fund, which is
+       selection and interaction together. The <b>record gap</b> is the stored daily return against the same day
+       recomputed from full-day bars — a few days were stored from a partial intraday bar.</div>`);
+}
+function drawAttribution(box){
+  box.innerHTML = sectionHead("Attribution", `<span class="muted">allocation vs selection vs SPY</span>`) + attributionCard();
+  const s = box.querySelector("#attrSeg");
+  if(s) s.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if(b.disabled) return; attrPeriod = b.dataset.p; drawAttribution(box); });
+}
+
 async function performanceAll(el){
   performanceView(el);
   // The models are the first SECTION, directly under the equity sleeve's own chart. Appended, not
@@ -1282,6 +1353,8 @@ async function performanceAll(el){
   el.appendChild(mbox);
   mbox.innerHTML = sectionHead("The model of models", `<span class="muted">what a client actually holds</span>`) + modelsCard();
   drawModels();
+  const attrBox = document.createElement("div"); el.appendChild(attrBox);
+  try{ drawAttribution(attrBox); }catch(e){ attrBox.innerHTML = sectionHead("Attribution") + `<div class="note">Attribution unavailable: ${esc(e.message||e)}</div>`; }
   const slug = document.createElement("div"); slug.innerHTML = sectionHead("Win / loss & slugging") + slugCard(); el.appendChild(slug);
   const riskBox = document.createElement("div"); el.appendChild(riskBox);
   try{ await risk(riskBox); }catch(e){ riskBox.innerHTML = sectionHead("Risk") + `<div class="note">Risk data unavailable: ${esc(e.message||e)}</div>`; }
