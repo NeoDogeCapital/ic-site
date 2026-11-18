@@ -424,7 +424,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <button id="go" class="btn" type="submit">Sign in</button>
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:35 · 9137b8e</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 14:52 · 3899f1c</div>
   </div>
 </section>
 
@@ -459,7 +459,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:35 · 9137b8e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 14:52 · 3899f1c</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -618,7 +618,12 @@ async function enter(){
     }catch(e){}
     try{
       const tr = await qAll("site_trades", r => r.order("trade_date", {ascending:false}));
-      if(tr && tr.length) D.trades = tr.map(t => ({...t, date: t.trade_date}));
+      // Mapped onto the PAYLOAD's keys (site_build.py: d · tk · amount · why), which is what the trade
+      // table renders. Spreading the view row kept its own names (ticker, dollar_amount, why_now), so
+      // every row printed "undefined" for date and ticker until 2026-11-18.
+      if(tr && tr.length) D.trades = tr.map(t => ({d: t.trade_date, tk: t.ticker, action: t.action,
+        shares: t.shares == null ? null : +t.shares, price: t.price == null ? null : +t.price,
+        amount: t.dollar_amount == null ? null : +t.dollar_amount, why: t.why_now || ""}));
     }catch(e){}
     // The model of models. Until this existed the site showed only the EQUITY sleeve, so the thing
     // a client actually holds — 60/40 or 80/20 — appeared nowhere and the book's 26.7% volatility
@@ -732,6 +737,13 @@ const pctFlat = (v, d=0) => v==null||isNaN(v) ? "—" : Number(v).toFixed(d) + "
 // plural. Counts that cannot plausibly be 1 (trading days since inception) are left as they are.
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const num = (v, d=2) => v==null||isNaN(v) ? "—" : Number(v).toFixed(d);
+// EARNINGS DATES: a date before today is the LAST report, never the next one. The nightly writer
+// stored Yahoo's current-event date as "next" until 2026-11-18, so Overview listed reports a month
+// past as "ahead". The writer is fixed; this keeps a past date from ever being shown as a forecast.
+const _todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+const erNext = d => (d && d >= _todayISO()) ? d : null;
+const erCell = d => !d ? "—" : erNext(d) ? esc(d)
+  : `<span class="muted" title="Last report ${esc(d)}; the next date has not been published">not set</span>`;
 const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -5428,11 +5440,13 @@ function overview(el){
       label:{show:true,position:"right",color:C.dim,fontSize:11,formatter:p=>pct(p.value,0)}}]
   }).on("click", p => location.hash = "#holdings/" + byPL[p.dataIndex].tk);
 
-  const er = H.filter(h=>h.next_er).sort((a,b)=>a.next_er.localeCompare(b.next_er)).slice(0,9);
-  document.getElementById("ovER").innerHTML = er.map(h => {
+  const er = H.filter(h=>erNext(h.next_er)).sort((a,b)=>a.next_er.localeCompare(b.next_er)).slice(0,9);
+  const erUnset = H.filter(h=>!erNext(h.next_er)).length;
+  document.getElementById("ovER").innerHTML = (er.length ? "" : `<p class="muted" style="margin:0">No upcoming report dates published for the book.</p>`) + er.map(h => {
     const days = Math.round((new Date(h.next_er) - new Date()) / 864e5);
     return `<a class="li" href="#holdings/${h.tk}" style="text-decoration:none;color:inherit"><span><span class="tk">${h.tk}</span> <span class="nm">${esc(h.name)}</span></span>
-      <span class="mono muted" style="font-size:var(--fs-sm)">${h.next_er} <span class="${days<=7?'amber':''}">(${days}d)</span></span></a>`; }).join("");
+      <span class="mono muted" style="font-size:var(--fs-sm)">${h.next_er} <span class="${days<=7?'amber':''}">(${days}d)</span></span></a>`; }).join("") +
+    (erUnset ? `<p class="muted" style="margin:8px 0 0;font-size:var(--fs-sm)">${plural(erUnset, "holding")} with no published next date.</p>` : "");
   const flags = H.map(h => { const f=[];
       if(h.comp!=null && h.comp<6.5) f.push(`composite ${num(h.comp)}`);
       if((h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6)) f.push("pillar floor");
@@ -5559,7 +5573,7 @@ function drawHoldings(){
       <td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>
       <td class="mono muted" style="font-size:var(--fs-sm)">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>
       ${facCells({ticker: h.tk, universe_tag: null})}
-      <td class="mono muted" style="font-size:var(--fs-sm)">${h.next_er||"—"}</td>
+      <td class="mono muted" style="font-size:var(--fs-sm)">${erCell(h.next_er)}</td>
       <td>${thesisChip(h.thesis_status)}</td></tr>`; }).join("") + cashRow(cols.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
     hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
@@ -5652,7 +5666,7 @@ function openHolding(tk){
       <div><span class="caps">Price</span><b>${usd(h.price,2)}</b></div>
       <div><span class="caps">P&amp;L</span><b class="${cls(h.pl)}">${pct(h.pl)}</b></div>
       <div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
-      <div><span class="caps">Next ER</span><b style="font-size:var(--fs-base)">${h.next_er||"—"}</b></div>
+      <div><span class="caps">Next ER</span><b style="font-size:var(--fs-base)">${erCell(h.next_er)}</b></div>
     </div>
     ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${fundaBlock(h.tk)}${cardBlock(h.tk)}${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}
     <div class="sec"><h4>Model read</h4><div class="mtab">
@@ -6009,7 +6023,7 @@ function signals(el){
       .map(([k,l])=>`<button class="fbtn ${sfv===k?'on':''}" data-f="${k}">${l}</button>`).join("");
     document.querySelectorAll("#sf .fbtn").forEach(b=>b.onclick=()=>{sfv=b.dataset.f;drawU();}); };
   drawU();
-  const er = H.filter(h=>h.next_er).sort((a,b)=>a.next_er.localeCompare(b.next_er));
+  const er = H.filter(h=>erNext(h.next_er)).sort((a,b)=>a.next_er.localeCompare(b.next_er));
   const today = new Date(); today.setHours(0,0,0,0);
   mk(document.getElementById("sCal"), {
     grid:{left:52,right:60,top:10,bottom:26},
@@ -6123,9 +6137,9 @@ function historyView(el){
             {name:"Removed",type:"bar",stack:"t",data:rem,itemStyle:{color:C.red,borderRadius:[0,0,3,3]}}]
   });
   document.getElementById("hT").innerHTML = `<thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Amount</th><th>Rationale</th></tr></thead><tbody>` +
-    TR.map(t=>`<tr><td class="mono muted" style="font-size:var(--fs-sm)">${t.d}</td><td><span class="chip ${t.action==='BUY'?'ok':t.action==='SELL'?'bad':''}">${t.action}</span></td>
-      <td class="tk">${t.tk}</td><td class="r mono">${num(t.shares,2)}</td><td class="r mono">${usd(t.price,2)}</td><td class="r mono">${usd(t.amount)}</td>
-      <td class="muted" style="white-space:normal;min-width:260px;font-size:var(--fs-md)">${esc(t.why)}</td></tr>`).join("") + "</tbody>";
+    TR.map(t=>`<tr><td class="mono muted" style="font-size:var(--fs-sm)">${esc(t.d ?? "—")}</td><td><span class="chip ${t.action==='BUY'?'ok':t.action==='SELL'?'bad':''}">${esc(t.action ?? "—")}</span></td>
+      <td class="tk">${esc(t.tk ?? "—")}</td><td class="r mono">${num(t.shares,2)}</td><td class="r mono">${usd(t.price,2)}</td><td class="r mono">${usd(t.amount)}</td>
+      <td class="muted" style="white-space:normal;min-width:260px;font-size:var(--fs-md)">${t.why ? esc(t.why) : "—"}</td></tr>`).join("") + "</tbody>";
 }
 </script>
 </body>
