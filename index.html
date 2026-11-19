@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 14:00 · 6f4a13b</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 14:41 · e9e314f</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 14:00 · 6f4a13b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 14:41 · e9e314f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -1208,7 +1208,10 @@ function about(el){
     The pillar scores then act as vetoes, because a ranking cannot judge management or a balance sheet.
     A composite under 6.5, a pillar under its 6.0 floor, or no pillar score at all holds a company at C
     however well it ranks. A broken thesis, a composite under 5.0, or both floors breached makes it a D.
-    A company whose score cannot be computed because a figure is missing is not ranked, and is shown as such.`) +
+    A company whose score cannot be computed because a figure is missing is not ranked, and is shown as such.
+    Neither is a company whose return on invested capital is zero or negative: the score multiplies its parts,
+    so a negative return produces a number that means nothing. It is graded C and labelled "not ranked", which
+    says the score does not describe it, not that it is a middling company. The vetoes still apply to it.`) +
   step(6, "Technicals — timing, never thesis", `
     Technicals decide <i>when</i>, never <i>what</i>:
     <ul class="list">
@@ -3970,7 +3973,7 @@ async function grid(el){
       const cell = {
         ticker: `<td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td>`,
         grade: `<td title="${esc(r.grade_reason || "")}">${r.grade}</td>`,
-        grade_score: `<td title="${esc(r.grade_basis === "not_ranked" ? "not ranked: a QGS input is missing" : r.grade_basis || "")}">${r.grade_score == null ? "—" : num(r.grade_score, 0)}</td>`,
+        grade_score: `<td title="${esc(r.grade_score == null && r.grade_reason ? String(r.grade_reason).split(";")[0] : r.grade_basis || "")}">${r.grade_score == null ? "—" : num(r.grade_score, 0)}</td>`,
         qgs_rank: `<td>${r.qgs_rank == null ? "—" : r.qgs_rank}</td>`,
         quad_score: `<td>${r.quad_score == null ? "—" : num(r.quad_score, 0)}</td>`,
         tech_rating: `<td>${esc(techLbl(r.tech_rating))}</td>`,
