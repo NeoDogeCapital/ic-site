@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-18 22:00 · eea907a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 05:04 · 6f4a13b</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-18 22:00 · eea907a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 05:04 · 6f4a13b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -798,9 +798,18 @@ const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 // A bare "Q3" in red on a name growing 39% reads as an error; the chip says what the quad means
 // where there is room (drawers), and keeps the short code with a tooltip in dense tables.
-const QUAD_NAME = {Q1:"Full compounders", Q2:"Margin compression", Q3:"Full deterioration", Q4:"Reset / avoid"};
+// V13 (2026-11-18): the boxes keep their numbers. What they are built from is in D.method and is
+// spelled out in QUAD_MEANS, which every quad chip's tooltip carries — a label on new axes that
+// still read as the old one is how a methodology change goes unnoticed on the page.
+const QUAD_NAME = {Q1:"Full compounders", Q2:"Margin compression", Q3:"Full deterioration", Q4:"Reset"};
+const QUAD_MEANS = () => ((typeof D !== "undefined" && D && D.method) || {}).quad === "quarterly"
+  ? {Q1:"gross-profit growth above the universe, operating margin expanding", Q2:"gross-profit growth above the universe, operating margin contracting",
+     Q3:"gross-profit growth below the universe, operating margin contracting (override needed for a new position)",
+     Q4:"gross-profit growth below the universe, operating margin expanding"}
+  : {Q1:"revenue and earnings both accelerating", Q2:"revenue accelerating, earnings compressing",
+     Q3:"both decelerating", Q4:"revenue falling while EPS expands"};
 const qchip = (q, long = false) => q
-  ? `<span class="chip ${q.toLowerCase()}" title="${QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}">${long && QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}</span>`
+  ? `<span class="chip ${q.toLowerCase()}" title="${QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] + " — " + (QUAD_MEANS()[q] || "") : q}">${long && QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}</span>`
   : `<span class="chip" title="Quad not computed">—</span>`;
 
 /* ═══ size + factor cells (shared by the Grid and the Universe table) ═══════════════
@@ -991,7 +1000,7 @@ const CODE_LBL = {
   ext:              {OVEREXTENDED:"Overextended", HEALTHY:"Healthy", OVERSOLD:"Oversold"},
   cost:             {CHEAP:"Cheap", NEUTRAL:"Fair", DEAR:"Expensive"},   // market_regime.cost_state
   quad:             {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression",
-                     Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset / avoid"},
+                     Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset"},
   trend:            {UPTREND:"200d uptrend", DOWNTREND:"200d downtrend", NEUTRAL:"200d no trend",
                      BULLISH:"Track line bullish", BEARISH:"Track line bearish"},
 };
@@ -1005,7 +1014,8 @@ const ENUM_LBL = {tech_rating: techLbl, timing: timingLbl, action: v => codeLbl(
 const ACTION_ORD = {ACCUMULATE:0, ADD_ON_WEAKNESS:1, STARTER_ADD:2, STARTER:3, HOLD:4,
                     HOLD_WAIT_TREND:5, HOLD_NO_NEW_BUYS:6, REVIEW:7, WATCH:8, TRIM_CANDIDATE:9,
                     REDUCE:10, EXIT_REVIEW:11, AVOID:12, EXIT:13};
-// Quad order is EV RANK, not the label. Q1 best → Q4 worst (CLAUDE.md § QUAD FRAMEWORK). The
+// Quad order is the box number, Q1 first. Under V13 only Q1 is evidenced as better than the rest,
+// so the order of Q2-Q4 here is a sorting convention, not a ranking (sort on Quad score for one). The
 // digits happen to sort the same way lexically, which is exactly why this was never noticed as a
 // missing ordering — but a name with NO quadrant must sink, and `(r.quadrant ?? "")` floated it to
 // the top of an ascending sort instead. Returning null here sinks it, like every other key.
@@ -1130,7 +1140,7 @@ function about(el){
   const step = (n, title, body) => `<div class="card" style="margin-top:14px"><div class="card-h"><div>
       <h3><span style="color:var(--brand);font-variant-numeric:tabular-nums">${n}</span> &nbsp;${title}</h3></div></div>
       <div style="padding:2px 2px 4px;line-height:1.65">${body}</div></div>`;
-  el.innerHTML = head("Integrity Compounders", "How the model works", `<span class="muted">V12.2</span>`) +
+  el.innerHTML = head("Integrity Compounders", "How the model works", `<span class="muted">V${esc(((D.method || {}).version) || "12.2")}</span>`) +
   `<div class="card"><div style="line-height:1.7">
      <b>What we are trying to own:</b> businesses that compound — they earn high returns on the capital they
      employ, convert profit into cash, and reinvest it at attractive rates, with management that allocates
@@ -1153,16 +1163,19 @@ function about(el){
     We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Universe tab"} out of thousands listed. A new screen is
     loaded every week or two${scr ? `; the one in use is dated ${esc(scr)}` : ""}. Every entry and exit
     is logged. A name is never dropped automatically: screen absence is surfaced for review, and holdings are exempt.`) +
-  step(2, "The quadrant — accelerating or decelerating?", `
-    For every name we compare what the business is expected to do against what it has done:
+  step(2, "The quadrant — growing faster than the field, and is the margin widening?", `
+    For every name we read the latest reported quarter on two questions:
     <ul class="list">
-      <li><b>Revenue momentum</b> = expected revenue growth − recent revenue growth</li>
-      <li><b>Earnings momentum</b> = expected earnings growth − recent earnings growth</li>
+      <li><b>Growth</b> = gross profit against the same quarter a year ago, compared with the median company we track</li>
+      <li><b>Margin</b> = operating margin against the same quarter a year ago</li>
     </ul>
-    <b>Q1</b> both accelerating, the ideal · <b>Q2</b> revenue accelerating while earnings compress ·
-    <b>Q3</b> both decelerating, which needs an explicit override to own ·
-    <b>Q4</b> earnings rising while revenue falls — usually cost-cutting, and the bucket we most want to avoid.
-    A quadrant change must persist two consecutive months before we act on it.`) +
+    <b>Q1</b> growing faster than the field with the margin widening, the ideal ·
+    <b>Q2</b> growing faster but the margin is being compressed ·
+    <b>Q3</b> growing slower with the margin compressing, which needs an explicit override to buy ·
+    <b>Q4</b> growing slower while the margin widens.
+    Each name also carries a <b>quad score</b> from 0 to 100, because the number says more than the box:
+    in testing only Q1 stood apart from the other three. The quadrant describes a company. It no longer
+    decides its grade. A change must persist two consecutive readings before we act on it.`) +
   step(3, "Quality and honesty checks", `
     <ul class="list">
       <li><b>Quality Growth Score</b> — expected growth, cash-flow yield on enterprise value, return on capital
@@ -1171,7 +1184,7 @@ function about(el){
       <li><b>Six quality indicators</b> — capital efficiency, pricing power, operating efficiency, cash conversion,
           growth durability, balance sheet. They describe a company; they never remove it.</li>
       <li><b>Earnings-quality flag</b> — if earnings are accelerating while gross profit is not, the improvement
-          is flagged as potentially engineered and gets extra scrutiny.</li>
+          is flagged as potentially engineered and gets extra scrutiny. It is a prompt to look, not a grade input.</li>
     </ul>`) +
   step(4, "Scoring — the three pillars", `
     Every candidate is scored 1–10 on three pillars. The first pass is written by a model working from filed
@@ -1183,13 +1196,19 @@ function about(el){
       <li><b>Financial strength (25%)</b> — balance sheet, earnings and cash quality, self-funding. <b>Floor 6.0.</b></li>
     </ul>
     A composite below 6.5 is not eligible. Valuation deliberately sits outside the pillars, in the quality score.`) +
-  step(5, "The grade — one letter per company", `
+  step(5, "The grade — a ranking, with vetoes", `
+    Every company is ranked against the rest on two things together: its Quality Growth Score, and how much
+    of its own stock it is buying back net of what it issues. The letter is where it falls in that ranking:
     <ul class="list">
-      <li><b>A</b> — accelerating, high quality, scores clear, no flags</li>
-      <li><b>B</b> — ownable, something short of A</li>
-      <li><b>C</b> — unscored, composite under 6.5, one floor breach, or earnings flagged</li>
-      <li><b>D</b> — thesis broken, composite under 5.0, or both floors breached</li>
-    </ul>`) +
+      <li><b>A</b> — the top 15%</li>
+      <li><b>B</b> — the next 35%</li>
+      <li><b>C</b> — the next 30%</li>
+      <li><b>D</b> — the bottom 20%</li>
+    </ul>
+    The pillar scores then act as vetoes, because a ranking cannot judge management or a balance sheet.
+    A composite under 6.5, a pillar under its 6.0 floor, or no pillar score at all holds a company at C
+    however well it ranks. A broken thesis, a composite under 5.0, or both floors breached makes it a D.
+    A company whose score cannot be computed because a figure is missing is not ranked, and is shown as such.`) +
   step(6, "Technicals — timing, never thesis", `
     Technicals decide <i>when</i>, never <i>what</i>:
     <ul class="list">
@@ -1209,6 +1228,8 @@ function about(el){
     allowed and documented.`) +
   step(8, "Building the portfolio", `
     <ul class="list">
+      <li><b>Buy from the top of the list</b> — among the names the grid would buy, open slots are filled
+          from the highest Quality Growth Score down</li>
       <li><b>Three position sizes</b> — 2% starter, 4% full, 6% the most we will deliberately
           allocate to one name. A winner that drifts above 6% is left alone; nothing is trimmed
           for getting large, and a reduction is always a decision someone makes and records</li>
@@ -2189,7 +2210,10 @@ INDICATORS.grade_hist = {
        + "not the number. A STEP line, because a grade holds until it changes. ⚠ The record "
        + "starts 2026-09-15 (45 snapshots) and the line simply stops before that rather than "
        + "being carried back — and 425 of 466 names never changed grade in that window, so a "
-       + "flat line is the reading rather than a missing one.",
+       + "flat line is the reading rather than a missing one. ⚠ THE RULER CHANGED ON 2026-11-18: "
+       + "from that date the grade is a percentile rank of QGS + buybacks with the pillar floors "
+       + "as vetoes (V13); before it, the V12.2 gates. A step on that date is the method, not the "
+       + "company — the view carries `method` and the V12.2 grade beside it (grade_v12).",
 };
 
 INDICATORS.quad_hist = {
@@ -2199,13 +2223,15 @@ INDICATORS.quad_hist = {
   fmtVal: _lvlName(QUAD_LVL),
   compute: (bars, S, ctx) => alignServer(bars, ctx.srv("site_decision_history"),
                                          "as_of", "_quad_lvl"),
-  basis: "the V12 quadrant for THIS name on each date, from the same view as Grade. Plotted on "
-       + "EV RANK so best is at the top (Q1 Full Compounders = 4 … Q4 Reset/Avoid = 1); the key "
-       + "prints Q1-Q4. ⚠ Q4 is the WORST bucket, not the mildest — revenue falling while EPS "
-       + "expands. ⚠ A BREAK IN THE LINE IS REAL: 14.4% of rows carry no quadrant because the "
-       + "name's EPS axis is undefined (negative trailing EPS, §13.4), and the last value is NOT "
-       + "carried across that span — the model declined to classify it. Same 2026-09-15 start as "
-       + "Grade; 394 of 466 names never changed quadrant in the window.",
+  basis: "the quadrant for THIS name on each date, from the same view as Grade. Plotted with Q1 "
+       + "at the top (Q1 = 4 … Q4 = 1); the key prints Q1-Q4. ⚠ THE RULER CHANGED ON 2026-11-18: "
+       + "from that date the box is gross-profit growth of the latest quarter vs the universe "
+       + "median × operating margin vs a year ago (V13); before it, forward minus trailing "
+       + "growth, revenue × EPS (V12.2, where Q4 was the worst box). The two agree on a name about "
+       + "as often as chance, so a step on that date is the method, not the company. Under V13 "
+       + "only Q1 is evidenced as better than the rest; the order of Q2-Q4 on this axis is a "
+       + "plotting convention. ⚠ A BREAK IN THE LINE IS REAL: a name with no quad on a date is "
+       + "left as a gap, never carried.",
 };
 
 /* alignServer reads a numeric column, and these two arrive as 'A' and 'Q1'. Decoding them here,
@@ -3251,8 +3277,8 @@ let gridFilterOpen = false;
 // and sortable while hidden. Remembered per viewer.
 // Eleven, sized to FIT a 1,232px card with no sideways scroll (measured live: twelve with Sector ran
 // 1,594px). Sector moved to the full view — still filterable — and Why takes the remaining width.
-const GRID_MONITOR = ["ticker","grade","tech_rating","action","timing","quadrant","composite","p1","p2","p3","grade_reason"];
-const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3"};       // monitor-view headers; the tooltip keeps the full name
+const GRID_MONITOR = ["ticker","grade","tech_rating","action","qgs_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
+const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_rank: "QGS #"};       // monitor-view headers; the tooltip keeps the full name
 let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
 // What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
 // not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
@@ -3833,9 +3859,17 @@ function rateCell(tk){
     + (bk ? ` <span class="muted" style="font-size:var(--fs-xs)">${bk}</span>` : "");
 }
 const GRID_COLS = [
-  ["ticker","Ticker","txt"], ["grade","Grade","ord"], ["tech_rating","Technical","ord"], ["action","Action","ord"],
+  ["ticker","Ticker","txt"], ["grade","Grade","ord"],
+  // V13 (2026-11-18): the three numbers behind the new labels. The grade is a percentile cut, the
+  // proposal buys from the top of the QGS rank, and the quad is a score as well as a box — a letter or
+  // a box without its number hides how close a name sits to the line.
+  ["grade_score","Grade pct","num","Percentile of QGS + net buyback yield in the core universe. A above 85, B above 50, C above 20, D below — before the pillar vetoes"],
+  ["tech_rating","Technical","ord"], ["action","Action","ord"],
+  ["qgs_rank","QGS rank","num","1 = the highest QGS among core names the grid would buy today. The proposal fills open slots from the top of this list"],
   ["timing","Timing","ord"], ["range_pos","Risk range","num"], ["guidance","Guidance","txt"],
-  ["quadrant","Quad","txt"], ["qgs_tier","QGS tier","ord"],
+  ["quadrant","Quad","txt"],
+  ["quad_score","Quad score","num","0–100: the mean percentile of the quad's two axes (gross-profit growth vs the universe, operating margin vs a year ago)"],
+  ["qgs_tier","QGS tier","ord"],
   ["composite","Composite","num"],
   // THE THREE PILLARS, screenable (Niko, 2026-11-04). Composite alone cannot separate "strong
   // business, weak management" from the reverse, and those are different decisions: P2 and P3
@@ -3889,7 +3923,8 @@ function gridKey(r, k){
   // of sinking like every other blank. QUAD_ORD is EV rank (Q1 best), which the digits happen to
   // match lexically; the fix here is the null, not the order.
   if(k === "quadrant") return QUAD_ORD[r.quadrant] ?? null;
-  if(k === "composite" || k === "range_pos" || k === "p1" || k === "p2" || k === "p3")
+  if(k === "composite" || k === "range_pos" || k === "p1" || k === "p2" || k === "p3"
+     || k === "grade_score" || k === "qgs_rank" || k === "quad_score")
     return r[k] == null ? null : +r[k];
   // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
   if(k === "implied_cagr"){
@@ -3934,7 +3969,10 @@ async function grid(el){
       const u = LIVE.suniv[r.ticker] || null, tag = r.universe_tag;
       const cell = {
         ticker: `<td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td>`,
-        grade: `<td>${r.grade}</td>`,
+        grade: `<td title="${esc(r.grade_reason || "")}">${r.grade}</td>`,
+        grade_score: `<td title="${esc(r.grade_basis === "not_ranked" ? "not ranked: a QGS input is missing" : r.grade_basis || "")}">${r.grade_score == null ? "—" : num(r.grade_score, 0)}</td>`,
+        qgs_rank: `<td>${r.qgs_rank == null ? "—" : r.qgs_rank}</td>`,
+        quad_score: `<td>${r.quad_score == null ? "—" : num(r.quad_score, 0)}</td>`,
         tech_rating: `<td>${esc(techLbl(r.tech_rating))}</td>`,
         action: `<td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>`,
         timing: `<td>${timingChip(r.timing, r.range_pos)}</td>`,
@@ -4003,7 +4041,7 @@ async function grid(el){
           <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
           <button class="lock" id="gtoggle">${gridFilterOpen ? "Hide" : "Filter columns"}${n ? ` (${n})` : ""}</button>
           ${n ? `<button class="lock" id="gclear">Clear all</button>` : ""}
-          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: eleven columns. On: all ${GRID_COLS.length} — adds sector, the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
+          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: ${GRID_MONITOR.length} columns. On: all ${GRID_COLS.length} — adds sector, the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
           <span class="muted" id="sortNote" style="font-size:var(--fs-sm);margin-left:auto"></span>
         </div>
         <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
@@ -5023,6 +5061,10 @@ const PAPER_GROUPS = [
 const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];   // legend defaults, model view only
 const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
 const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
+// The first monthly lock struck on the V13 grade (a percentile rank) and the V13 quad (latest quarter).
+// Every book that selects on a grade or a quadrant holds names chosen by the V12.2 rules before this
+// date and by the V13 rules from it, so the line is one record of two selection rules.
+const PAPER_V13_LOCK = "2026-12-01";
 const PAPER_FALLBACK_COL = ["#e07a5f", "#81b29a", "#f2cc8f", "#8ab6d6", "#c8a2c8"];   // for unregistered books only
 let paperRange = "all";                      // YTD / 1Y / All
 let paperGroup = "model";
@@ -5053,7 +5095,11 @@ const PAPER_NOTES = {
        Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
        one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
        returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
-       unreliable regardless.`,
+       unreliable regardless.
+       <div style="margin-top:6px"><b>The grade and the quadrant changed definition on 2026-11-18 (V13).</b> Books here that select on either
+       were locked under the old rules and re-lock under the new ones on ${PAPER_V13_LOCK}: from that date &ldquo;Grade A&rdquo; means the top 15% by
+       ranking and each quadrant is read from the latest reported quarter. Returns on either side of that date belong to different
+       selection rules and should not be read as one record of either.</div>`,
   duration: ov => {
     const same = ov ? `As locked ${ov.dates.join(" / ")}: <b>${plural(ov.both_long,"name")} are long in both books and ${ov.both_short} are short in both</b>; only
          ${ov.vis_long_rate_short + ov.vis_short_rate_long} sit on opposite sides (${ov.vis_long_rate_short} and ${ov.vis_short_rate_long}).`
@@ -5183,7 +5229,8 @@ async function paperCard(el){
     const cuts = shown.map(s => (typeof PAPER_RECON_FROM !== "undefined" && PAPER_RECON_FROM[s]) || null).filter(Boolean).sort();
     const liveFrom = cuts.length ? cuts[cuts.length - 1] : null;
     const atOrAfter = d => days.find(x => x >= d);
-    const marks = [[grp.id === "model" ? PAPER_REAL_FROM : null, "model data"], [liveFrom, "live"]]
+    const marks = [[grp.id === "model" ? PAPER_REAL_FROM : null, "model data"], [liveFrom, "live"],
+                   [grp.id === "model" ? PAPER_V13_LOCK : null, "V13 rules"]]
       .filter(([d]) => d)
       .map(([d,l]) => { const at = atOrAfter(d); return at && at !== days[0] ? {xAxis:at, label:{formatter:l}} : null; })
       .filter(Boolean);
@@ -5700,7 +5747,7 @@ function overview(el){
     if(b.disabled) return; ovPeriod = b.dataset.p; clearCharts(); overview(el); });
   // Two different absences used to share one "N/A" slice: an index fund, for which a quad does not
   // apply, and stocks whose quad could not be computed. They are different facts (2026-11-18).
-  const QN = {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression", Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset / avoid"};
+  const QN = {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression", Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset"};
   const qc = {}; H.forEach(h => {
     const q = h.quad ? (QN[h.quad] || h.quad) : (h.sector === "Index / ETF" ? "Index fund · n/a" : "No quad · not computed");
     qc[q] = (qc[q]||0) + (h.weight||0); });
@@ -6326,20 +6373,26 @@ function drawUniverseTable(){
 }
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
+  // THE AXES ARE THE PAYLOAD'S (V13). D.method says what x and y are, in which units, and where to
+  // clip; a payload from before V13 has no method block and draws as it always did.
+  const QM = D.method || {}, QQ = QM.quad === "quarterly";
+  const XC = QM.x_clip || 30, YC = QM.y_clip || 30;
+  const xU = QM.x_unit || "%", yU = QM.y_unit || "%";
   el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
   `<div class="kpis" style="grid-template-columns:repeat(5,minmax(0,1fr))">
-    ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset / avoid"}[q],
-      `<span style="color:${C.q[q]}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
+    ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset"}[q],
+      `<span style="color:${C.q[q]}" title="${esc(QUAD_MEANS()[q])}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
     ${(() => {
       // THE FIFTH CARD (2026-11-18). The four quads summed to 79% of the universe and the rest —
       // names with an undefined axis (negative trailing EPS, no forward estimate) — appeared in no
       // card and no dot on the map. Missing must look missing, so it is counted, not inferred.
       const none = n - ["Q1","Q2","Q3","Q4"].reduce((a, q) => a + (qc[q] || 0), 0);
-      return kpi("No quad · axis undefined", `<span style="color:${C.dim}">${none}</span>`,
+      return kpi(QQ ? "No quad · no current quarter" : "No quad · axis undefined", `<span style="color:${C.dim}">${none}</span>`,
                  `${(none/n*100).toFixed(0)}% of universe · not on the map`);
     })()}
   </div>
-  <div class="card"><div class="card-h"><div><h3>Revenue momentum vs earnings momentum</h3><div class="sub">x = forward minus trailing revenue growth · y = forward minus trailing EPS growth · size = alignment · rings = holdings</div></div>
+  <div class="card"><div class="card-h"><div><h3>${esc(QM.quad_title || "Revenue momentum vs earnings momentum")}</h3><div class="sub">${esc(QM.quad_sub || "x = forward minus trailing revenue growth · y = forward minus trailing EPS growth")}${
+      QQ && QM.universe_median_gp_growth != null ? ` · universe median growth ${num(QM.universe_median_gp_growth*100,1)}%` : ""} · size = alignment · rings = holdings</div></div>
     <div class="filters" id="uf">${[["all","All"],["held","Holdings"],["watch","Watchlist"],["accum","Accumulate"]].map(([k,l])=>`<button class="fbtn ${uFilter===k?'on':''}" data-f="${k}">${l}</button>`).join("")}</div></div>
     <div class="chart" id="uMap" style="height:560px"></div></div>
   <div class="grid g2" style="margin-top:16px">
@@ -6357,20 +6410,20 @@ function universe(el){
     between them, filterable on every column and sortable on several at once.</div>`;
   document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f; clearCharts(); universe(el); });
   const keep = uKeep;
-  const clip = v => Math.max(-30, Math.min(30, v));
+  const clipX = v => Math.max(-XC, Math.min(XC, v)), clipY = v => Math.max(-YC, Math.min(YC, v));
   const pts = U.filter(u=>u.x!=null&&u.y!=null&&u.quad);
   mk(document.getElementById("uMap"), {
     grid:{left:50,right:20,top:20,bottom:40},
-    xAxis:axY({type:"value",min:-30,max:30,name:"Revenue momentum →",nameLocation:"middle",nameGap:26,nameTextStyle:{color:C.dim},axisLabel:{color:C.dim,formatter:v=>v+"%"},splitLine:{lineStyle:{color:C.line}}}),
-    yAxis:axY({type:"value",min:-30,max:30,name:"Earnings momentum →",nameLocation:"middle",nameGap:34,nameTextStyle:{color:C.dim},axisLabel:{color:C.dim,formatter:v=>v+"%"}}),
-    tooltip:{trigger:"item",formatter:p=>{const u=p.data.u;return `<b>${u.tk}</b> ${esc(u.name)}<br>${u.quad} · ${u.tier||"—"} · align ${num(u.align,0)} ${u.bucket||""}<br>rev mom ${num(u.x,1)}% · EPS mom ${num(u.y,1)}%<br>composite ${num(u.comp)} · ${u.trend||""}${u.held?"<br><b style='color:#6aa6f8'>HELD</b>":""}`;}},
+    xAxis:axY({type:"value",min:-XC,max:XC,name:QM.x_label || "Revenue momentum →",nameLocation:"middle",nameGap:26,nameTextStyle:{color:C.dim},axisLabel:{color:C.dim,formatter:v=>v+xU},splitLine:{lineStyle:{color:C.line}}}),
+    yAxis:axY({type:"value",min:-YC,max:YC,name:QM.y_label || "Earnings momentum →",nameLocation:"middle",nameGap:34,nameTextStyle:{color:C.dim},axisLabel:{color:C.dim,formatter:v=>v+yU}}),
+    tooltip:{trigger:"item",formatter:p=>{const u=p.data.u;return `<b>${u.tk}</b> ${esc(u.name)}<br>${u.quad} · ${u.tier||"—"} · align ${num(u.align,0)} ${u.bucket||""}<br>${esc(QM.x_short || "rev mom")} ${num(u.x,1)}${xU} · ${esc(QM.y_short || "EPS mom")} ${num(u.y,1)}${yU}${u.qscore != null ? ` · quad score ${num(u.qscore,0)}` : ""}<br>composite ${num(u.comp)} · ${u.trend||""}${u.held?"<br><b style='color:#6aa6f8'>HELD</b>":""}`;}},
     series:[
       {type:"scatter",data:[],markArea:{silent:true,data:[
-        [{coord:[0,0],itemStyle:{color:"rgba(106,166,248,.045)"}},{coord:[30,30]}],[{coord:[0,-30],itemStyle:{color:"rgba(63,207,142,.035)"}},{coord:[30,0]}],
-        [{coord:[-30,-30],itemStyle:{color:"rgba(239,100,100,.035)"}},{coord:[0,0]}],[{coord:[-30,0],itemStyle:{color:"rgba(240,169,74,.035)"}},{coord:[0,30]}]]},
+        [{coord:[0,0],itemStyle:{color:"rgba(106,166,248,.045)"}},{coord:[XC,YC]}],[{coord:[0,-YC],itemStyle:{color:"rgba(63,207,142,.035)"}},{coord:[XC,0]}],
+        [{coord:[-XC,-YC],itemStyle:{color:"rgba(239,100,100,.035)"}},{coord:[0,0]}],[{coord:[-XC,0],itemStyle:{color:"rgba(240,169,74,.035)"}},{coord:[0,YC]}]]},
        markLine:{silent:true,symbol:"none",lineStyle:{color:"rgba(255,255,255,.18)",type:"solid"},label:{show:false},data:[{xAxis:0},{yAxis:0}]}},
-      {type:"scatter",data:pts.map(u=>({value:[clip(u.x),clip(u.y)],u,
-        symbol: Math.abs(u.x)>30||Math.abs(u.y)>30 ? "triangle" : "circle",
+      {type:"scatter",data:pts.map(u=>({value:[clipX(u.x),clipY(u.y)],u,
+        symbol: Math.abs(u.x)>XC||Math.abs(u.y)>YC ? "triangle" : "circle",
         symbolSize: 5 + (u.align||0)/9,
         itemStyle:{color:C.q[u.quad], opacity: keep(u) ? (u.held?.95:.6) : .07,
           borderColor: u.held ? "#fff" : "transparent", borderWidth: u.held ? 1.5 : 0},
