@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 14:55 · fa2ce6d</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 15:08 · ef153f2</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 14:55 · fa2ce6d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 15:08 · ef153f2</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3875,7 +3875,7 @@ const GRID_COLS = [
   // buy-list order, headed "QGS #": 413 of 474 names showed a dash in a column that read as "this
   // company's QGS rank", and there was no QGS number at all. Three columns now, each saying what it is.
   ["qgs","QGS","num","Quality Growth Score × 10,000: (forward revenue + EPS growth) × free cash flow yield on enterprise value × ROIC × FCF margin. Tiers: Rare elite above 28, Exceptional above 16, Good compounder above 6, Average above 2"],
-  ["qgs_universe_rank","QGS rank","num","1 = the highest QGS of every core company we track. Companies whose free cash flow is not positive share the last place. Where there is no rank the cell says why"],
+  ["qgs_universe_rank","QGS rank","num","1 = the highest QGS of every core company we track. Companies whose free cash flow or ROIC is not positive share the last place. Where there is no rank the cell says why"],
   ["qgs_rank","Buy-list #","num","The order the proposal fills open slots in: QGS rank among only the core names the grid would buy today. Blank for every name that is not on the buy list"],
   ["timing","Timing","ord"], ["range_pos","Risk range","num"], ["guidance","Guidance","txt"],
   ["quadrant","Quad","txt"],
@@ -3944,7 +3944,7 @@ function qgsCell(r){
 }
 function qgsRankCell(r){
   if(r.qgs_universe_rank != null){
-    const last = r.grade_basis === "qgs_not_positive";
+    const last = r.grade_basis === "qgs_not_positive" || r.grade_basis === "roic_not_positive";
     return `<td class="mono"${last ? ` title="${esc("Shares the last place: " + (String(r.grade_reason || "").split(";")[0]))}"` : ""}>${r.qgs_universe_rank}${last ? ' <span class="muted">last</span>' : ""}</td>`;
   }
   const [lbl, tip] = qgsWhy(r, true);
