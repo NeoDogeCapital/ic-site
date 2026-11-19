@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 14:41 · e9e314f</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 14:55 · fa2ce6d</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 14:41 · e9e314f</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 14:55 · fa2ce6d</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3280,8 +3280,8 @@ let gridFilterOpen = false;
 // and sortable while hidden. Remembered per viewer.
 // Eleven, sized to FIT a 1,232px card with no sideways scroll (measured live: twelve with Sector ran
 // 1,594px). Sector moved to the full view — still filterable — and Why takes the remaining width.
-const GRID_MONITOR = ["ticker","grade","tech_rating","action","qgs_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
-const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_rank: "QGS #"};       // monitor-view headers; the tooltip keeps the full name
+const GRID_MONITOR = ["ticker","grade","tech_rating","action","qgs_universe_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
+const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_universe_rank: "QGS #", qgs_rank: "Buy #"};       // monitor-view headers; the tooltip keeps the full name
 let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
 // What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
 // not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
@@ -3293,14 +3293,17 @@ function gridText(r, key){
 const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
 // Numeric columns whose value lives in LIVE (the duration tables) rather than on the matrix row, so
 // the filter and the sort must both resolve them through gridKey().
-const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta", ...FAC_KEYS]);
+// "qgs" is on the row, but what the cell SHOWS is not always what the row stores (a non-positive ROIC
+// hides it — qgsShown), so it resolves through gridKey() too.
+const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta", "qgs", ...FAC_KEYS]);
 // Of those, the ones stored as a DECIMAL but typed as a PERCENT in the filter box. The bounds are
 // scaled once, in matchesFilters, by this one rule — rate_beta is a plain coefficient and is not.
 const PCT_TYPED = new Set(["implied_cagr", "vis_pct", "range_pos"]);
 // Columns whose filter box is typed in a friendlier unit than the stored one. Market cap is stored in dollars
 // and filtered in $ billions (nobody types 5000000000). The factor percentiles are already 0-100, so they
 // need no entry here.
-const FILTER_UNITS = {mcap: {scale: 1e9, hint: "$B"}};
+// QGS is stored as a small decimal and shown × 10,000, so its filter is typed on the shown scale.
+const FILTER_UNITS = {mcap: {scale: 1e9, hint: "$B"}, qgs: {scale: 1e-4, hint: "×10⁴"}};
 // Columns whose cell is rounded for display, and to how many decimals. The filter rounds to the
 // same precision so a row can never contradict the filter that hid it. The six factor percentiles
 // render at 0 dp; derived from FACTORS so a seventh factor cannot be forgotten here.
@@ -3868,7 +3871,12 @@ const GRID_COLS = [
   // a box without its number hides how close a name sits to the line.
   ["grade_score","Grade pct","num","Percentile of QGS + net buyback yield in the core universe. A above 85, B above 50, C above 20, D below — before the pillar vetoes"],
   ["tech_rating","Technical","ord"], ["action","Action","ord"],
-  ["qgs_rank","QGS rank","num","1 = the highest QGS among core names the grid would buy today. The proposal fills open slots from the top of this list"],
+  // EVERY NAME HAS A QGS AND A RANK, OR SAYS WHY NOT (Niko, 2026-11-19). The only rank here used to be the
+  // buy-list order, headed "QGS #": 413 of 474 names showed a dash in a column that read as "this
+  // company's QGS rank", and there was no QGS number at all. Three columns now, each saying what it is.
+  ["qgs","QGS","num","Quality Growth Score × 10,000: (forward revenue + EPS growth) × free cash flow yield on enterprise value × ROIC × FCF margin. Tiers: Rare elite above 28, Exceptional above 16, Good compounder above 6, Average above 2"],
+  ["qgs_universe_rank","QGS rank","num","1 = the highest QGS of every core company we track. Companies whose free cash flow is not positive share the last place. Where there is no rank the cell says why"],
+  ["qgs_rank","Buy-list #","num","The order the proposal fills open slots in: QGS rank among only the core names the grid would buy today. Blank for every name that is not on the buy list"],
   ["timing","Timing","ord"], ["range_pos","Risk range","num"], ["guidance","Guidance","txt"],
   ["quadrant","Quad","txt"],
   ["quad_score","Quad score","num","0–100: the mean percentile of the quad's two axes (gross-profit growth vs the universe, operating margin vs a year ago)"],
@@ -3915,7 +3923,35 @@ function pillarCell(r, k){
   const breach = n < 6.0;
   return `<span style="color:${breach ? C.red : C.text}"${breach ? ' title="through the 6.0 hard floor — cannot be initiated"' : ""}>${num(n)}</span>`;
 }
+// The QGS a row SHOWS. A non-positive ROIC makes the product meaningless (V13.1), so that stored number is
+// not displayed, sorted or filtered on: one function, so the cell, the sort and the filter cannot disagree.
+function qgsShown(r){ return (r.qgs == null || r.grade_basis === "roic_not_positive") ? null : +r.qgs; }
+function qgsFmt(v){ const x = v * 1e4, a = Math.abs(x); return x.toLocaleString("en-US", {maximumFractionDigits: a >= 100 ? 0 : a >= 10 ? 1 : 2, minimumFractionDigits: a >= 100 ? 0 : a >= 10 ? 1 : 2}); }
+// Why a row has no QGS or no rank, in two or three words, from the grade's own basis. [label, tooltip]
+function qgsWhy(r, forRank){
+  const first = r.grade_reason ? String(r.grade_reason).split(";")[0] : "";
+  if(r.grade_basis === "roic_not_positive") return ["ROIC ≤ 0", first];
+  if(r.grade_basis === "qgs_not_positive") return ["FCF ≤ 0", first];
+  if(r.grade_basis === "not_ranked") return ["no data", first];
+  if(forRank && r.universe_tag === "micro") return ["micro", "Micro sleeve: outside the core ranking"];
+  return ["—", ""];
+}
+function qgsCell(r){
+  const v = qgsShown(r);
+  if(v != null) return `<td class="mono">${qgsFmt(v)}</td>`;
+  const [lbl, tip] = qgsWhy(r, false);
+  return `<td class="muted" title="${esc(tip)}">${esc(lbl)}</td>`;
+}
+function qgsRankCell(r){
+  if(r.qgs_universe_rank != null){
+    const last = r.grade_basis === "qgs_not_positive";
+    return `<td class="mono"${last ? ` title="${esc("Shares the last place: " + (String(r.grade_reason || "").split(";")[0]))}"` : ""}>${r.qgs_universe_rank}${last ? ' <span class="muted">last</span>' : ""}</td>`;
+  }
+  const [lbl, tip] = qgsWhy(r, true);
+  return `<td class="muted" title="${esc(tip)}">${esc(lbl)}</td>`;
+}
 function gridKey(r, k){
+  if(k === "qgs") return qgsShown(r);
   if(k === "grade") return GRADE_ORD[r.grade] ?? 9;
   if(k === "tech_rating") return TECH_ORD[r.tech_rating] ?? 9;
   if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
@@ -3927,7 +3963,7 @@ function gridKey(r, k){
   // match lexically; the fix here is the null, not the order.
   if(k === "quadrant") return QUAD_ORD[r.quadrant] ?? null;
   if(k === "composite" || k === "range_pos" || k === "p1" || k === "p2" || k === "p3"
-     || k === "grade_score" || k === "qgs_rank" || k === "quad_score")
+     || k === "grade_score" || k === "qgs_rank" || k === "qgs_universe_rank" || k === "quad_score")
     return r[k] == null ? null : +r[k];
   // the price's required FCF growth. Sorted descending it ranks the most demanding prices first.
   if(k === "implied_cagr"){
@@ -3974,6 +4010,7 @@ async function grid(el){
         ticker: `<td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td>`,
         grade: `<td title="${esc(r.grade_reason || "")}">${r.grade}</td>`,
         grade_score: `<td title="${esc(r.grade_score == null && r.grade_reason ? String(r.grade_reason).split(";")[0] : r.grade_basis || "")}">${r.grade_score == null ? "—" : num(r.grade_score, 0)}</td>`,
+        qgs: qgsCell(r), qgs_universe_rank: qgsRankCell(r),
         qgs_rank: `<td>${r.qgs_rank == null ? "—" : r.qgs_rank}</td>`,
         quad_score: `<td>${r.quad_score == null ? "—" : num(r.quad_score, 0)}</td>`,
         tech_rating: `<td>${esc(techLbl(r.tech_rating))}</td>`,
