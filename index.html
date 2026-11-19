@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 16:00 · 4ec437a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-19 17:17 · 39b7176</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 16:00 · 4ec437a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-19 17:17 · 39b7176</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -4156,7 +4156,10 @@ async function risk(el, title="Risk"){
     ${card("Limit breaches",
       `${(co.breaches||[]).length + gates.length} flagged · weights include cash · priced ${esc(R.as_of)}`,
       `<ul class="list">${gates.map(b=>`<li><b>${esc(b)}</b> <span class="muted">· simulated at today's weights</span></li>`).join("")}${
-        (co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||(gates.length ? "" : "<li class='muted'>None</li>")}</ul>`)}
+        (co.breaches||[]).map(b=>`<li>${esc(b)}</li>`).join("")||(gates.length ? "" : "<li class='muted'>None</li>")}</ul>${
+        /* the correlation limit's window, and the warning that is NOT a breach, on the card that lists the breaches */
+        (() => { const c = R.correlation||{}, g = c.governing, r = c.recent; return (g && r) ?
+          `<div class="muted" style="font-size:12px;margin-top:10px">The ${num(c.cap)} correlation limit is tested on the trailing year (${g.n_obs} sessions to ${esc((c.session||"").slice(5))}): ${g.n_over} of ${g.n_pairs} pairs are over it. Early warning, not a breach: ${r.n_over} are over it on the last ${r.n_obs} sessions.</div>` : ""; })()}`)}
     ${card("Risk concentration", "weight vs share of risk", `<ul class="list">${(rc.callouts||[]).map(b=>`<li>${esc(b)}</li>`).join("")}</ul><div class="chart" id="rkRc"></div>`)}
   </div>
   <div class="grid g2" style="margin-top:16px">
@@ -6553,7 +6556,16 @@ function factors(el, title="Factors & concentration"){
       return kpi("IT sector", w == null ? "—" : num(w,1) + "%",
         w == null ? "cap table not in the payload" : `of total · cap ${num(lim,0)}% · ${esc((CAP.priced||"").slice(5))} close`, w > lim ? "neg" : ""); })()}
     ${kpi("Effective N", num(F.effective_n,1), "stocks only · the index fund is left out")}
-    ${kpi("Avg pairwise corr.", num(F.avg_pairwise_correlation), "limit 0.65", (F.avg_pairwise_correlation||0)>.65?"neg":"")}
+    ${(() => { /* THE LIMIT IS PER PAIR, and it has a window. This tile printed the AVERAGE (0.24)
+                    under "limit 0.65", which no book can breach, while the count beside it in the
+                    flags was a 90-day figure and the Risk tab's a 1-year one. One definition now
+                    (engines.book.correlation_table): the trailing year governs, the last 90 days
+                    is shown as a warning. A snapshot written before that has no record. */
+      const c = F.correlation, g = c && c.governing, r = c && c.recent;
+      return g ? kpi("Correlated pairs", String(g.n_over),
+                     `over ${num(c.cap)} on 1 year · ${r ? r.n_over : "—"} on the last ${r ? r.window_days : 90} days · avg ${num(g.avg)}`,
+                     g.n_over ? "neg" : "")
+               : kpi("Avg pairwise corr.", num(F.avg_pairwise_correlation), "pair count not in this snapshot"); })()}
     ${kpi("Wtd beta", num(F.wtd_avg_beta), "average of vendor betas, by weight")}
     ${kpi("Wtd ROIC", F.wtd_avg_roic!=null?num(F.wtd_avg_roic,1)+"%":"—", "")}
     ${kpi("Top-5 weight", F.top5_concentration_pct!=null?num(F.top5_concentration_pct,1)+"%":"—", "")}
