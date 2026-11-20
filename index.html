@@ -312,6 +312,41 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
    is the only place that says what is on the chart. */
 .indchip:not(.on){opacity:.55}
 .lwcchips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+/* The Indicators and Signals menus: a panel under its button, each entry a name and one line.
+   Until 2026-11-20 .lwcmenu had NO rule at all — the panel rendered as an unstyled block in the
+   page flow, pushing the chart down when it opened. */
+.lwcmenuwrap{position:relative;display:inline-block}
+.lwcmenu{position:absolute;z-index:40;top:calc(100% + 6px);right:0;width:min(390px,90vw);max-height:480px;overflow:auto;
+  background:var(--panel-solid);border:1px solid var(--line2);border-radius:var(--r-md);padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.lwcmenu[hidden]{display:none}
+.lwcmhead{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 2px;font:700 var(--fs-md) Inter,sans-serif;color:var(--text)}
+.lwcmhead a{font:500 var(--fs-xs) Inter,sans-serif;color:var(--muted)}
+.lwcmsec{font:600 var(--fs-xs) var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:10px 8px 4px}
+.lwcitem{display:block;width:100%;text-align:left;background:none;border:0;border-radius:var(--r-sm);padding:7px 8px;cursor:pointer;color:var(--text)}
+.lwcitem:hover{background:rgba(255,255,255,.06)}
+.lwcit{font:600 var(--fs-md) Inter,sans-serif}
+.lwcitem.on .lwcit{color:var(--accent2)}
+.lwcadded{float:right;font:500 var(--fs-xs) Inter,sans-serif;color:var(--dim)}
+.lwcdesc{display:block;font:400 var(--fs-sm)/1.45 Inter,sans-serif;color:var(--muted);margin-top:2px}
+.lwcsum{color:var(--muted);font-size:var(--fs-sm);line-height:1.55;margin:0 0 8px}
+.lwcknote{color:var(--muted);font-weight:400;margin-left:5px}
+.lwcknote:empty{display:none}
+/* GBG maps: a label, a strip of one cell per session, the state now. */
+.gbgmap{display:grid;grid-template-columns:minmax(150px,max-content) 1fr minmax(150px,max-content);column-gap:12px;row-gap:3px;align-items:center}
+.gbglab{font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gbglab[data-gbgpick]:hover b{color:var(--accent2)}
+.gbgcells{display:flex;height:18px;border-radius:var(--r-xs);overflow:hidden;background:rgba(255,255,255,.03)}
+.gbgcells i{flex:1 1 0;min-width:0;display:block}
+.gbgx{background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 3px,transparent 3px 6px) !important}
+.gbgright{font-size:var(--fs-sm);white-space:nowrap}
+.gbgaxis{position:relative;height:16px;font:500 var(--fs-xs) var(--mono);color:var(--dim)}
+.gbgaxis span{position:absolute;transform:translateX(-50%);top:2px;white-space:nowrap}
+.gbglegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:var(--fs-xs);color:var(--muted)}
+.gbglegend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.gbgnote{font-size:var(--fs-xs);line-height:1.5;margin-top:8px}
+@media(max-width:760px){.gbgmap{grid-template-columns:minmax(90px,max-content) 1fr}.gbgright{display:none}}
+.mktsearch{display:inline-flex;gap:4px;margin-left:10px}
+.mktsearch input{width:130px}
 .lwcgrp{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
 /* Markets: the symbol selector. Same chip as the timeframe buttons — one visual language for
    "pick one of these", rather than a third kind of button. */
@@ -458,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 19:36 · b4dde9e</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 19:52 · ed5116b</div>
   </div>
 </section>
 
@@ -493,7 +528,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 19:36 · b4dde9e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 19:52 · ed5116b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -629,6 +664,9 @@ async function enter(){
       }
       LIVE.gbgOk = true;
     }catch(e){ LIVE.gbg = {}; LIVE.gbgNewest = {}; LIVE.gbgOk = false; }
+    // the session dates the maps' one-character-per-session strings are aligned to (db/084)
+    try{ LIVE.gbgCal = ((await qAll("site_gasbrakesgas_calendar")).find(r => r.timeframe === "D") || {}).dates || []; }
+    catch(e){ LIVE.gbgCal = []; }
     // WHY a name has no rate beta (db/029): micro-sleeve names are excluded by design, a name whose
     // price series stopped is a data problem, and the page must not call both "too few returns".
     try{
@@ -2324,19 +2362,33 @@ function decodeDecisionRows(rows){
  *            over a Gas bar coming off an overbought reading; green, pointing up, under a Brakes
  *            bar coming off an oversold one. They are defined on the oscillator and were first
  *            drawn there; on the price bars is where a reader looks for them.              */
-const GBG_COL  = {"2": C.green, "1": "#a9e8cb", "0": "#f2d14b", "-1": "#f7b4b4", "-2": C.red};
+/* ⚠ SUPERSEDED IN PART, SAME DAY (Niko's recording of the other desk's chart, 2026-11-20). What
+ * is drawn now, and it is ONE toggle:
+ *   - candles in the state's colour, strong shades bright and weak shades dimmed;
+ *   - a RIBBON of the same colours along the top of the price pane, which is where the sequence
+ *     is read once a candle is two pixels wide;
+ *   - a LETTER on each bar the state changes: G below the bar, B above it, N on the side it came
+ *     from (below when it left Gas, above when it left Brakes). Letters, not words: a word needs
+ *     45px and a choppy name flips several times a week, so the words either overlapped or were
+ *     thinned away; a letter needs 16;
+ *   - the oscillator in its own pane: a line from −6 to +6 filled bar by bar down to zero, BLUE
+ *     where volume was heavy and TEAL where it was light, over zones shaded two points deep;
+ *     the GBG Squeeze as amber bars climbing a point for each bar the oscillator rests at zero,
+ *     to six; and an ARROW on the zero line at the bar the squeeze ends, up or down;
+ *   - the standard volume strip hidden while it is on (`hides`), its chip saying so.
+ * The four continuation / correction icons that the second pass put on the price bars are gone:
+ * they are not on the other desk's chart, and beside the letters they were noise. The oscillator's
+ * key still names one on the bar it falls on. */
+const GBG_COL  = {"2": C.green, "1": "#2c7a59", "0": "#f2d14b", "-1": "#8c3a3a", "-2": C.red};
+// For TEXT on a dark page the dimmed weak shades are too dark to read, so words use these.
+const GBG_TXT  = {"2": C.green, "1": "#7fd6b0", "0": "#f2d14b", "-1": "#f1a3a3", "-2": C.red};
 const GBG_NONE = "#5b6472";
 const GBG_NAME = {"2": "Gas · strong", "1": "Gas · weak", "0": "Neutral",
                   "-1": "Brakes · weak", "-2": "Brakes · strong"};
-const GBG_TAG  = {"1": {text: "Gas",     above: false, color: GBG_COL["2"]},
-                  "0": {text: "Neutral", above: true,  color: GBG_COL["0"]},
-                  "-1": {text: "Brakes", above: true,  color: GBG_COL["-2"]}};
-const GBG_MARK = {
-  gas_continuation:    {text: "Gas resumes",        above: false, shape: "circle",    color: GBG_COL["2"]},
-  gas_correction:      {text: "Gas off its high",   above: true,  shape: "arrowDown", color: GBG_COL["-2"]},
-  brakes_continuation: {text: "Brakes resume",      above: true,  shape: "circle",    color: GBG_COL["-2"]},
-  brakes_correction:   {text: "Brakes off its low", above: false, shape: "arrowUp",   color: GBG_COL["2"]},
-};
+const GBG_MARK = {gas_continuation: {text: "Gas resumes"}, gas_correction: {text: "Gas off its high"},
+                  brakes_continuation: {text: "Brakes resume"}, brakes_correction: {text: "Brakes off its low"}};
+const GBG_TF = {D: "daily", "2D": "two-day", W: "weekly", M: "monthly"};
+const _gbgWords = (state, strength) => state[0].toUpperCase() + state.slice(1) + (strength ? ", " + strength : "");
 // The stored row for the interval on screen, or null. The engine computes D, 2D and W, and only
 // for a name with 110 finished bars on that interval.
 // ⚠ NO ROW IS DRAWN AS "NO READING", NOT AS NOTHING. With the toggle on and no row (the monthly
@@ -2345,87 +2397,180 @@ const GBG_MARK = {
 // green and red candles under a switched-on chip, which reads as a broken toggle or, worse, as
 // a chart that has been checked and found unremarkable.
 const _gbgRow = (ctx) => (ctx.srv("site_gasbrakesgas") || []).find(r => r.timeframe === LWCP.iv) || null;
+// Where each GBG Squeeze in the stored tail ENDED: the first bar the oscillator left zero after
+// resting there. [{date, up, size}], oldest first. From the tail, not the bars on screen, so the
+// summary can name the last one even when it is left of the view.
+function _gbgSqueezeExits(t){
+  const out = [];
+  for(let i = 1; i < (t.d || []).length; i++)
+    if(t.q[i - 1] >= 1 && t.o[i] != null && t.o[i] !== 0) out.push({date: t.d[i], up: t.o[i] > 0, size: t.q[i - 1]});
+  return out;
+}
 
 INDICATORS.gbg_trend = {
   group: "GasBrakesGas",
-  label: "GasBrakesGas trend", pane: "price", type: "line", on: false, paints: "bars",
+  label: "GasBrakesGas · trend state", short: "GasBrakesGas", pane: "price", type: "line", on: false, paints: "bars",
   source: "server", view: "site_gasbrakesgas",
+  with: ["gbg_osc"], hides: ["volume"],
   fmtVal: v => GBG_NAME[String(v)] || "—",
   compute: (bars, S, ctx) => {
-    const r = _gbgRow(ctx);
+    const r = _gbgRow(ctx), blank = bars.map(() => null);
     if(!r || !Array.isArray(r.runs) || !r.runs.length)
-      return {vals: bars.map(() => null), colors: bars.map(() => null), none: GBG_NONE};
+      return {vals: blank, colors: blank, ribbon: blank, none: GBG_NONE,
+              chip: LWCP.iv === "M" ? "no reading on monthly bars" : "no reading: under 110 finished bars",
+              summary: `GasBrakesGas has no reading on ${GBG_TF[LWCP.iv]} bars for this name`
+                     + (LWCP.iv === "M" ? ": it is computed on daily, two-day and weekly bars only." : ": it needs 110 finished bars.")};
     const runs = r.runs, first = runs[0][0], last = r.bar_date;
     let j = 0, cur = null;
     const shade = bars.map(b => { const e = b.e || b.d;
       while(j < runs.length && runs[j][0] <= e){ cur = runs[j][1]; j++; }
       return (e < first || e > last) ? null : cur; });
-    // Flips, from the STORED run list rather than from the bars on screen, so a tag sits on the
-    // bar the state changed on even when the bar before it is outside the loaded window.
+    // Letters, from the STORED run list rather than from the bars on screen, so a letter sits on
+    // the bar the state changed on even when the bar before it is outside the loaded window.
     const at = new Map(bars.map((b, i) => [b.e || b.d, i]));
     const marks = [];
     for(let k = 1; k < runs.length; k++){
       const was = Math.sign(runs[k - 1][1]), now = Math.sign(runs[k][1]), i = at.get(runs[k][0]);
-      if(was === now || i === undefined) continue;          // a change of strength is not a flip
-      const t = GBG_TAG[String(now)];
-      marks.push({i, tag: true, minor: now === 0, above: t.above, shape: "square", color: t.color, text: t.text});
+      if(was === now || i === undefined) continue;          // a change of strength is not a change of state
+      marks.push(now > 0 ? {i, tag: true, above: false, color: GBG_COL["2"], text: "G"}
+               : now < 0 ? {i, tag: true, above: true,  color: GBG_COL["-2"], text: "B"}
+               :           {i, tag: true, minor: true, above: was < 0, color: GBG_COL["0"], text: "N"});
     }
-    const m = (r.tail && r.tail.m) || {};
-    bars.forEach((b, i) => { const c = GBG_MARK[m[b.e || b.d]];
-      if(c && shade[i] != null) marks.push({i, tag: false, above: c.above, shape: c.shape, color: c.color, text: ""}); });
-    return {vals: shade, colors: shade.map(s => s == null ? null : GBG_COL[String(s)]), none: GBG_NONE,
-            marks, markNames: ["flip tag", "icon"], minorName: "Neutral",
-            states: bars.map(b => (GBG_MARK[m[b.e || b.d]] || {}).text || "")};
+    marks.forEach(m => { m.shape = "circle"; m.size = 0; });      // the letter alone, no shape under it
+    const colors = shade.map(s => s == null ? null : GBG_COL[String(s)]);
+    const t = r.tail || {}, ex = _gbgSqueezeExits(t), lastEx = ex[ex.length - 1];
+    const sq = r.squeeze > 0 ? `GBG Squeeze ${r.squeeze} of 6 and still building.`
+      : lastEx ? `No GBG Squeeze now; the last one (${lastEx.size} of 6) ended ${lastEx.up ? "upward" : "downward"} on ${lastEx.date}.`
+      : "No GBG Squeeze in the stored bars.";
+    const from = r.prev_state ? `, from ${r.prev_state[0].toUpperCase() + r.prev_state.slice(1)}` : "";
+    return {vals: shade, colors, ribbon: colors, none: GBG_NONE, marks, tagWidth: 16,
+            markNames: ["state letter", "icon"], minorName: "Neutral",
+            chip: `${_gbgWords(r.state, r.strength)} since ${r.since}`,
+            summary: `GasBrakesGas, ${GBG_TF[LWCP.iv]} bars: ${_gbgWords(r.state, r.strength)} since ${r.since}${from}. `
+                   + `Oscillator ${r.osc > 0 ? "+" : ""}${r.osc}. ${sq} ${marks.length} change${marks.length === 1 ? "" : "s"} of state on the bars loaded. `
+                   + `Stored as of ${r.bar_date}; the bar still forming is grey.`};
   },
-  basis: "colours each price bar by its trend. Green is Gas (trend up), red is Brakes (trend "
-       + "down), yellow is Neutral, and the lighter shade is the weaker trend, so with this on a "
-       + "bar's colour no longer says whether the day closed up or down. A word marks the bar "
-       + "where the state flips to Gas, Neutral or Brakes. A dot marks the trend resuming after "
-       + "a pullback, and an arrow marks a move against the trend fading; those four icons were "
-       + "built from a description of the original and never checked against it, and they exist "
-       + "for the newest 750 bars. It is a fitted approximation of a third-party trend "
-       + "indicator, not that indicator: where it was built it matched the original's state on "
-       + "94% of bars and its exact shade on 81%. Computed each night on finished daily, two-day "
-       + "and weekly bars at split-adjusted prices, so a grey bar has no reading: the bar still "
-       + "forming, a name's first 109 bars, and every monthly bar. Shown for context only. It "
-       + "has not been tested against returns and it feeds no grade, action or brake.",
+  basis: "candles take the state's colour: green Gas (trend up), yellow Neutral, red Brakes (trend "
+       + "down), the dimmer shade the weaker trend, so a bar's colour no longer says whether the day "
+       + "closed up or down. The strip along the top is the same sequence. G, N or B marks each "
+       + "change of state: G below the bar, B above it, N on the side it came from. In the pane "
+       + "below, the oscillator runs from −6 to +6, filled down to zero, blue where volume was heavy "
+       + "and teal where it was light, over zones shaded two points deep; the amber bars are the GBG "
+       + "Squeeze, climbing a point for each bar the oscillator rests at zero, to six, and an arrow "
+       + "marks the bar it ends, up or down. It is a fitted approximation of a third-party trend "
+       + "indicator, not that indicator: where it was built it matched the original's state on 94% "
+       + "of bars and its exact shade on 81%, and on 2026-11-19 all eleven sector readings here "
+       + "matched that desk's. Computed each night on finished daily, two-day and weekly bars at "
+       + "split-adjusted prices, so a grey bar has no reading: the bar still forming, a name's first "
+       + "109 bars, and every monthly bar. It has not been tested against returns and feeds no "
+       + "grade, action or brake.",
 };
 
 INDICATORS.gbg_osc = {
-  group: "GasBrakesGas",
+  group: "GasBrakesGas", companionOf: "gbg_trend",
   label: "GasBrakesGas oscillator", pane: "gbg", type: "line", multi: true, on: false,
   source: "server", view: "site_gasbrakesgas",
-  guides: [0, 5, -5], scale: {min: -7, max: 7},
+  guides: [0], scale: {min: -6.6, max: 6.6}, paneHeight: 150,
   compute: (bars, S, ctx) => {
-    const r = _gbgRow(ctx), t = r && r.tail;
+    const r = _gbgRow(ctx), t = r && r.tail, blank = bars.map(() => null);
     if(!t || !Array.isArray(t.d) || !t.d.length)
-      return [{vals: bars.map(() => null), label: "Oscillator", width: 1.8},
-              {vals: bars.map(() => null), label: "Squeeze", type: "histogram"}];
+      return [{vals: blank, label: "Oscillator", width: 1.8}, {vals: blank, label: "GBG Squeeze", type: "histogram"}];
     const at = new Map(t.d.map((d, i) => [d, i]));
     const ix = bars.map(b => at.get(b.e || b.d));                 // undefined = no stored bar
     const pick = (arr) => ix.map(i => i === undefined || arr[i] == null ? null : arr[i]);
     const osc = pick(t.o), sq = pick(t.q), heavy = pick(t.h);
+    // heavy volume blue, light teal; a series with no volume at all (a ratio, some funds) is grey
+    const HV = "#5b8def", LV = "#3aa89b", NV = C.muted;
+    const lineCol = heavy.map(h => h === 1 ? HV : h === 0 ? LV : NV);
+    const fillCol = heavy.map(h => h === 1 ? "rgba(91,141,239,.42)" : h === 0 ? "rgba(58,168,155,.38)" : "rgba(139,147,163,.3)");
+    const exits = new Map(_gbgSqueezeExits(t).map(x => [x.date, x]));
+    const marks = [];
+    bars.forEach((b, i) => { const x = exits.get(b.e || b.d);
+      if(x) marks.push({i, pos: "inBar", shape: x.up ? "arrowUp" : "arrowDown", color: x.up ? C.green : C.red, text: ""}); });
+    // the level a band is drawn at only where the oscillator exists, so the zones start and stop with it
+    const lvl = v => osc.map(o => o == null ? null : v);
     return [
-      {vals: osc, label: "Oscillator", width: 1.8,
-       // heavy volume is a brighter line; a series with no volume (null) is the plain colour
-       colors: heavy.map(h => h === 1 ? C.text : h === 0 ? C.dim : C.muted),
+      {vals: lvl(6),  type: "band", base: 4,  color: "rgba(63,207,142,.13)", silent: true},
+      {vals: lvl(-6), type: "band", base: -4, color: "rgba(239,100,100,.13)", silent: true},
+      {vals: osc, type: "histogram", colors: fillCol, silent: true},
+      {vals: osc, label: "Oscillator", width: 1.6, colors: lineCol,
        states: bars.map((b, i) => { const m = (t.m || {})[b.e || b.d];
-         return [m && GBG_MARK[m] ? GBG_MARK[m].text : "", heavy[i] === 1 ? "heavy volume" : ""]
+         return [m && GBG_MARK[m] ? GBG_MARK[m].text : "", heavy[i] === 1 ? "heavy volume" : heavy[i] === 0 ? "light volume" : ""]
            .filter(Boolean).join(" · "); }),
        fmtVal: v => (v > 0 ? "+" : "") + v},
-      {vals: sq, label: "Squeeze", type: "histogram",
-       colors: sq.map(q => q == null ? null : q >= 6 ? "rgba(227,179,65,.95)" : "rgba(227,179,65,.45)"),
-       fmtVal: v => v >= 6 ? "6 (max)" : String(v)},
+      {vals: sq, label: "GBG Squeeze", type: "histogram",
+       colors: sq.map(q => q == null ? null : q >= 6 ? "rgba(227,179,65,.98)" : "rgba(227,179,65,.6)"),
+       fmtVal: v => v >= 6 ? "6 (max)" : String(v), marks},
     ];
   },
-  basis: "six overbought and oversold readings (two RSIs, two stochastics and two Bollinger "
-       + "positions) added to a whole number from −6 to +6, on the same finished bars as the "
-       + "trend. The amber bars are the squeeze: how many bars in a row it has sat at zero, up to "
-       + "6. A brighter line is heavier volume than the last 28 bars' average. The icons these "
-       + "readings produce are drawn on the price bars by the trend toggle; this pane names one in "
-       + "its key on the bar it falls on. Covers the newest 750 finished bars, daily, two-day and "
-       + "weekly. Shown for context only.",
+  basis: "",
 };
+
+/* ── two more plain indicators the other desk's chart has ───────────────────────────────────── */
+INDICATORS.stoch = {
+  group: "Momentum",
+  label: "Stochastics 14/3", pane: "stoch", type: "line", multi: true, on: false,
+  guides: [20, 80], scale: {min: 0, max: 100},
+  compute: (bars) => {
+    const n = 14, raw = bars.map((b, i) => { if(i < n - 1) return null;
+      let hi = -Infinity, lo = Infinity;
+      for(let j = i - n + 1; j <= i; j++){ if(bars[j].h > hi) hi = bars[j].h; if(bars[j].l < lo) lo = bars[j].l; }
+      return hi === lo ? 50 : (b.c - lo) / (hi - lo) * 100; });
+    const avg3 = a => a.map((_, i) => i < 2 || a[i] == null || a[i - 1] == null || a[i - 2] == null ? null : (a[i] + a[i - 1] + a[i - 2]) / 3);
+    const k = avg3(raw), d = avg3(k);
+    return [{vals: k, label: "%K", color: "#6aa6f8", width: 1.3}, {vals: d, label: "%D", color: "#f0a94a", width: 1.1}];
+  },
+  basis: _ON_SCREEN,
+};
+INDICATORS.zscore = {
+  group: "Momentum",
+  label: "Price z-score 50", pane: "z", type: "line", color: "#a78bfa", width: 1.3, on: false,
+  guides: [-2, 0, 2],
+  compute: (bars) => { const c = bars.map(b => b.c), m = _sma(c, 50), sd = _std(c, 50);
+    return c.map((v, i) => m[i] == null || !sd[i] ? null : (v - m[i]) / sd[i]); },
+  basis: _ON_SCREEN + " The close against its own 50-bar average, in standard deviations of the same 50 bars.",
+};
+
+/* ── what each entry is, in one line, and which menu it sits in ────────────────────────────────
+ * [menu, section, description]. The menu is the split a reader makes: an INDICATOR is arithmetic
+ * on the bars on screen; a SIGNAL is something this model, or a published method, concludes.
+ * Plain words, no parameters a reader has to decode: the caption under the chart carries the
+ * basis of anything that needs one. A key missing here still appears, under Indicators, with its
+ * label as its description — visible, so the gap gets closed rather than hidden. */
+const _P = "On the price chart", _B = "In a pane below", _OWN = "The model's own, computed nightly",
+      _BR = "Computed in this browser", _PAPER = "The paper record, against this name";
+const IND_SECTIONS = [_P, _B, _OWN, _BR, _PAPER];          // the order sections appear in a menu
+const IND_MENU = {
+  sma20:      ["indicators", _P, "The average close of the last 20 bars."],
+  sma50:      ["indicators", _P, "The average close of the last 50 bars."],
+  sma200:     ["indicators", _P, "The average close of the last 200 bars: the long trend."],
+  ema35:      ["indicators", _P, "A 35-bar average that weights recent closes more. The trade briefings' trend anchor."],
+  bb20:       ["indicators", _P, "A 20-bar average with bands two standard deviations either side."],
+  avwap52:    ["indicators", _P, "Volume-weighted average price since the 52-week low: what buyers since the low paid."],
+  avwap_earn: ["indicators", _P, "Volume-weighted average price since the last earnings report."],
+  volume:     ["indicators", _P, "Shares traded per bar."],
+  rsi14:      ["indicators", _B, "Wilder's momentum oscillator, 0 to 100, with lines at 30 and 70."],
+  macd:       ["indicators", _B, "The gap between a fast and a slow average, its signal line and their difference."],
+  stoch:      ["indicators", _B, "Where the close sits in its recent high-low range, smoothed (%K) and averaged (%D)."],
+  roc63:      ["indicators", _B, "Rate of change: the return over the last 63 bars."],
+  zscore:     ["indicators", _B, "How many standard deviations the close is from its own 50-bar average."],
+  atrpct:     ["indicators", _B, "Average true range as a percent of price: how far it moves in a normal bar."],
+  hv20:       ["indicators", _B, "Realised volatility of the last 20 bars, annualised."],
+  obv:        ["indicators", _B, "The slope of on-balance volume: whether volume is arriving on up bars or down bars."],
+  rvol50:     ["indicators", _B, "Each bar's volume as a multiple of its 50-bar average."],
+  gbg_trend:  ["signals", _OWN, "Gas, Neutral or Brakes, strong or weak: candles in the state's colour, a G, N or B where the state changes, a ribbon along the top, and its oscillator in a pane below with the squeeze climbing from its zero line."],
+  grade_hist: ["signals", _OWN, "The decision grid's grade for this name on each date it was computed, A to D."],
+  quad_hist:  ["signals", _OWN, "This name's quadrant on each date, Q1 to Q4."],
+  mfi:        ["signals", _OWN, "The Market Fragility Index: market-wide, the same on every chart. How much protection to own."],
+  pfi:        ["signals", _OWN, "This book's own fragility index, the same on every chart. A short series."],
+  trade_band: ["signals", _BR, "The one-week risk range: a calibrated low and high around the trade."],
+  trend_band: ["signals", _BR, "The one-month risk range."],
+  trackline:  ["signals", _BR, "A trend line that turns green or red after two closes beyond 1.5 ATR. A state, not a sell signal."],
+  alphatrend: ["signals", _BR, "The open-source AlphaTrend ratchet: green rising, amber flat, red falling."],
+};
+Object.keys(INDICATORS).filter(k => k.startsWith("paper_")).forEach(k => {
+  IND_MENU[k] = ["signals", _PAPER, k === "paper_self" ? "This name rebased to 100, to compare with a paper book."
+    : "A forward paper book's value over time. Dashed where it was reconstructed, solid where it is the live record."]; });
 
 /* ═══ GASBRAKESGAS AS TABLE COLUMNS — Universe and Signals (Niko, 2026-11-20, db/082) ═════════
  * "I want to be able to see in the columns in the universe and sort based on GasBrakesGas signal
@@ -2465,7 +2610,7 @@ function gbgCell(tk, tf){
     + (r.prev_state ? ` (from ${r.prev_state[0].toUpperCase() + r.prev_state.slice(1)})` : "")
     + (old ? " · THIS ROW HAS STOPPED UPDATING" : "")
     + " · shown for context: not tested against returns, and not an input to the grade or action";
-  return `<span title="${esc(tip)}" style="white-space:nowrap;color:${old ? C.muted : GBG_COL[String(r.shade)]}">`
+  return `<span title="${esc(tip)}" style="white-space:nowrap;color:${old ? C.muted : GBG_TXT[String(r.shade)]}">`
        + `● ${esc(GBG_NAME[String(r.shade)])}${old ? ` <span class="muted" style="font-size:var(--fs-xs)">${esc(r.bar_date.slice(5))}</span>` : ""}</span>`;
 }
 function gbgFlipCell(tk){
@@ -2479,7 +2624,7 @@ function gbgFlipCell(tk){
     + (r.mark ? ` · on the newest bar: ${(GBG_MARK[r.mark] || {}).text || r.mark}` : "")
     + " · shown for context: not tested against returns";
   return `<span title="${esc(tip)}" style="white-space:nowrap">`
-       + (n === 1 ? `<b style="color:${GBG_COL[String(Math.sign(r.shade) * 2)]}">new</b>` : `<span class="mono">${n}</span>`)
+       + (n === 1 ? `<b style="color:${GBG_TXT[String(Math.sign(r.shade) * 2)]}">new</b>` : `<span class="mono">${n}</span>`)
        + (from ? ` <span class="muted" style="font-size:var(--fs-xs)">from ${esc(from)}</span>` : "")
        + (r.mark ? ` <span class="muted" style="font-size:var(--fs-xs)" title="${esc((GBG_MARK[r.mark] || {}).text || "")}">◆</span>` : "") + `</span>`;
 }
@@ -2520,7 +2665,7 @@ const LWC_TF = [["3M", 63], ["6M", 126], ["YTD", "ytd"], ["1Y", 252], ["3Y", 756
 // per chart — techChart can run several times for one drawer and a listener per call leaks.
 if(typeof window !== "undefined" && !window.__lwcMenuWired){
   window.__lwcMenuWired = true;
-  const shut = () => { if(!lwcMenuOpen) return; lwcMenuOpen = false;
+  const shut = () => { if(!lwcMenuOpen) return; lwcMenuOpen = null;
     document.querySelectorAll(".lwcmenu").forEach(m => m.hidden = true);
     document.querySelectorAll(".lwcmenubtn").forEach(b => b.classList.remove("on")); };
   document.addEventListener("click", shut);
@@ -2609,6 +2754,9 @@ function lwcPrefs(){
     if(!["candles", "bars", "line"].includes(p.ser)) p.ser = "candles";
     if(!LWC_IV.some(x => x[0] === p.iv)) p.iv = "D";
     if(!LWC_TF.some(x => x[0] === p.tf)) p.tf = "1Y";
+    // a companion (the GasBrakesGas oscillator) is on exactly when its owner is, whatever a
+    // preference saved before the two were one toggle says
+    for(const [k, v] of Object.entries(INDICATORS)) if(v.companionOf) p.on[k] = !!p.on[v.companionOf];
     return p;
   } catch(e){ return d; }
 }
@@ -2617,7 +2765,7 @@ let LWCP = lwcPrefs();
 // techChart() rebuilds the whole element on every toggle, so "is the menu open" cannot live in
 // the DOM — it would close the moment you ticked something, which is the one time you want it
 // to stay put. Module-level, not in prefs: it is this session's state, not a preference.
-let lwcMenuOpen = false;
+let lwcMenuOpen = null;          // null, "indicators" or "signals"
 
 // Earliest date the view holds. db/069 set this floor deliberately — a FIXED date, so "Max" means
 // the same window today and in a year, which a rolling CURRENT_DATE - N never could.
@@ -2787,12 +2935,16 @@ const LWC_PANE_PX  = 95;       // every indicator pane's budget
  * `panes` is passed in by the caller, which now computes the indicators BEFORE sizing the chart.
  * An indicator that returns an all-null array still keeps its pane deliberately: an empty pane
  * labelled "MACD —" says "on, no data yet", while no pane at all reads as a broken toggle. */
-function lwcHeight(panes){
-  const n = panes ? panes.size : 1;
-  return LWC_PRICE_PX + Math.max(0, n - 1) * LWC_PANE_PX;
+// `heights` is {pane name: px} for a pane whose entry asks for more than the default 95px
+// (`paneHeight` in the registry): an oscillator drawn as a filled area over shaded zones with a
+// squeeze climbing from its zero line needs room that an RSI line does not.
+function lwcHeight(panes, heights){
+  let h = LWC_PRICE_PX;
+  for(const p of (panes || [])) if(p !== "price") h += (heights && heights[p]) || LWC_PANE_PX;
+  return h;
 }
 
-function lwcChrome(tk, partial, basisLines){
+function lwcChrome(tk, partial, basisLines, hidden){
   const tf = LWC_TF.map(([l]) =>
     `<button class="tfb${l === LWCP.tf ? " on" : ""}" data-tf="${l}">${l}</button>`).join("")
     + `<span class="lwcsep"></span>`
@@ -2802,37 +2954,57 @@ function lwcChrome(tk, partial, basisLines){
     + [["candles", "Candles"], ["bars", "Bars"], ["line", "Line"]].map(([v, l]) =>
         `<button class="tfb${v === LWCP.ser ? " on" : ""}" data-ser="${v}"
           title="${v === "line" ? "Closing price only — the one form that can draw a session with no recorded open" : "Open, high, low and close"}">${l}</button>`).join("");
-  // The library lives in a MENU, not a permanent row: 18 chips on screen is clutter, and the
-  // count on the button is the thing a reader actually needs ("how many are on"). Same idiom as
-  // the Grid's "Filter columns" panel, deliberately — one gesture to learn, not two.
-  const groups = {};
-  for(const [k, cfg] of Object.entries(INDICATORS)) (groups[cfg.group || "Other"] ||= []).push([k, cfg]);
-  const nOn = Object.values(LWCP.on).filter(Boolean).length;
+  /* TWO MENUS, AND EACH ENTRY SAYS WHAT IT IS (Niko, 2026-11-20, from his other desk's chart).
+   * The first version was a panel of 36 unlabelled chips grouped by a one-word heading, with the
+   * meaning of each in a tooltip nobody hovers. An INDICATOR is arithmetic on the bars on screen;
+   * a SIGNAL is something this model (or a published method) concludes from them. Each entry is
+   * its name and one plain line, under the heading that says where it is drawn or where it comes
+   * from, and "Added" where it is already on. The descriptions live in IND_MENU (indicators.js).
+   * An entry that is the second half of another (the GasBrakesGas oscillator) is not listed: it
+   * goes on and off with the entry it belongs to. */
+  const meta = (k, cfg) => { const m = IND_MENU[k];
+    return m ? {menu: m[0], section: m[1], desc: m[2]}
+             : {menu: "indicators", section: cfg.pane === "price" ? "On the price chart" : "In a pane below", desc: ""}; };
+  const listed = Object.entries(INDICATORS).filter(([, cfg]) => !cfg.companionOf);
+  const nOn = listed.filter(([k]) => LWCP.on[k]).length;
   /* The removable key: one chip per indicator that is ON, with the × that turns it off. It is
    * the second half of "which line is which" — the pane legends name the lines where they are
    * drawn, and this says what is on at all and lets a reader take one off without hunting
    * through the menu for it. The swatch is omitted where the registry declares no colour,
    * because a chip showing a colour the line is not drawn in is worse than no swatch; the pane
-   * legend carries the colour the series was ACTUALLY created with. */
-  const keyRow = !nOn ? "" : `<div class="lwckey">` + Object.entries(INDICATORS)
+   * legend carries the colour the series was ACTUALLY created with.
+   * A chip can carry a NOTE: what the signal reads right now ("Brakes, strong since 10-30"), or
+   * that the entry is switched on but not drawn ("hidden while GasBrakesGas is on") — an entry
+   * that is on and absent with no word of why reads as a broken toggle. */
+  const keyRow = !nOn ? "" : `<div class="lwckey">` + listed
     .filter(([k]) => LWCP.on[k])
     .map(([k, cfg]) => `<span class="lwckc" title="${esc(cfg.basis || cfg.label)}">`
        + (cfg.color ? `<i class="lwcsw" style="background:${esc(cfg.color)}"></i>` : "")
-       + `${esc(cfg.label)}<button class="lwckx" data-indoff="${esc(k)}" `
+       + `${esc(cfg.label)}<span class="lwcknote" data-chipnote="${esc(k)}">${
+           hidden && hidden.has(k) ? "hidden while " + esc(hidden.get(k)) + " is on" : ""}</span>`
+       + `<button class="lwckx" data-indoff="${esc(k)}" `
        + `title="Remove ${esc(cfg.label)} from the chart">×</button></span>`).join("")
     + `</div>`;
-  const chips = `<div class="lwcmenuwrap">
-      <button class="tfb lwcmenubtn${lwcMenuOpen ? " on" : ""}" id="lwcIndBtn-${esc(tk)}"
-        title="Choose which indicators the chart draws">Indicators <b>${nOn}</b> ▾</button>
-      <div class="lwcmenu" id="lwcIndMenu-${esc(tk)}"${lwcMenuOpen ? "" : " hidden"}>
-        ${Object.entries(groups).map(([g, items]) =>
-          `<div class="lwcmgrp"><span class="lwcglab">${esc(g)}</span>` + items.map(([k, cfg]) =>
-            `<button class="indchip${LWCP.on[k] ? " on" : ""}" data-ind="${k}"
-              title="${esc(cfg.basis || cfg.label)}">${esc(cfg.label)}${cfg.basis ? " ⓘ" : ""}</button>`).join("")
-          + `</div>`).join("")}
-        <div class="lwcmfoot"><a href="#" data-indreset>Reset to defaults</a>
-          <span class="muted">ⓘ marks an indicator whose basis is stated in the caption</span></div>
-      </div></div>`;
+  const menus = [["indicators", "Indicators"], ["signals", "Signals"]].map(([id, title]) => {
+    const mine = listed.filter(([k, cfg]) => meta(k, cfg).menu === id);
+    const sections = [];
+    for(const [k, cfg] of mine){ const sec = meta(k, cfg).section;
+      (sections.find(x => x[0] === sec) || (sections.push([sec, []]), sections[sections.length - 1]))[1].push([k, cfg]); }
+    // the model's own conclusions first, then what any browser can compute, then the paper record
+    const rank = x => { const i = IND_SECTIONS.indexOf(x[0]); return i < 0 ? 99 : i; };
+    sections.sort((x, y) => rank(x) - rank(y));
+    const n = mine.filter(([k]) => LWCP.on[k]).length, open = lwcMenuOpen === id;
+    return `<div class="lwcmenuwrap">
+      <button class="tfb lwcmenubtn${open ? " on" : ""}" data-menu="${id}"
+        title="${id === "signals" ? "What this model, or a published method, concludes from the bars" : "Arithmetic on the bars on screen"}">${title} <b>${n}</b> ▾</button>
+      <div class="lwcmenu" data-menupanel="${id}"${open ? "" : " hidden"}>
+        <div class="lwcmhead"><span>${title}</span><a href="#" data-indreset title="Back to the default set">Reset</a></div>
+        ${sections.map(([sec, items]) => `<div class="lwcmsec">${esc(sec)}</div>` + items.map(([k, cfg]) => {
+            const on = !!LWCP.on[k];
+            return `<button class="lwcitem${on ? " on" : ""}" data-ind="${esc(k)}">
+              <span class="lwcit">${esc(cfg.label)}</span>${on ? `<span class="lwcadded">Added</span>` : ""}
+              <span class="lwcdesc">${esc(meta(k, cfg).desc || cfg.label)}</span></button>`; }).join("")).join("")}
+      </div></div>`; }).join("");
   return `<div class="lwcbar">
       <div class="tfs">${tf}</div>
       <div class="lwcopts">
@@ -2840,10 +3012,11 @@ function lwcChrome(tk, partial, basisLines){
         <button class="tfb${LWCP.total ? " on" : ""}" data-opt="total"
           title="Total return uses the dividend-adjusted close; split-adjusted uses the raw close">${
           LWCP.total ? "Total return" : "Split-adjusted"}</button>
+        <span class="lwcsep"></span>${menus}
       </div>
     </div>
-    <div class="lwcchips">${chips}</div>
     ${keyRow}
+    <div class="lwcsum" id="lwcSum-${esc(tk)}"></div>
     <div id="lwcChart-${esc(tk)}"></div>
     <div class="lwcfoot">${partial
       ? `<span class="amber">The last ${LWCP.iv === "D" ? "bar" : LWCP.iv === "W" ? "week" : LWCP.iv === "M" ? "month" : "2-day bucket"} is still forming</span> — the engines stop at the last complete session; this chart draws it so the price is current. `
@@ -2888,9 +3061,16 @@ async function techChart(el, tk, dailyBars){
     || (LWCP.iv === "M" && lastN < 18);   // ~21 sessions in a full month; 18 allows for holidays
   // Only the enabled indicators contribute a basis line, so the caption describes what is on
   // screen rather than everything that could be.
+  /* AN ENTRY CAN HIDE ANOTHER WHILE IT IS ON (`hides`). GasBrakesGas hides the volume strip: its
+   * own oscillator already draws volume into every bar (blue where heavy), and a second volume
+   * pane under it spends 95px saying the same thing less well. The hidden entry stays switched
+   * on — it comes back the moment the other goes off — and its chip says why it is not drawn. */
+  const HIDDEN = new Map();
+  for(const [k, cfg] of Object.entries(INDICATORS))
+    if(LWCP.on[k]) (cfg.hides || []).forEach(h => { if(LWCP.on[h]) HIDDEN.set(h, cfg.short || cfg.label); });
   const basis = Object.entries(INDICATORS)
-    .filter(([k, c]) => LWCP.on[k] && c.basis).map(([, c]) => `${c.label}: ${c.basis}`);
-  el.innerHTML = lwcChrome(tk, partial, basis);
+    .filter(([k, c]) => LWCP.on[k] && c.basis && !HIDDEN.has(k)).map(([, c]) => `${c.label}: ${c.basis}`);
+  el.innerHTML = lwcChrome(tk, partial, basis, HIDDEN);
 
   const host = document.getElementById(`lwcChart-${tk}`);
 
@@ -2916,7 +3096,7 @@ async function techChart(el, tk, dailyBars){
                srv: v => (LIVE.srv || {})[INDICATORS_PERNAME.has(v) ? `${v}|${tk}` : v] || []};
   const COMPUTED = [];
   for(const [k, cfg] of Object.entries(INDICATORS)){
-    if(!LWCP.on[k]) continue;
+    if(!LWCP.on[k] || HIDDEN.has(k)) continue;
     let out = null;
     try { out = cfg.compute(bars, S, ctx); }
     catch(e){ console.warn(`lwc: indicator "${k}" failed to compute — skipped`, e); continue; }
@@ -2930,15 +3110,25 @@ async function techChart(el, tk, dailyBars){
    * drawn in `none` (grey), never left in the ordinary green or red, because an up-day candle
    * left green beside state-coloured ones would read as a state. Generic, not a branch for one
    * indicator: the first enabled painter wins, and the candles, bars and line forms all take it. */
+  // What a signal reads RIGHT NOW goes on its chip, and its one-paragraph reading above the
+  // chart: a reader should not have to hover the newest bar to learn the state.
+  for(const [k, , out] of COMPUTED){
+    const n = out && out.chip && el.querySelector(`[data-chipnote="${k}"]`);
+    if(n) n.textContent = out.chip;
+  }
+  { const sum = el.querySelector(".lwcsum"), lines = COMPUTED.map(([, , out]) => out && out.summary).filter(Boolean);
+    if(sum){ sum.innerHTML = lines.map(esc).join("<br>"); sum.hidden = !lines.length; } }
   const PAINT = COMPUTED.find(([, cfg]) => cfg.paints === "bars");
   const paintAt = !PAINT ? null
     : Object.fromEntries(bars.map((b, i) => [b.d, PAINT[2].colors[i] || PAINT[2].none]));
   const panesUsed = new Set(["price", ...COMPUTED.map(([, cfg]) => cfg.pane)]);
+  const paneHeights = {};
+  for(const [, cfg] of COMPUTED) if(cfg.paneHeight) paneHeights[cfg.pane] = Math.max(paneHeights[cfg.pane] || 0, cfg.paneHeight);
 
   let chart = null, ro = null;
   try {
   chart = LightweightCharts.createChart(host, Object.assign(_lwcTheme(), {
-    width: host.clientWidth, height: lwcHeight(panesUsed),
+    width: host.clientWidth, height: lwcHeight(panesUsed, paneHeights),
     rightPriceScale: {borderColor: C.line, mode: LWCP.log ? 1 : 0},   // 1 = logarithmic
   }));
 
@@ -2980,6 +3170,17 @@ async function techChart(el, tk, dailyBars){
       paintAt ? {color: paintAt[b.d], borderColor: paintAt[b.d], wickColor: paintAt[b.d]} : null)));
   }
 
+  /* A PAINTER'S RIBBON: one thin strip along the top of the price pane, a colour per bar. The
+   * candles already carry the state, but on a three-year chart a candle is two pixels wide and
+   * the strip is where the eye reads the sequence. Its own price scale, pinned to the top 1.5%
+   * of the pane, so it never moves with the price and never touches it. */
+  if(PAINT && Array.isArray(PAINT[2].ribbon)){
+    const rb = chart.addSeries(LightweightCharts.HistogramSeries,
+      {priceScaleId: "ribbon", priceLineVisible: false, lastValueVisible: false, priceFormat: {type: "volume"}}, 0);
+    rb.priceScale().applyOptions({scaleMargins: {top: 0, bottom: 0.985}, visible: false});
+    rb.setData(bars.map((b, i) => PAINT[2].ribbon[i] ? {time: b.d, value: 1, color: PAINT[2].ribbon[i]} : {time: b.d}));
+  }
+
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
   // Already computed above (see COMPUTE FIRST, THEN SIZE); this only draws them.
   /* SER is the DATA KEY's source of truth: every series that reaches the canvas registers here
@@ -2998,7 +3199,21 @@ async function techChart(el, tk, dailyBars){
    * replaced. So you cannot cut a hole in a line series by withholding data, and the usual
    * "one series per colour, gaps in between" idiom silently draws every segment straight across
    * every other segment's span. That is what put three crossing lines on the chart. */
-  const put = (vals, cfg, p, color, width, dash, label, colors, states) => {
+  const put = (vals, cfg, p, color, width, dash, label, colors, states, ln) => {
+    /* A BAND is a shaded zone between two levels (`ln.base` and the value), for a pane that
+     * needs its extremes marked: the library's baseline series, lines off, one fill. A line may
+     * also be SILENT — drawn, but not given a row in the key — for the fill under a line that is
+     * already named and for the zones, which are not readings. */
+    if(cfg.type === "band"){
+      const fill = color || "rgba(255,255,255,.06)";
+      const z = chart.addSeries(LightweightCharts.BaselineSeries, {
+        baseValue: {type: "price", price: ln.base}, topLineColor: "transparent", bottomLineColor: "transparent",
+        topFillColor1: fill, topFillColor2: fill, bottomFillColor1: fill, bottomFillColor2: fill, lineVisible: false,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        ...(cfg.scale ? {autoscaleInfoProvider: () => ({priceRange: {minValue: cfg.scale.min, maxValue: cfg.scale.max}})} : {})}, p);
+      z.setData(bars.map((b, i) => vals[i] == null ? {time: b.d} : {time: b.d, value: +vals[i]}));
+      return z;
+    }
     const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
     const col = color || (cfg.type === "histogram" ? "rgba(106,166,248,.45)" : C.text);
     /* `scale: {min, max}` IS A DECLARED RANGE, AND IT WAS BEING IGNORED — RSI has carried
@@ -3030,6 +3245,7 @@ async function techChart(el, tk, dailyBars){
       ? {time: b.d}
       : colors && colors[i] ? {time: b.d, value: +vals[i], color: colors[i]}
                             : {time: b.d, value: +vals[i]}));
+    if(ln && ln.silent) return s;
     const map = new Map();
     bars.forEach((b, i) => { if(vals[i] != null) map.set(b.d, +vals[i]); });
     SER.push({pane: p, label: label || cfg.label, color: col, dash: !!dash, map,
@@ -3070,7 +3286,7 @@ async function techChart(el, tk, dailyBars){
         // values; both default to the entry's
         const lc = (ln.type || ln.fmtVal)
           ? Object.assign({}, cfg, {type: ln.type || cfg.type, fmtVal: ln.fmtVal || cfg.fmtVal}) : cfg;
-        const s = put(ln.vals, lc, p, ln.color, ln.width, ln.dash, ln.label || cfg.label, ln.colors, ln.states);
+        const s = put(ln.vals, lc, p, ln.color, ln.width, ln.dash, ln.label || cfg.label, ln.colors, ln.states, ln);
         first ||= s;
         if(ln.marks && ln.marks.length) LINEMARKS.push([s, ln.marks, ln.label || cfg.label]);
       });
@@ -3149,21 +3365,23 @@ async function techChart(el, tk, dailyBars){
   if(PAINT && Array.isArray(PAINT[2].marks)){
     const names = PAINT[2].markNames || ["tag", "mark"];
     const seen = (a) => a.filter(m => bars[m.i].d >= _markFrom).length;
-    const mk = m => ({time: bars[m.i].d, position: m.above ? "aboveBar" : "belowBar",
-      color: m.color, shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""});
+    const mk = m => Object.assign({time: bars[m.i].d, position: m.above ? "aboveBar" : "belowBar",
+      color: m.color, shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""},
+      m.size == null ? null : {size: m.size});
     const icons = PAINT[2].marks.filter(m => !m.tag);
-    if(seen(icons) > markCap) lineMarksHidden.push(`${seen(icons)} ${PAINT[1].label} ${names[1]}(s)`);
+    if(seen(icons) > markCap) lineMarksHidden.push(`${seen(icons)} ${PAINT[1].short || PAINT[1].label} ${names[1]}(s)`);
     else icons.forEach(m => onPrice.push(mk(m)));
     const tags = PAINT[2].marks.filter(m => m.tag);
     const inView = Math.max(1, bars.filter(b => b.d >= _markFrom).length);
-    const gap = Math.max(1, Math.ceil(45 / ((host.clientWidth || 900) / inView)));
+    // a WORD needs about 45px before two of them touch; a single letter about 16
+    const gap = Math.max(1, Math.ceil((PAINT[2].tagWidth || 45) / ((host.clientWidth || 900) / inView)));
     const kept = [];
     for(const minor of [false, true])
       tags.filter(m => !!m.minor === minor).sort((x, y) => y.i - x.i).forEach(m => {
         if(kept.every(k => k.above !== m.above || Math.abs(k.i - m.i) >= gap)) kept.push(m); });
     kept.forEach(m => onPrice.push(mk(m)));
     const dropped = seen(tags) - seen(kept);
-    if(dropped) lineMarksHidden.push(`${dropped} of ${seen(tags)} ${PAINT[1].label} ${names[0]}(s) (the words would overlap)`);
+    if(dropped) lineMarksHidden.push(`${dropped} of ${seen(tags)} ${PAINT[1].short || PAINT[1].label} ${names[0]}(s) (they would overlap)`);
   }
   if(onPrice.length) LightweightCharts.createSeriesMarkers(candles,
     onPrice.sort((a, b) => a.time < b.time ? -1 : 1));
@@ -3171,9 +3389,9 @@ async function techChart(el, tk, dailyBars){
   for(const [s, ms, label] of LINEMARKS){
     const inView = ms.filter(m => bars[m.i].d >= _markFrom).length;
     if(inView > markCap){ lineMarksHidden.push(`${inView} ${label} mark(s)`); continue; }
-    LightweightCharts.createSeriesMarkers(s, ms.map(m => ({
-      time: bars[m.i].d, position: m.above ? "aboveBar" : "belowBar", color: m.color,
-      shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""}))
+    LightweightCharts.createSeriesMarkers(s, ms.map(m => Object.assign({
+      time: bars[m.i].d, position: m.pos || (m.above ? "aboveBar" : "belowBar"), color: m.color,
+      shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""}, m.size == null ? null : {size: m.size}))
       .sort((a, b) => a.time < b.time ? -1 : 1));
   }
 
@@ -3233,7 +3451,8 @@ async function techChart(el, tk, dailyBars){
   // Apply the budget lwcHeight() just computed. Without this the library's own 2:1 default wins
   // and the price pane shrinks with every indicator added; see the constants' header.
   try {
-    chart.panes().forEach((pn, i) => pn.setStretchFactor(i === 0 ? LWC_PRICE_PX : LWC_PANE_PX));
+    const nameOf = Object.fromEntries(Object.entries(paneOf).map(([name, i]) => [i, name]));
+    chart.panes().forEach((pn, i) => pn.setStretchFactor(i === 0 ? LWC_PRICE_PX : (paneHeights[nameOf[i]] || LWC_PANE_PX)));
   } catch(e){
     // An older library build without setStretchFactor: keep the default 2:1 rather than fail the
     // whole chart over its proportions. Logged, not silent -- a layout that quietly reverts is
@@ -3303,7 +3522,7 @@ async function techChart(el, tk, dailyBars){
   // LWC needs an explicit width; without this the chart keeps its initial size when the drawer or
   // the window changes and the right-hand bars fall off the edge.
   ro = new ResizeObserver(() => {
-    chart.applyOptions({width: host.clientWidth, height: lwcHeight(panesUsed)});
+    chart.applyOptions({width: host.clientWidth, height: lwcHeight(panesUsed, paneHeights)});
     requestAnimationFrame(placeBoxes);   // the pane rows move with the container
   });
   ro.observe(host);
@@ -3334,23 +3553,214 @@ async function techChart(el, tk, dailyBars){
   el.querySelectorAll("[data-ser]").forEach(btn => btn.onclick = () => { LWCP.ser = btn.dataset.ser; redraw(); });
   el.querySelectorAll("[data-opt]").forEach(btn => btn.onclick = () => {
     LWCP[btn.dataset.opt] = !LWCP[btn.dataset.opt]; redraw(); });
+  // An entry and the entries that belong to it (`with`) go on and off together.
+  const setInd = (k, on) => { LWCP.on[k] = on; ((INDICATORS[k] || {}).with || []).forEach(c => { LWCP.on[c] = on; }); };
   el.querySelectorAll("[data-ind]").forEach(btn => btn.onclick = () => {
-    LWCP.on[btn.dataset.ind] = !LWCP.on[btn.dataset.ind]; redraw(); });
+    setInd(btn.dataset.ind, !LWCP.on[btn.dataset.ind]); redraw(); });
   el.querySelectorAll("[data-indoff]").forEach(btn => btn.onclick = () => {
-    LWCP.on[btn.dataset.indoff] = false; redraw(); });
-  const mBtn = document.getElementById(`lwcIndBtn-${tk}`);
-  if(mBtn) mBtn.onclick = (e) => { e.stopPropagation(); lwcMenuOpen = !lwcMenuOpen;
-    const m = document.getElementById(`lwcIndMenu-${tk}`);
-    if(m) m.hidden = !lwcMenuOpen; mBtn.classList.toggle("on", lwcMenuOpen); };
-  const rst = el.querySelector("[data-indreset]");
-  if(rst) rst.onclick = (e) => { e.preventDefault();
-    for(const [k, cfg] of Object.entries(INDICATORS)) LWCP.on[k] = !!cfg.on; redraw(); };
-  // Clicking inside the panel must not close it — a toggle is a click, and closing on every
+    setInd(btn.dataset.indoff, false); redraw(); });
+  // One menu open at a time; opening one closes the other. The open menu survives a redraw
+  // (lwcMenuOpen is module state), so ticking three entries is three clicks, not three round trips.
+  el.querySelectorAll("[data-menu]").forEach(btn => btn.onclick = (e) => { e.stopPropagation();
+    lwcMenuOpen = lwcMenuOpen === btn.dataset.menu ? null : btn.dataset.menu;
+    el.querySelectorAll("[data-menupanel]").forEach(m => { m.hidden = m.dataset.menupanel !== lwcMenuOpen; });
+    el.querySelectorAll("[data-menu]").forEach(x => x.classList.toggle("on", x.dataset.menu === lwcMenuOpen)); });
+  el.querySelectorAll("[data-indreset]").forEach(rst => rst.onclick = (e) => { e.preventDefault();
+    for(const [k, cfg] of Object.entries(INDICATORS)) LWCP.on[k] = !!cfg.on; redraw(); });
+  // Clicking inside a panel must not close it — a toggle is a click, and closing on every
   // tick would make choosing three indicators three round trips.
-  const mPanel = document.getElementById(`lwcIndMenu-${tk}`);
-  if(mPanel) mPanel.onclick = e => e.stopPropagation();
+  el.querySelectorAll("[data-menupanel]").forEach(m => { m.onclick = e => e.stopPropagation(); });
 
   }   // end finally — controls are always wired
+}
+/* ═══ GBG MAPS — one row per series, one cell per session ══════════════════════════════════════
+ *
+ * Niko, 2026-11-20, from a recording of his other desk: replicate its GBG Sector Map and apply it
+ * to the Markets and Universe tabs "for the entire universe and my holdings". A map answers what
+ * a table of current states cannot: not "what is it now" but "how long has it been that, and what
+ * was it before" — thirty, sixty or 126 sessions at a glance, one row under another.
+ *
+ * FOUR MAPS, ONE DRAWING FUNCTION:
+ *   Sector map (Markets)         each sector fund's price RELATIVE TO SPY: is the sector gaining
+ *                                on the index or losing to it. The other desk's map; on
+ *                                2026-11-19 all eleven rows here matched it.
+ *   Indices, factors, themes     the same question for the rotation the daily note measures.
+ *   My holdings (Universe)       each holding's OWN trend, or each holding against SPY.
+ *   The universe by sector       BREADTH: what share of a sector's names is in Gas, Neutral and
+ *                                Brakes each session. No name's history is drawn 474 times.
+ *
+ * WHAT A CELL IS. One character per session from ic_gasbrakesgas.recent (db/084), aligned to a
+ * session calendar served once (site_gasbrakesgas_calendar): G gas strong, g gas weak, n neutral,
+ * b brakes weak, B brakes strong, "-" no bar or no reading. A "-" is drawn as an empty cell, not
+ * as the colour beside it.
+ *
+ * ⚠ A RELATIVE READING IS NOT A PRICE READING, and the card says so under every relative map:
+ * Gas on XLK/SPY means technology is gaining on the index, and it can be falling while it does.
+ * ⚠ A BREADTH CELL IS A SHARE, NOT A STATE. Its colour is the balance of Gas over Brakes among the
+ * names that have a reading that session, in five steps, and the tooltip gives the three shares
+ * and how many names they are of. A sector with fewer than three readings has no cell.
+ * ⚠ DISPLAY. Nothing here decides anything; see `run.py health` -> "GasBrakesGas readers".      */
+
+const GBG_SECTOR_FUND = {XLK: "Technology", XLY: "Consumer Discretionary", XLC: "Communication Services",
+  XLE: "Energy", XLF: "Financials", XLI: "Industrials", XLB: "Materials", XLV: "Health Care",
+  XLP: "Consumer Staples", XLU: "Utilities", XLRE: "Real Estate"};
+const GBG_OTHER_FUND = [
+  ["QQQ", "Nasdaq 100", "Index"], ["IWM", "Russell 2000", "Index"], ["RSP", "S&P 500 equal weight", "Index"],
+  ["EFA", "Developed ex-US", "Index"], ["EEM", "Emerging markets", "Index"],
+  ["VLUE", "Value", "Factor"], ["MTUM", "Momentum", "Factor"], ["QUAL", "Quality", "Factor"],
+  ["USMV", "Low volatility", "Factor"], ["IWF", "Growth", "Factor"],
+  ["SMH", "Semiconductors", "Theme"], ["TLT", "Long Treasuries", "Theme"], ["GLD", "Gold", "Theme"]];
+const GBG_CODE = {G: 2, g: 1, n: 0, b: -1, B: -2};
+const GBG_REL = "SPY";
+
+let gbgMapN = 30;
+try { const v = +localStorage.getItem("ic.gbg.n"); if([30, 60, 126].includes(v)) gbgMapN = v; } catch(e){}
+let gbgUniView = "holdings";
+try { const v = localStorage.getItem("ic.gbg.view"); if(["holdings", "relative", "sectors"].includes(v)) gbgUniView = v; } catch(e){}
+
+// The status rows and the session calendar. Loaded at sign-in; fetched here if a tab is opened
+// before that finished or it failed then. A failure leaves gbgOk false and the card says so.
+async function gbgEnsure(){
+  if(!LIVE.gbg || !Object.keys(LIVE.gbg).length){
+    try{
+      LIVE.gbg = {}; LIVE.gbgNewest = {};
+      for(const r of await qAll("site_gasbrakesgas_status")){
+        (LIVE.gbg[r.ticker] ||= {})[r.timeframe] = r;
+        if(!LIVE.gbgNewest[r.timeframe] || r.bar_date > LIVE.gbgNewest[r.timeframe]) LIVE.gbgNewest[r.timeframe] = r.bar_date;
+      }
+      LIVE.gbgOk = true;
+    }catch(e){ LIVE.gbg = {}; LIVE.gbgOk = false; }
+  }
+  if(!LIVE.gbgCal || !LIVE.gbgCal.length){
+    try{ LIVE.gbgCal = ((await qAll("site_gasbrakesgas_calendar")).find(r => r.timeframe === "D") || {}).dates || []; }
+    catch(e){ LIVE.gbgCal = []; }
+  }
+}
+
+// One row from a stored daily status row. `key` is the ticker the row is stored under.
+function gbgRowOf(key, label, sub, pick){
+  const r = ((LIVE.gbg || {})[key] || {}).D || null;
+  return {label, sub, pick, recent: r && r.recent, row: r};
+}
+
+/* Breadth: one row for a group of names. For each session the share of the names WITH a reading
+ * that are in Gas, Neutral and Brakes; the cell's colour is the balance, the tooltip the shares. */
+function gbgBreadthRow(label, tickers, pick){
+  const recents = tickers.map(t => (((LIVE.gbg || {})[t] || {}).D || {}).recent).filter(Boolean);
+  const len = (LIVE.gbgCal || []).length, cells = [];
+  for(let i = 0; i < len; i++){
+    let g = 0, n = 0, b = 0;
+    for(const s of recents){ const c = s[i]; if(c === "G" || c === "g") g++; else if(c === "n") n++; else if(c === "B" || c === "b") b++; }
+    const tot = g + n + b;
+    if(tot < 3){ cells.push(null); continue; }
+    const net = (g - b) / tot;
+    cells.push({c: net > 0.5 ? "G" : net > 0.15 ? "g" : net < -0.5 ? "B" : net < -0.15 ? "b" : "n",
+                t: `Gas ${Math.round(100 * g / tot)}% · Neutral ${Math.round(100 * n / tot)}% · Brakes ${Math.round(100 * b / tot)}% of ${tot} names`,
+                g: g / tot, b: b / tot, n: tot});
+  }
+  const last = [...cells].reverse().find(Boolean);
+  return {label, sub: `${recents.length} name${recents.length === 1 ? "" : "s"}`, pick, cells,
+          right: last ? `<span style="color:${GBG_TXT["2"]}">Gas ${Math.round(100 * last.g)}%</span> · `
+                      + `<span style="color:${GBG_TXT["-2"]}">Brakes ${Math.round(100 * last.b)}%</span>` : ""};
+}
+
+function gbgMapHTML(rows, n){
+  const cal = (LIVE.gbgCal || []), dates = cal.slice(-n);
+  if(LIVE.gbgOk === false) return `<p class="amber">The GasBrakesGas rows did not load, so there is nothing to draw. This is a failed load, not an empty map.</p>`;
+  if(!dates.length) return `<p class="muted">No session calendar yet: the map is filled by the nightly run.</p>`;
+  const cell = (code, date, tip) => {
+    const s = GBG_CODE[code];
+    return s === undefined
+      ? `<i class="gbgx" title="${esc(date)}: no reading"></i>`
+      : `<i style="background:${GBG_COL[String(s)]}" title="${esc(date + ": " + (tip || GBG_NAME[String(s)]))}"></i>`;
+  };
+  const body = rows.map(r => {
+    let cells;
+    if(r.cells) cells = r.cells.slice(-n).map((c, i) => c ? cell(c.c, dates[i], c.t) : cell("-", dates[i]));
+    else if(r.recent) cells = r.recent.slice(-n).split("").map((c, i) => cell(c, dates[i]));
+    else cells = null;
+    const st = r.row;
+    const right = r.right != null ? r.right
+      : st ? `<span style="color:${GBG_TXT[String(st.shade)]};font-weight:600">${esc(_gbgWords(st.state, st.strength))}</span> <span class="muted">since ${esc(st.since)}</span>`
+      : `<span class="muted" title="Fewer than 110 finished bars, or no price series for it">no reading</span>`;
+    return `<div class="gbglab"${r.pick ? ` data-gbgpick="${esc(r.pick)}" style="cursor:pointer" title="Chart ${esc(r.pick)}"` : ""}>
+        <b>${esc(r.label)}</b>${r.sub ? ` <span class="muted">${esc(r.sub)}</span>` : ""}</div>
+      <div class="gbgcells">${cells ? cells.join("") : `<span class="muted" style="font-size:var(--fs-xs);padding-left:6px">no reading</span>`}</div>
+      <div class="gbgright">${right}</div>`;
+  }).join("");
+  // six date labels under the cells, evenly spaced, the last one on the newest session
+  const ticks = [0, 1, 2, 3, 4, 5].map(k => Math.round(k * (dates.length - 1) / 5));
+  const axis = `<div></div><div class="gbgaxis">${ticks.map(i => `<span style="left:${((i + 0.5) / dates.length * 100).toFixed(2)}%">${esc(dates[i].slice(5))}</span>`).join("")}</div><div></div>`;
+  return `<div class="gbgmap">${body}${axis}</div>`;
+}
+const gbgLegend = (breadth) => `<div class="gbglegend">` + [["2", breadth ? "Mostly Gas" : "Gas, strong"], ["1", breadth ? "More Gas than Brakes" : "Gas, weak"],
+    ["0", breadth ? "Balanced" : "Neutral"], ["-1", breadth ? "More Brakes than Gas" : "Brakes, weak"], ["-2", breadth ? "Mostly Brakes" : "Brakes, strong"]]
+  .map(([k, l]) => `<span><i style="background:${GBG_COL[k]}"></i>${l}</span>`).join("") + `<span><i class="gbgx"></i>No reading</span></div>`;
+const gbgNButtons = () => `<div class="tfs">` + [30, 60, 126].map(v =>
+  `<button class="tfb${v === gbgMapN ? " on" : ""}" data-gbgn="${v}" title="The newest ${v} sessions">${v}</button>`).join("") + `</div>`;
+const gbgSpan = () => { const d = (LIVE.gbgCal || []).slice(-gbgMapN); return d.length ? `The newest ${d.length} sessions, ${d[0]} to ${d[d.length - 1]}` : ""; };
+
+// Wire a container holding one or more maps: the 30/60/126 buttons redraw, a row label charts it.
+function gbgWire(el, redraw, onPick){
+  el.querySelectorAll("[data-gbgn]").forEach(b => b.onclick = () => {
+    gbgMapN = +b.dataset.gbgn; try { localStorage.setItem("ic.gbg.n", String(gbgMapN)); } catch(e){} redraw(); });
+  el.querySelectorAll("[data-gbgpick]").forEach(b => b.onclick = () => onPick && onPick(b.dataset.gbgpick));
+}
+
+/* ── Markets: the sector map, and the same question for indices, factors and themes ─────────── */
+async function gbgMarketsMaps(el, onPick){
+  await gbgEnsure();
+  const draw = () => {
+    const sectors = Object.entries(GBG_SECTOR_FUND).map(([tk, name]) => gbgRowOf(`${tk}/${GBG_REL}`, `${tk} / ${GBG_REL}`, name, tk));
+    const others = GBG_OTHER_FUND.map(([tk, name, kind]) => gbgRowOf(`${tk}/${GBG_REL}`, `${tk} / ${GBG_REL}`, `${name} · ${kind}`, tk));
+    const rel = `A relative reading says how the fund is trending against the index, not whether its own price is rising. Select a fund to chart it. Shown for context: not tested against returns.`;
+    el.innerHTML =
+      card("GBG Sector Map", `<span style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+          <span>GasBrakesGas on each sector fund's price relative to ${GBG_REL}, one cell per session: is the sector gaining on the index, or losing to it. ${esc(gbgSpan())}; computed each night after the close.</span>${gbgNButtons()}</span>`,
+        gbgMapHTML(sectors, gbgMapN) + gbgLegend(false) + `<p class="muted gbgnote">${rel}</p>`)
+      + `<div style="margin-top:14px">` + card("Indices, factors and themes against " + GBG_REL,
+        `The same reading for the rotation the daily note measures: size, style and three themes, each against the index.`,
+        gbgMapHTML(others, gbgMapN) + gbgLegend(false) + `<p class="muted gbgnote">${rel}</p>`) + `</div>`;
+    gbgWire(el, draw, onPick);
+  };
+  draw();
+}
+
+/* ── Universe: my holdings, my holdings against the index, and the universe by sector ───────── */
+async function gbgUniverseMaps(el){
+  await gbgEnsure();
+  if(!LIVE.matrix){ try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){ LIVE.matrix = null; } }
+  const draw = () => {
+    const H = (D.holdings || []).slice().sort((a, b) => (b.value || 0) - (a.value || 0));
+    const tot = H.reduce((s, h) => s + (h.value || 0), 0) || 1;
+    let rows, lead, breadth = false;
+    if(gbgUniView === "sectors"){
+      breadth = true;
+      const core = (LIVE.matrix || []).filter(r => r.universe_tag !== "micro");
+      const by = {};
+      core.forEach(r => (by[r.sector || "Unknown"] ||= []).push(r.ticker));
+      rows = [gbgBreadthRow("All core names", core.map(r => r.ticker), null),
+              ...Object.entries(by).sort((a, b) => b[1].length - a[1].length).map(([sec, tks]) => gbgBreadthRow(sec, tks, null))];
+      lead = `Breadth: for each sector, the share of its names in Gas, Neutral and Brakes on their own daily bars, each name counted once. A cell's colour is the balance of Gas over Brakes; hover it for the shares. ${LIVE.matrix ? "" : "The universe did not load, so this is empty. "}`;
+    } else if(gbgUniView === "relative"){
+      rows = H.map(h => gbgRowOf(`${h.tk}/${GBG_REL}`, `${h.tk} / ${GBG_REL}`, `${(100 * (h.value || 0) / tot).toFixed(1)}%`, h.tk));
+      lead = `Each holding's price relative to ${GBG_REL}: is it gaining on the index, or losing to it. A holding can be in Gas here while its own price falls. `;
+    } else {
+      rows = H.map(h => gbgRowOf(h.tk, h.tk, `${(100 * (h.value || 0) / tot).toFixed(1)}%`, h.tk));
+      lead = `Each holding's own trend on daily bars, largest position first. `;
+    }
+    const views = [["holdings", "My holdings"], ["relative", "Holdings against " + GBG_REL], ["sectors", "Universe by sector"]];
+    el.innerHTML = card("GasBrakesGas map",
+      `<span style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+         <span class="tfs">${views.map(([v, l]) => `<button class="tfb${v === gbgUniView ? " on" : ""}" data-gbgview="${v}">${l}</button>`).join("")}</span>${gbgNButtons()}</span>`,
+      `<p class="muted gbgnote" style="margin-top:0">${lead}${esc(gbgSpan())}. Select a name to open its chart.</p>`
+      + gbgMapHTML(rows, gbgMapN) + gbgLegend(breadth)
+      + `<p class="muted gbgnote">GasBrakesGas is a fitted approximation of a third-party trend indicator. It is shown for context: it has not been tested against returns and is not an input to any grade or action here.</p>`);
+    el.querySelectorAll("[data-gbgview]").forEach(b => b.onclick = () => {
+      gbgUniView = b.dataset.gbgview; try { localStorage.setItem("ic.gbg.view", gbgUniView); } catch(e){} draw(); });
+    gbgWire(el, draw, tk => openName(tk));
+  };
+  draw();
 }
 /* ⚠ The two chart containers carry NO fixed height. techChart() renders its own chrome, chip row,
  * legend, a 420px canvas and a caption into whatever element it is given; the 340px and 360px
@@ -3436,7 +3846,14 @@ const MARKETS = [
 
 let mktSym = "SPY";
 try { mktSym = localStorage.getItem("ic.mkt") || "SPY"; } catch(e){}
-if(!MARKETS.some(m => m[0] === mktSym)) mktSym = "SPY";   // a stale pref must not blank the tab
+/* ANY TRACKED TICKER CAN BE CHARTED HERE (Niko, 2026-11-20: the other desk's "Ticker or name").
+ * The six index funds are still the buttons, but a sector fund picked from the GBG Sector Map, or
+ * any ticker typed into the box, charts on the same chart with the same indicators. A symbol that
+ * is not one of the six is validated by whether it HAS bars, when the tab loads: one that does
+ * not falls back to SPY and the tab says which symbol had no prices, instead of blanking. */
+const _mktSane = s => /^[A-Z0-9.\-^]{1,10}$/.test(s || "");
+if(!_mktSane(mktSym)) mktSym = "SPY";
+let mktMiss = null;
 
 // Trailing return over n BARS, from whatever bars are loaded. Null rather than 0 when the window
 // does not reach back that far — a name with 40 bars has no 252-bar return, and 0% would read as
@@ -3471,6 +3888,11 @@ async function markets(el){
   const wide = lwcFrom(LWCP.tf) < lwcFrom("YTD") ? LWCP.tf : "YTD";
   const bars = {};
   for(const [tk] of MARKETS) bars[tk] = await loadBars(tk, wide);
+  if(!bars[mktSym]){
+    let b = [];
+    try { b = await loadBars(mktSym, wide); } catch(e){ b = []; }
+    if(b.length) bars[mktSym] = b; else { mktMiss = mktSym; mktSym = "SPY"; }
+  }
 
   const pct = (v, dp) => v == null ? '<span class="muted">—</span>'
     : `<span class="${v >= 0 ? "pos" : "neg"}">${(v * 100).toFixed(dp == null ? 1 : dp)}%</span>`;
@@ -3505,8 +3927,13 @@ async function markets(el){
   el.innerHTML = head("Markets", "Major equity indices",
       `<span class="muted">${MARKETS.length} indices · chart and indicators shared with the rest of the site</span>`)
     + `<div class="mktsel">${MARKETS.map(([tk, name]) =>
-        `<button class="tfb${tk === mktSym ? " on" : ""}" data-mkt="${tk}" title="${esc(name)}">${esc(tk)}</button>`).join("")}</div>`
+        `<button class="tfb${tk === mktSym ? " on" : ""}" data-mkt="${tk}" title="${esc(name)}">${esc(tk)}</button>`).join("")}${
+        MARKETS.some(m => m[0] === mktSym) ? "" : `<button class="tfb on" title="Charted from the search box or a map">${esc(mktSym)}</button>`}
+        <form class="mktsearch" id="mktSearch"><input class="search" id="mktQ" placeholder="Any ticker" autocomplete="off" spellcheck="false"
+          title="Chart any tracked ticker: a holding, a universe name, a sector or factor fund"><button class="tfb" type="submit">Go</button></form></div>`
+    + (mktMiss ? `<p class="amber" style="margin:8px 0 0">No price history is stored for ${esc(mktMiss)}, so ${esc(mktSym)} is shown instead.</p>` : "")
     + `<div class="card" style="padding:12px;margin-top:10px"><div id="mktChart"></div></div>`
+    + `<div id="mktMaps" style="margin-top:14px"></div>`
     + `<div style="margin-top:14px">` + breadthCard + `</div>`
     + `<div style="margin-top:14px">` + card("Index returns", "trailing, on the bars currently loaded",
         `<div class="table-wrap"><table class="tbl"><thead><tr>
@@ -3514,11 +3941,19 @@ async function markets(el){
          </tr></thead><tbody>${rows}</tbody></table></div>`) + `</div>`;
 
   const pick = (tk) => {
-    mktSym = tk;
+    tk = String(tk || "").trim().toUpperCase();
+    if(!_mktSane(tk)) return;
+    mktSym = tk; mktMiss = null;
     try { localStorage.setItem("ic.mkt", tk); } catch(e){}
-    markets(el);
+    markets(el).then(() => { const c = document.getElementById("mktChart"); if(c && c.scrollIntoView) c.scrollIntoView({block: "nearest"}); });
   };
   el.querySelectorAll("[data-mkt]").forEach(n => n.onclick = () => pick(n.dataset.mkt));
+  const form = document.getElementById("mktSearch");
+  // a search, not a submission: nothing leaves the page, it only chooses which ticker to chart
+  if(form) form.onsubmit = (e) => { e.preventDefault(); pick(document.getElementById("mktQ").value); };
+  // GBG Sector Map and the index / factor / theme map; selecting a row charts that fund above
+  const maps = document.getElementById("mktMaps");
+  if(maps) gbgMarketsMaps(maps, pick).catch(e => { maps.innerHTML = `<div class="note">GBG maps unavailable: ${esc(e.message || e)}</div>`; });
 
   const host = document.getElementById("mktChart");
   if(host) techChart(host, mktSym, bars[mktSym]);
@@ -5346,6 +5781,9 @@ async function holdingsAll(el){
 // The heavier table goes last.
 async function universeAll(el){
   universe(el);
+  // the map before the grid: thirty sessions of every holding, or of every sector, at a glance,
+  // and then the table to sort and filter it (gbg_map.js writes its own card heading)
+  await section(el, "Trend map", b => gbgUniverseMaps(b), "", true);
   await section(el, "Decision grid", b => grid(b));
 }
 // WHY DO WE OWN IT. Both process documents, in one place: the locked record per name, and the book
