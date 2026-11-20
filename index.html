@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 19:04 · 9626de9</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 19:36 · b4dde9e</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 19:04 · 9626de9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 19:36 · b4dde9e</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -616,6 +616,9 @@ async function enter(){
       LIVE.rbeta = Object.fromEntries((await qAll("site_rate_beta")).map(r => [r.ticker, r]));
       LIVE.rbetaOk = true;
     }catch(e){ LIVE.rbeta = {}; LIVE.rbetaOk = false; }
+    // Thesis watch (db/083) for the name drawer; the Theses tab reloads it. Flagged on failure.
+    try{ LIVE.twatch = Object.fromEntries((await qAll("site_thesis_watch")).map(w => [w.ticker, w])); LIVE.twatchOk = true; }
+    catch(e){ LIVE.twatch = {}; LIVE.twatchOk = false; }
     // GasBrakesGas status for the Universe and Signals columns (db/082): the stored rows without
     // their run lists. A failed load is flagged, so the cells read "?" and not an empty dash.
     try{
@@ -5365,6 +5368,52 @@ function plainBlock(t, badge){
     <h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>
   </div>`;
 }
+/* ── THESIS WATCH: is anything this thesis said to watch actually happening? (db/083) ──────────
+ * scripts/thesis_watch.py reads every holding's locked thesis each night and gives one verdict
+ * per risk and per sell condition, with the evidence it rests on. The status here is COMPUTED
+ * from those verdicts (engines/thesis_watch.py) and never says "broken": that is a person's call.
+ * ⚠ THREE THINGS THAT MUST NOT LOOK LIKE "FINE": a row that failed to load ("?"), a name the
+ * monitor has no row for, and "could not assess" — which is the answer whenever the evidence had
+ * nothing bearing on an item, and is shown in its own colour rather than left blank. */
+const TW_COL = {INTACT: "ok", WATCH: "warn", REVIEW: "bad", UNASSESSED: "", NO_THESIS: "bad"};
+const TW_LBL = {INTACT: "Intact", WATCH: "Watch", REVIEW: "Review", UNASSESSED: "Not assessed", NO_THESIS: "No thesis"};
+const TV_LBL = {NOT_TRIGGERED: "Not triggered", APPROACHING: "Approaching", TRIGGERED: "Triggered", CANNOT_ASSESS: "Could not assess"};
+const _twColor = v => v === "TRIGGERED" ? C.red : v === "APPROACHING" ? C.amber : v === "NOT_TRIGGERED" ? C.green : C.muted;
+function twChip(tk){
+  if(LIVE.twatchOk === false) return `<span class="chip warn" title="The thesis-watch rows did not load, so this is unknown">?</span>`;
+  const w = (LIVE.twatch || {})[tk];
+  if(!w) return `<span class="muted" title="Not a holding, or not read yet: the monitor reads held names only">—</span>`;
+  const inv = (w.invalidation_met || []).length;
+  return `<span class="chip ${TW_COL[w.status] || ""}" title="${esc(w.assessed + " of " + w.items + " items assessed · as of " + w.as_of)}">${
+    esc(TW_LBL[w.status] || w.status)}${inv ? " · sell condition met" : ""}</span>`;
+}
+function thesisWatchBlock(tk){
+  const w = (LIVE.twatch || {})[tk];
+  if(!w) return "";
+  const ev = Object.fromEntries((w.evidence || []).map(e => [e.id, e]));
+  const cite = ids => (ids || []).map(i => `<span class="mono" style="border-bottom:1px dotted ${C.muted};cursor:help" title="${
+    esc(ev[i] ? (ev[i].date ? "[" + ev[i].date + "] " : "") + ev[i].text : "not in the stored evidence")}">${esc(i)}</span>`).join(" ");
+  const rows = (w.results || []).map(r => [
+    `<span class="mono">${esc(r.id)}</span>`,
+    `<div>${esc(r.text)}</div>` + (r.kind === "risk" && r.trigger ? `<div class="muted" style="font-size:var(--fs-xs)">Trigger: ${esc(r.trigger)}</div>` : ""),
+    `<b style="color:${_twColor(r.verdict)};white-space:nowrap">${esc(TV_LBL[r.verdict] || r.verdict)}</b>`,
+    `${esc(r.reading || "")}${r.note ? `<div class="muted" style="font-size:var(--fs-xs)">${esc(r.note)}</div>` : ""}`,
+    cite(r.evidence)]);
+  const inv = (w.invalidation_met || []);
+  const head = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <span class="chip ${TW_COL[w.status] || ""}">${esc(TW_LBL[w.status] || w.status)}</span>
+      <span class="muted">${w.assessed} of ${w.items} items could be assessed · ${w.triggered} triggered · ${w.approaching} approaching · as of ${esc(w.as_of)}${
+        w.carried ? ` · evidence unchanged since it was last read on ${esc(w.assessed_on || "—")}` : ""}</span></div>`;
+  const alerts =
+    (inv.length ? `<p style="color:${C.red}"><b>A sell condition in this thesis is assessed as met (${esc(inv.join(", "))}).</b> Whether the thesis is broken is a decision for a person; this changes nothing by itself.</p>` : "")
+    + ((w.floors || []).length ? `<p style="color:${C.red}">${esc(w.floors.join(" · "))}</p>` : "")
+    + (w.error ? `<p class="amber">This name could not be read tonight (${esc(w.error)}), so nothing below is an assessment.</p>` : "")
+    + ((w.outside || []).length ? `<h4 style="margin-top:10px">Outside what this thesis tests</h4><ul class="list">${
+        w.outside.map(o => `<li>${esc(o.note || "(note withheld)")} <span class="muted">${cite(o.evidence)}</span></li>`).join("")}</ul>` : "");
+  return `<div class="sec"><h4>Thesis watch</h4>${head}${alerts}
+    ${rows.length ? tbl(["", "What the thesis says to watch", "Verdict", "Reading", "Evidence"], rows) : ""}
+    <p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Each verdict is a model's reading of filed quarterly figures, segment lines, this model's own state and three weeks of news, kept only if it cites evidence that was in front of it (hover an id). "Not triggered" on an event means it was not reported in that news window. R = a risk, I = a sell condition. It reports; it does not change a grade, a thesis or a position.</p></div>`;
+}
 function thesisBlock(tk, full=false){
   const t = LIVE.theses[tk]; if(!t) return "";
   const badge = t.status === "LOCKED" ? `<span class="chip">LOCKED v${t.version}</span>` : `<span class="chip bad">DRAFT v${t.version} · not yet reviewed</span>`;
@@ -5386,24 +5435,50 @@ function thesisBlock(tk, full=false){
     <h4 style="margin-top:10px">Evidence</h4><ul class="list">${(t.evidence||[]).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.source)}</span> — ${esc(e.fact)}</li>`).join("")}</ul>
     ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}
   </div>`;
-  if(!plain) return detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${badge}</h4>`);
-  return plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
+  const watch = thesisWatchBlock(tk);
+  if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${badge}</h4>`);
+  return watch + plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
 }
 let thesisSel = null;
+async function loadThesisWatch(){
+  try{ LIVE.twatch = Object.fromEntries((await qAll("site_thesis_watch")).map(w => [w.ticker, w])); LIVE.twatchOk = true; }
+  catch(e){ LIVE.twatch = {}; LIVE.twatchOk = false; }
+}
 async function theses(el){
   LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
+  await loadThesisWatch();
   const T = Object.values(LIVE.theses), held = new Set(D.holdings.map(h => h.tk));
   const locked = T.filter(t => t.status === "LOCKED").length;
   thesisSel = thesisSel && LIVE.theses[thesisSel] ? thesisSel : (T[0]||{}).ticker;
   el.innerHTML = head("Research", "Theses", `<span class="muted">${locked} locked · ${T.length-locked} drafts awaiting review · Catalyst · Edge · Risk</span>`) +
+    (() => { // what the monitor found, before the list: the names a person has to look at first
+      const W = Object.values(LIVE.twatch || {}), rank = {REVIEW: 0, NO_THESIS: 1, WATCH: 2, UNASSESSED: 3, INTACT: 4};
+      if(LIVE.twatchOk === false) return `<div style="margin-bottom:16px">` + card("Thesis watch", "", `<p class="amber">The monitor's readings did not load, so nothing can be said about them.</p>`) + `</div>`;
+      if(!W.length) return "";
+      const n = s => W.filter(w => w.status === s).length;
+      const hot = W.filter(w => w.status === "REVIEW" || w.status === "WATCH" || w.status === "NO_THESIS")
+        .sort((a, b) => (rank[a.status] - rank[b.status]) || a.ticker.localeCompare(b.ticker));
+      return `<div style="margin-bottom:16px">` + card("Thesis watch",
+        `${W.length} holdings read as of ${esc(W[0].as_of)} · ${n("REVIEW")} review · ${n("WATCH")} watch · ${n("INTACT")} intact · ${n("UNASSESSED")} not assessed`,
+        (hot.length ? tbl(["Ticker", "Status", "What moved"], hot.map(w => [
+          `<b style="cursor:pointer" data-tw="${esc(w.ticker)}">${esc(w.ticker)}</b>`, twChip(w.ticker),
+          esc([...(w.results || []).filter(r => r.verdict === "TRIGGERED" || r.verdict === "APPROACHING")
+                 .map(r => `${r.id} ${TV_LBL[r.verdict].toLowerCase()}: ${r.text.slice(0, 80)}`),
+               ...(w.floors || []),
+               ...((w.outside || []).length ? [`${w.outside.length} development(s) the thesis does not test for`] : [])].join(" · "))]))
+          : `<p class="muted">No holding has an item triggered or approaching.</p>`)
+        + `<p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Read nightly from each thesis's own risks and sell conditions. "Intact" means at least half of them could be assessed and none tripped. It reports; a person decides.</p>`) + `</div>`;
+    })() +
     `<div class="grid g-1-2">` +
     card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
       T.sort((a,b) => (held.has(b.ticker)-held.has(a.ticker)) || a.ticker.localeCompare(b.ticker)).map(t => `<tr data-tk="${t.ticker}" style="cursor:pointer${t.ticker===thesisSel?';background:rgba(106,166,248,.08)':''}">
         <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted">${esc(t.theme||"")}</td>
-        <td>${t.status==="LOCKED"?'<span class="chip">locked</span>':'<span class="chip bad">draft</span>'}</td></tr>`).join("")
+        <td>${t.status==="LOCKED"?'<span class="chip">locked</span>':'<span class="chip bad">draft</span>'}</td>
+        <td>${held.has(t.ticker) ? twChip(t.ticker) : ""}</td></tr>`).join("")
     }</tbody></table></div>`) +
     card(thesisSel||"—", "", thesisBlock(thesisSel, true) || "<p class='muted'>No thesis yet.</p>") + `</div>`;
   el.querySelectorAll("tr[data-tk]").forEach(tr => tr.onclick = () => { thesisSel = tr.dataset.tk; theses(el); });
+  el.querySelectorAll("[data-tw]").forEach(b => b.onclick = () => { thesisSel = b.dataset.tw; theses(el); });
 }
 
 /* ═══ forward track record (paper) ══════════════════════════════════════════ */
