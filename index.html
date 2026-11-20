@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 18:00 · 39b7176</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 18:31 · f684305</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 18:00 · 39b7176</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 18:31 · f684305</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2248,6 +2248,120 @@ function decodeDecisionRows(rows){
   }
   return rows;
 }
+
+/* ═══ GASBRAKESGAS — a trend state on the price bars, and its oscillator ═══════════════════════
+ *
+ * Two toggles, off by default. Niko, 2026-11-20: the indicator from his other desk, on every
+ * chart here. The rules are in engines/gasbrakesgas.py and the guide they were ported from is
+ * research/gasbrakesgas-implementation-guide.md.
+ *
+ * ⚠ SERVER-SOURCED ON PURPOSE, UNLIKE EVERY OTHER OVERLAY IN THIS FILE. It is a FITTED
+ * APPROXIMATION of a proprietary third-party indicator, and this file ships in a PUBLIC
+ * repository. Computing it here would publish the fitted parameter set. scripts/gasbrakesgas.py
+ * computes it nightly, ic_gasbrakesgas stores it, and this file only reads the results through
+ * site_gasbrakesgas (db/081) and decides how to draw them. Nothing below is the formula.
+ *
+ * ⚠ THE NAME. It is GasBrakesGas, with Gas, Neutral and Brakes. It is never labelled with the
+ * name of the indicator it approximates — on the chip, in the key, or in the caption.
+ *
+ * ⚠ DISPLAY ONLY. It feeds no grade, action, grid, proposal or brake, and it has never been
+ * tested against returns, here or where it came from. The caption says so.
+ *
+ * WHAT A BAR CAN BE:
+ *   a shade      2 Gas strong · 1 Gas weak · 0 Neutral · -1 Brakes weak · -2 Brakes strong
+ *   no reading   grey. The bar still forming (states exist for FINISHED bars only), a bar before
+ *                the name's 110th, a bar newer than last night's run, and every bar on the
+ *                monthly interval, which the engine does not compute. Grey is "not measured",
+ *                and it is drawn rather than left in the ordinary green or red because an
+ *                unpainted up-day candle beside painted ones would read as a state.
+ *
+ * MATCHED ON THE BAR'S LAST SESSION. The engine dates a weekly or two-day bar by its last
+ * session; aggBars() draws a bucket at its first and carries the last as `e`. The run list is
+ * filled forward only INSIDE itself — never before its first entry and never past `bar_date`.
+ * Blue and purple, not green and red: the candles already use those for up and down.          */
+const GBG_COL  = {"2": "#2f81f7", "1": "#8ec3ff", "0": "#e3b341", "-1": "#f2a2c9", "-2": "#bf4fd6"};
+const GBG_NONE = "#5b6472";
+const GBG_NAME = {"2": "Gas · strong", "1": "Gas · weak", "0": "Neutral",
+                  "-1": "Brakes · weak", "-2": "Brakes · strong"};
+const GBG_MARK = {
+  gas_continuation:    {text: "Gas resumes",       above: false, shape: "arrowUp",   color: GBG_COL["2"]},
+  gas_correction:      {text: "Gas off its high",  above: true,  shape: "circle",    color: GBG_COL["1"]},
+  brakes_continuation: {text: "Brakes resume",     above: true,  shape: "arrowDown", color: GBG_COL["-2"]},
+  brakes_correction:   {text: "Brakes off its low", above: false, shape: "circle",   color: GBG_COL["-1"]},
+};
+// The stored row for the interval on screen, or null. The engine computes D, 2D and W, and only
+// for a name with 110 finished bars on that interval.
+// ⚠ NO ROW IS DRAWN AS "NO READING", NOT AS NOTHING. With the toggle on and no row (the monthly
+// interval, a name too young for weekly bars, a fetch that returned nothing) the trend paints
+// every bar grey and the oscillator keeps an empty pane. Declining instead would leave ordinary
+// green and red candles under a switched-on chip, which reads as a broken toggle or, worse, as
+// a chart that has been checked and found unremarkable.
+const _gbgRow = (ctx) => (ctx.srv("site_gasbrakesgas") || []).find(r => r.timeframe === LWCP.iv) || null;
+
+INDICATORS.gbg_trend = {
+  group: "GasBrakesGas",
+  label: "GasBrakesGas trend", pane: "price", type: "line", on: false, paints: "bars",
+  source: "server", view: "site_gasbrakesgas",
+  fmtVal: v => GBG_NAME[String(v)] || "—",
+  compute: (bars, S, ctx) => {
+    const r = _gbgRow(ctx);
+    if(!r || !Array.isArray(r.runs) || !r.runs.length)
+      return {vals: bars.map(() => null), colors: bars.map(() => null), none: GBG_NONE};
+    const runs = r.runs, first = runs[0][0], last = r.bar_date;
+    let j = 0, cur = null;
+    const shade = bars.map(b => { const e = b.e || b.d;
+      while(j < runs.length && runs[j][0] <= e){ cur = runs[j][1]; j++; }
+      return (e < first || e > last) ? null : cur; });
+    return {vals: shade, colors: shade.map(s => s == null ? null : GBG_COL[String(s)]), none: GBG_NONE};
+  },
+  basis: "colours each price bar by its trend. Blue is Gas (trend up), purple is Brakes (trend "
+       + "down), amber is Neutral, and the lighter shade is the weaker trend. It is a fitted "
+       + "approximation of a third-party trend indicator, not that indicator: where it was built "
+       + "it matched the original's state on 94% of bars and its exact shade on 81%. Computed "
+       + "each night on finished daily, two-day and weekly bars at split-adjusted prices, so a "
+       + "grey bar has no reading: the bar still forming, a name's first 109 bars, and every "
+       + "monthly bar. Shown for context only. It has not been tested against returns and it "
+       + "feeds no grade, action or brake.",
+};
+
+INDICATORS.gbg_osc = {
+  group: "GasBrakesGas",
+  label: "GasBrakesGas oscillator", pane: "gbg", type: "line", multi: true, on: false,
+  source: "server", view: "site_gasbrakesgas",
+  guides: [0, 5, -5], scale: {min: -7, max: 7},
+  compute: (bars, S, ctx) => {
+    const r = _gbgRow(ctx), t = r && r.tail;
+    if(!t || !Array.isArray(t.d) || !t.d.length)
+      return [{vals: bars.map(() => null), label: "Oscillator", width: 1.8},
+              {vals: bars.map(() => null), label: "Squeeze", type: "histogram"}];
+    const at = new Map(t.d.map((d, i) => [d, i]));
+    const ix = bars.map(b => at.get(b.e || b.d));                 // undefined = no stored bar
+    const pick = (arr) => ix.map(i => i === undefined || arr[i] == null ? null : arr[i]);
+    const osc = pick(t.o), sq = pick(t.q), heavy = pick(t.h);
+    const marks = [];
+    bars.forEach((b, i) => { const m = (t.m || {})[b.e || b.d], cfg = m && GBG_MARK[m];
+      if(cfg && osc[i] != null) marks.push({i, above: cfg.above, shape: cfg.shape, color: cfg.color, text: ""}); });
+    return [
+      {vals: osc, label: "Oscillator", width: 1.8,
+       // heavy volume is a brighter line; a series with no volume (null) is the plain colour
+       colors: heavy.map(h => h === 1 ? C.text : h === 0 ? C.dim : C.muted),
+       states: bars.map((b, i) => { const m = (t.m || {})[b.e || b.d];
+         return [m && GBG_MARK[m] ? GBG_MARK[m].text : "", heavy[i] === 1 ? "heavy volume" : ""]
+           .filter(Boolean).join(" · "); }),
+       fmtVal: v => (v > 0 ? "+" : "") + v, marks},
+      {vals: sq, label: "Squeeze", type: "histogram",
+       colors: sq.map(q => q == null ? null : q >= 6 ? "rgba(227,179,65,.95)" : "rgba(227,179,65,.45)"),
+       fmtVal: v => v >= 6 ? "6 (max)" : String(v)},
+    ];
+  },
+  basis: "six overbought and oversold readings (two RSIs, two stochastics and two Bollinger "
+       + "positions) added to a whole number from −6 to +6, on the same finished bars as the "
+       + "trend. The amber bars are the squeeze: how many bars in a row it has sat at zero, up to "
+       + "6. A brighter line is heavier volume than the last 28 bars' average. An arrow marks the "
+       + "trend resuming after a pullback and a dot marks it coming off an extreme; those marks "
+       + "were built from a description of the original and never checked against it. Covers the "
+       + "newest 750 finished bars, daily, two-day and weekly. Shown for context only.",
+};
 /* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
  *
  * Replaces the echarts close-line chart. LWC is Apache-2.0 and is the ONLY TradingView product
@@ -2315,6 +2429,22 @@ function _isoWeek(iso){
   return d.toISOString().slice(0, 10);
 }
 
+/* Which two-day bar a session belongs to: weekdays are numbered from Monday 1970-01-05, weekends
+ * skipped, and paired 0 with 1, 2 with 3, and so on.
+ * ⚠ THIS WAS `Math.floor(i / 2)` — THE BAR'S POSITION IN WHATEVER WINDOW HAD BEEN FETCHED. The
+ * window's first day moves forward every session, so the pairing flipped from one day to the
+ * next: yesterday's (Mon,Tue)(Wed,Thu) became (Tue,Wed)(Thu,Fri), and every indicator on the
+ * two-day chart was recomputed on different bars each morning. The comment three lines below
+ * already said why W and M bucket on the calendar ("an N-bar bucket slides forward each session
+ * and no two charts agree"); 2D was the N-bar bucket it warned about. Counting from a fixed
+ * Monday makes a two-day bar the same bar on every chart and every day, and it is the pairing
+ * engines/gasbrakesgas.py uses, so the stored GasBrakesGas states land on the right bars.
+ * A holiday leaves its pair with one session. */
+function _twoDayKey(iso){
+  const n = Math.round((Date.parse(iso + "T00:00:00Z") - Date.UTC(1970, 0, 5)) / 864e5);
+  return Math.floor((Math.floor(n / 7) * 5 + Math.min(((n % 7) + 7) % 7, 4)) / 2);
+}
+
 function aggBars(bars, iv){
   if(iv === "D" || !bars.length) return bars;
   const out = [];
@@ -2323,7 +2453,7 @@ function aggBars(bars, iv){
     // M buckets on calendar month (the date's own YYYY-MM), for the same reason W uses the ISO
     // week rather than 21 bars: a calendar bucket is the same bucket on every chart and every
     // day, while an N-bar bucket slides forward each session and no two charts agree.
-    const k = iv === "W" ? _isoWeek(b.d) : iv === "M" ? b.d.slice(0, 7) : Math.floor(i / 2);
+    const k = iv === "W" ? _isoWeek(b.d) : iv === "M" ? b.d.slice(0, 7) : _twoDayKey(b.d);
     if(k !== key){
       if(cur) out.push(cur);
       key = k;
@@ -2331,10 +2461,13 @@ function aggBars(bars, iv){
       // the vendor had none). It stays null rather than falling back to the close — a bucket whose
       // first session has no open has no open, and inventing one draws a candle body that did not
       // happen.
-      cur = {d: b.d, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v || 0, sc: b.sc, n: 1};
+      // `d` is the bucket's FIRST session (where the candle is drawn) and `e` its LAST — the
+      // date a server-computed series dates the same bar by, so it is what such a series is
+      // matched on. A daily bar carries no `e`; readers use `b.e || b.d`.
+      cur = {d: b.d, e: b.d, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v || 0, sc: b.sc, n: 1};
     } else {
       cur.h = Math.max(cur.h, b.h); cur.l = Math.min(cur.l, b.l);
-      cur.c = b.c; cur.sc = b.sc; cur.v += (b.v || 0); cur.n++;
+      cur.c = b.c; cur.sc = b.sc; cur.v += (b.v || 0); cur.n++; cur.e = b.d;
     }
   });
   if(cur) out.push(cur);
@@ -2454,7 +2587,7 @@ async function lwcPrefetch(tk){
 // Which column carries the date in each served view — they do not agree (ic_paper_nav uses
 // nav_date), so it is declared rather than guessed.
 const INDICATORS_DATEKEY = {site_market_regime: "as_of", site_portfolio_fragility: "as_of",
-                            site_paper_nav: "nav_date"};
+                            site_paper_nav: "nav_date", site_gasbrakesgas: "timeframe"};
 
 // Server-side narrowing, for a view that serves far more than the chart draws. site_paper_nav
 // holds all 39 paper books (~8,000 rows) and the registry exposes 8 of them, so the other 31 are
@@ -2466,7 +2599,7 @@ const INDICATORS_QUERY = {
 
 // Views served PER TICKER rather than once per session. Declared, like everything else here: a
 // view that is per-name and not listed would be fetched once and then shown on every other name.
-const INDICATORS_PERNAME = new Set(["site_decision_history"]);
+const INDICATORS_PERNAME = new Set(["site_decision_history", "site_gasbrakesgas"]);
 
 // A view whose rows need decoding before a compute() can read them as numbers (grade "A" -> 4).
 // Done once where the rows land, not per indicator, so the mapping has one home.
@@ -2670,6 +2803,15 @@ async function techChart(el, tk, dailyBars){
     if(cfg.multi && !out.some(ln => ln && ln.vals)) continue;
     COMPUTED.push([k, cfg, out]);
   }
+  /* AN ENTRY MAY PAINT THE PRICE BARS INSTEAD OF ADDING A SERIES (`paints: "bars"`).
+   * Its compute() returns {vals, colors, none}: a colour per bar, and the colour for a bar it has
+   * NO reading for. Under a painter every bar is one or the other — a bar with no reading is
+   * drawn in `none` (grey), never left in the ordinary green or red, because an up-day candle
+   * left green beside state-coloured ones would read as a state. Generic, not a branch for one
+   * indicator: the first enabled painter wins, and the candles, bars and line forms all take it. */
+  const PAINT = COMPUTED.find(([, cfg]) => cfg.paints === "bars");
+  const paintAt = !PAINT ? null
+    : Object.fromEntries(bars.map((b, i) => [b.d, PAINT[2].colors[i] || PAINT[2].none]));
   const panesUsed = new Set(["price", ...COMPUTED.map(([, cfg]) => cfg.pane)]);
 
   let chart = null, ro = null;
@@ -2701,17 +2843,20 @@ async function techChart(el, tk, dailyBars){
   if(LWCP.ser === "line"){
     candles = chart.addSeries(LightweightCharts.LineSeries,
       {color: C.green, lineWidth: 2, priceLineVisible: false, lastValueVisible: true}, 0);
-    candles.setData(bars.map(b => ({time: b.d, value: px(b)})));
+    candles.setData(bars.map(b => paintAt ? {time: b.d, value: px(b), color: paintAt[b.d]}
+                                          : {time: b.d, value: px(b)}));
   } else if(LWCP.ser === "bars"){
     candles = chart.addSeries(LightweightCharts.BarSeries,
       {upColor: C.green, downColor: C.red, thinBars: false, lastValueVisible: true}, 0);
-    candles.setData(withOpen.map(b => ({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)})));
+    candles.setData(withOpen.map(b => Object.assign({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)},
+      paintAt ? {color: paintAt[b.d]} : null)));
   } else {
     candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
       upColor: C.green, downColor: C.red, borderVisible: false,
       wickUpColor: C.green, wickDownColor: C.red, lastValueVisible: true,
     }, 0);
-    candles.setData(withOpen.map(b => ({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)})));
+    candles.setData(withOpen.map(b => Object.assign({time: b.d, open: b.o, high: b.h, low: b.l, close: px(b)},
+      paintAt ? {color: paintAt[b.d], borderColor: paintAt[b.d], wickColor: paintAt[b.d]} : null)));
   }
 
   // ── the registry's indicators ──────────────────────────────────────────────────────────────
@@ -2735,10 +2880,17 @@ async function techChart(el, tk, dailyBars){
   const put = (vals, cfg, p, color, width, dash, label, colors, states) => {
     const Type = cfg.type === "histogram" ? LightweightCharts.HistogramSeries : LightweightCharts.LineSeries;
     const col = color || (cfg.type === "histogram" ? "rgba(106,166,248,.45)" : C.text);
+    /* `scale: {min, max}` IS A DECLARED RANGE, AND IT WAS BEING IGNORED — RSI has carried
+     * {min: 0, max: 100} since the registry was written and the pane autoscaled anyway, so a
+     * quiet RSI filled its pane and looked like a volatile one. It also matters once a line
+     * carries marks: the library pads the scale for them, and a −6..+6 oscillator in a 95px pane
+     * came out on a ±20 axis, flat. A bounded reading is drawn on its bounds. */
+    const fixed = cfg.scale ? {autoscaleInfoProvider: () => ({
+      priceRange: {minValue: cfg.scale.min, maxValue: cfg.scale.max}})} : {};
     const s = chart.addSeries(Type, cfg.type === "histogram"
       ? {color: col, priceLineVisible: false, lastValueVisible: false,
-         priceFormat: {type: "volume"}}
-      : {color: col, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false,
+         priceFormat: {type: "volume"}, ...fixed}
+      : {color: col, lineWidth: width || 1.2, priceLineVisible: false, lastValueVisible: false, ...fixed,
          // A STEP line for anything that holds a value until it changes. A grade does not
          // interpolate from B to C over three weeks; drawing a slope between them would show a
          // transition that never happened.
@@ -2769,21 +2921,45 @@ async function techChart(el, tk, dailyBars){
               vol: cfg.type === "histogram"});
     return s;
   };
+  const guide = (s, cfg) => (cfg.guides || []).forEach(g => s.createPriceLine({
+    price: g, color: C.dim, lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false}));
+  // Marks a LINE carries (`ln.marks`), as opposed to the T/B/R markers on the candles. Collected
+  // here and placed below, under the same density cap and the same "never silently" rule.
+  const LINEMARKS = [];
   for(const [k, cfg, out] of COMPUTED){
+    if(cfg.paints){
+      // A painter adds no series; it gets a key entry on the price pane so the colour under the
+      // crosshair is NAMED. A colour with no legend is the unlabelled line all over again.
+      const map = new Map();
+      bars.forEach((b, i) => { if(out.vals[i] != null) map.set(b.d, out.vals[i]); });
+      SER.push({pane: 0, label: cfg.label, color: out.none, dash: false, map,
+                colors: out.colors, states: out.states || null, fmtVal: cfg.fmtVal || null, vol: false});
+      continue;
+    }
     const p = pane(cfg.pane);
     // ⚠ The label comes from the LINE or the entry — never inferred from `dash`. The first
     // version read a dashed line as "(reconstructed)", which is true of the paper books and
     // false of the trade band, whose bands are dashed because they are bands. A legend that
     // invents a provenance claim is worse than one that only gives a name.
-    if(cfg.multi){ out.forEach(ln => ln && ln.vals && put(ln.vals, cfg, p, ln.color, ln.width,
-                     ln.dash, ln.label || cfg.label, ln.colors, ln.states)); }
+    if(cfg.multi){
+      let first = null;
+      out.forEach(ln => { if(!ln || !ln.vals) return;
+        // a line may be a different KIND from its entry (bars under a line) and print its own
+        // values; both default to the entry's
+        const lc = (ln.type || ln.fmtVal)
+          ? Object.assign({}, cfg, {type: ln.type || cfg.type, fmtVal: ln.fmtVal || cfg.fmtVal}) : cfg;
+        const s = put(ln.vals, lc, p, ln.color, ln.width, ln.dash, ln.label || cfg.label, ln.colors, ln.states);
+        first ||= s;
+        if(ln.marks && ln.marks.length) LINEMARKS.push([s, ln.marks, ln.label || cfg.label]);
+      });
+      if(first) guide(first, cfg);       // guides were honoured on single-line entries only
+    }
     else {
       const s2 = put(out, cfg, p, cfg.color, cfg.width, cfg.dash);
       // guides are declared in the registry (RSI 30/70) and were being ignored -- an overbought
       // line the reader cannot see is a threshold that may as well not exist
-      (cfg.guides || []).forEach(g => s2.createPriceLine({
-        price: g, color: C.dim, lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false}));
+      guide(s2, cfg);
     }
   }
 
@@ -2833,6 +3009,20 @@ async function techChart(el, tk, dailyBars){
   const marksHidden = marks.length > markCap ? marks.length : 0;
   if(marks.length && !marksHidden) LightweightCharts.createSeriesMarkers(candles,
     marks.sort((a, b) => a.time < b.time ? -1 : 1));
+  // marks carried by a line: same cap, counted per line, and the caption names what was withheld.
+  // Counted over the range ON SCREEN, not over everything fetched: the lead-in bars to the left
+  // of the view carry marks too, and counting those hid the marks on a six-month chart because
+  // of a year of history nobody was looking at.
+  const lineMarksHidden = [];
+  const _markFrom = lwcViewFrom(LWCP.tf);
+  for(const [s, ms, label] of LINEMARKS){
+    const inView = ms.filter(m => bars[m.i].d >= _markFrom).length;
+    if(inView > markCap){ lineMarksHidden.push(`${inView} ${label} mark(s)`); continue; }
+    LightweightCharts.createSeriesMarkers(s, ms.map(m => ({
+      time: bars[m.i].d, position: m.above ? "aboveBar" : "belowBar", color: m.color,
+      shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""}))
+      .sort((a, b) => a.time < b.time ? -1 : 1));
+  }
 
   // ── THE DATA KEY: one legend per pane, swatch + name + value at the crosshair ───────────────
   // Before this the chart said `O H L C vol` for the symbol and nothing at all for the eight
@@ -2937,6 +3127,12 @@ async function techChart(el, tk, dailyBars){
       `<span class="amber">${marksHidden} T/B/R and TD marker(s) hidden</span> — closer than `
     + `25px apart at this range, which is narrower than the markers themselves. Shorten the range or `
     + `widen the bar interval to see them. `);
+  }
+  if(lineMarksHidden.length){
+    const foot = el.querySelector(".lwcfoot");
+    if(foot) foot.insertAdjacentHTML("afterbegin",
+      `<span class="amber">${esc(lineMarksHidden.join(", "))} hidden</span> — too dense to read at `
+    + `this range. Shorten the range or widen the bar interval to see them. `);
   }
   requestAnimationFrame(placeBoxes);
   chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
