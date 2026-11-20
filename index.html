@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 18:49 · 535c426</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 19:04 · 9626de9</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 18:49 · 535c426</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 19:04 · 9626de9</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -616,6 +616,16 @@ async function enter(){
       LIVE.rbeta = Object.fromEntries((await qAll("site_rate_beta")).map(r => [r.ticker, r]));
       LIVE.rbetaOk = true;
     }catch(e){ LIVE.rbeta = {}; LIVE.rbetaOk = false; }
+    // GasBrakesGas status for the Universe and Signals columns (db/082): the stored rows without
+    // their run lists. A failed load is flagged, so the cells read "?" and not an empty dash.
+    try{
+      LIVE.gbg = {}; LIVE.gbgNewest = {};
+      for(const r of await qAll("site_gasbrakesgas_status")){
+        (LIVE.gbg[r.ticker] ||= {})[r.timeframe] = r;
+        if(!LIVE.gbgNewest[r.timeframe] || r.bar_date > LIVE.gbgNewest[r.timeframe]) LIVE.gbgNewest[r.timeframe] = r.bar_date;
+      }
+      LIVE.gbgOk = true;
+    }catch(e){ LIVE.gbg = {}; LIVE.gbgNewest = {}; LIVE.gbgOk = false; }
     // WHY a name has no rate beta (db/029): micro-sleeve names are excluded by design, a name whose
     // price series stopped is a data problem, and the page must not call both "too few returns".
     try{
@@ -1287,7 +1297,7 @@ function about(el){
 
 
 /* ═══ SIGNALS: universe-wide technical analysis (v2) ══════════════════════ */
-let sigFilter = {q:"", trend:"", timing:"", held:false};
+let sigFilter = {q:"", trend:"", timing:"", gbg:"", held:false};
 // An ordered list, not a single key -- the same sort the Grid and Universe tabs use, from
 // sorting.js. First key wins, later keys break ties; shift-click a header to add one.
 let sigSort = [{k:"range_pos", d:1}];
@@ -1298,7 +1308,13 @@ const SIG_COLS = [
   // grade and quad come from the decision matrix, not from technicals_v2 -- this table joins the
   // two so the technical read sits beside what the model thinks of the business.
   ["grade","Grade","ord"], ["quad","Quad","ord"],
-  ["trend","Track line","ord"], ["range_pos","Timing","ord"],
+  ["trend","Track line","ord"],
+  // GasBrakesGas (Niko, 2026-11-20): the same three columns as the Universe grid, from the same
+  // functions in indicators.js. Display only — not an input to the rating at the end of the row.
+  ["gbg","GBG","ord","GasBrakesGas state on daily bars. A fitted approximation of a third-party trend indicator, shown for context — not tested against returns"],
+  ["gbg_w","GBG weekly","ord","GasBrakesGas state on weekly bars; needs 110 finished weeks"],
+  ["gbg_flip","GBG flip","num","Finished daily bars since the state last changed. 'new' = it flipped on the newest bar; sort ascending for the most recent flips"],
+  ["range_pos","Timing","ord"],
   ["trade_mid","Trade range (1w)","num"], ["trend_mid","Trend range (1m)","num"], ["rsi","RSI","num"],
   ["rvol","Rel vol","num"], ["above_52w_low_avwap","52w-low VWAP","ord"], ["td","TD b/s","num"],
   ["range_move","Range moving","ord"],
@@ -1321,6 +1337,9 @@ function rangeCell(tk){
 function sigKey(v, k, M){
   const n = x => x == null ? null : +x;
   if(k === "trend") return TREND_ORD[v.trend] ?? 9;
+  if(k === "gbg") return gbgSortKey(v.ticker, "D");
+  if(k === "gbg_w") return gbgSortKey(v.ticker, "W");
+  if(k === "gbg_flip") return gbgBars(v.ticker);
   if(k === "range_pos") return [TIMING_ORD[v.timing] ?? 9, n(v.range_pos) ?? 9];   // timing bucket, then depth in range
   if(k === "above_52w_low_avwap") return v.above_52w_low_avwap ? 0 : 1;
   if(k === "tech_rating") return TECH_ORD[(M[v.ticker]||{}).tech_rating] ?? 9;
@@ -1359,6 +1378,7 @@ async function signalsV2(el){
   const draw = () => {
     const f = sigFilter;
     const rowsUnsorted = V.filter(v => (!f.trend || v.trend === f.trend) && (!f.timing || v.timing === f.timing)
+        && (!f.gbg || gbgLabel(v.ticker, "D").startsWith(f.gbg))
         && (!f.held || held.has(v.ticker))
         && (!f.q || (v.ticker + " " + (M[v.ticker]?.sector || "")).toLowerCase().includes(f.q.toLowerCase())))
       ;
@@ -1373,6 +1393,7 @@ async function signalsV2(el){
         <td>${esc(m.grade || "\u2014")}</td>
         <td>${esc(m.quadrant || "\u2014")}</td>
         <td>${trendChip(v.trend)}<div class="muted" style="font-size:var(--fs-xs)">${esc(v.trend_since||"")}</div></td>
+        <td>${gbgCell(v.ticker, "D")}</td><td>${gbgCell(v.ticker, "W")}</td><td>${gbgFlipCell(v.ticker)}</td>
         <td>${timingChip(v.timing, v.range_pos)}</td>
         <td class="mono" style="font-size:var(--fs-sm)">${usd(v.trade_low,2)} – ${usd(v.trade_high,2)}</td>
         <td class="mono" style="font-size:var(--fs-sm)">${usd(v.trend_low,2)} – ${usd(v.trend_high,2)}</td>
@@ -1422,6 +1443,8 @@ async function signalsV2(el){
       <select class="input" id="strend" style="width:auto"><option value="">Any trend</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>
       <select class="input" id="stiming" style="width:auto">${["","BUY_ZONE","ACCUMULATE_OK","NEUTRAL","WAIT_FOR_LOW_END","TRIM_ZONE","AVOID_EXTENDED"]
         .map(v => `<option value="${v}">${v ? timingLbl(v) : "Any timing"}</option>`).join("")}</select>
+      <select class="input" id="sgbg" style="width:auto">${["","Gas","Neutral","Brakes"]
+        .map(v => `<option value="${v}">${v || "Any GasBrakesGas"}</option>`).join("")}</select>
       <label class="check"><input type="checkbox" id="sheld" ${sigFilter.held?"checked":""}> Holdings only</label></div>
      <div class="table-wrap" style="max-height:640px;overflow:auto"><table class="tbl"><thead><tr id="sigHead"></tr></thead>
        <tbody id="sigRows"></tbody></table></div>`) + `</div>
@@ -1439,6 +1462,8 @@ async function signalsV2(el){
   document.getElementById("stiming").value = sigFilter.timing;
   document.getElementById("strend").onchange = e => { sigFilter.trend = e.target.value; draw(); };
   document.getElementById("stiming").onchange = e => { sigFilter.timing = e.target.value; draw(); };
+  document.getElementById("sgbg").value = sigFilter.gbg;
+  document.getElementById("sgbg").onchange = e => { sigFilter.gbg = e.target.value; draw(); };
   document.getElementById("sheld").onchange = e => { sigFilter.held = e.target.checked; draw(); };
   el.addEventListener("click", ev2 => { const tr = ev2.target.closest("tr[data-open]"); if(tr) openName(tr.dataset.open); });
 }
@@ -2398,6 +2423,63 @@ INDICATORS.gbg_osc = {
        + "its key on the bar it falls on. Covers the newest 750 finished bars, daily, two-day and "
        + "weekly. Shown for context only.",
 };
+
+/* ═══ GASBRAKESGAS AS TABLE COLUMNS — Universe and Signals (Niko, 2026-11-20, db/082) ═════════
+ * "I want to be able to see in the columns in the universe and sort based on GasBrakesGas signal
+ * and current status. Same applies to Signals tab." Three columns, the same three in both tables,
+ * drawn and sorted by the functions below so the two tables cannot disagree:
+ *   GBG          the daily state now            sorted Gas·strong → Brakes·strong
+ *   GBG weekly   the weekly state now           same order
+ *   GBG flip     how many finished daily bars the state has lasted — the SIGNAL. 1 is a flip on
+ *                the newest bar, so ascending puts the newest flips first.
+ * LIVE.gbg is {ticker: {D, 2D, W}} from site_gasbrakesgas_status: the stored rows without their
+ * history, because a table of 500 names must not fetch 5 MB of run lists to print one word each.
+ *
+ * ⚠ THREE DIFFERENT BLANKS, AND THE CELL SAYS WHICH. No row for the name (fewer than 110 finished
+ * bars on that timeframe — 72 names have no weekly reading); the rows did not load ("?", never a
+ * dash, because a dash reads as "checked, nothing there"); a row that has stopped updating (shown,
+ * muted, with its date).
+ * ⚠ STILL DISPLAY ONLY. A column a reader sorts by decides nothing, and every tooltip says it has
+ * not been tested against returns.                                                            */
+const GBG_ORD = {"Gas · strong": 0, "Gas · weak": 1, "Neutral": 2, "Brakes · weak": 3, "Brakes · strong": 4};
+const _gbgRowOf = (tk, tf) => ((typeof LIVE !== "undefined" && LIVE.gbg || {})[tk] || {})[tf] || null;
+function gbgLabel(tk, tf){ const r = _gbgRowOf(tk, tf); return r ? (GBG_NAME[String(r.shade)] || "") : ""; }
+function gbgSortKey(tk, tf){ const r = _gbgRowOf(tk, tf); return r ? (GBG_ORD[GBG_NAME[String(r.shade)]] ?? null) : null; }
+function gbgBars(tk){ const r = _gbgRowOf(tk, "D"); return r && r.bars_in_state != null ? +r.bars_in_state : null; }
+const _gbgSigned = v => v == null ? "—" : (v > 0 ? "+" : "") + v;
+function _gbgMissing(tf){
+  if(typeof LIVE !== "undefined" && LIVE.gbgOk === false)
+    return `<span class="amber" title="The GasBrakesGas rows did not load, so this is unknown, not empty">?</span>`;
+  return `<span class="muted" title="No reading: this name has fewer than 110 finished ${tf === "W" ? "weekly" : "daily"} bars">—</span>`;
+}
+function gbgCell(tk, tf){
+  const r = _gbgRowOf(tk, tf);
+  if(!r) return _gbgMissing(tf);
+  const newest = (typeof LIVE !== "undefined" && LIVE.gbgNewest || {})[tf];
+  const old = newest && r.bar_date < newest && (Date.parse(newest) - Date.parse(r.bar_date)) > 8 * 864e5;
+  const tip = `${tf === "W" ? "Weekly" : "Daily"} bars to ${r.bar_date} · score ${_gbgSigned(r.score)} of ±10 · `
+    + `oscillator ${_gbgSigned(r.osc)}${r.squeeze ? " · squeeze " + r.squeeze : ""} · this state since ${r.since}`
+    + (r.prev_state ? ` (from ${r.prev_state[0].toUpperCase() + r.prev_state.slice(1)})` : "")
+    + (old ? " · THIS ROW HAS STOPPED UPDATING" : "")
+    + " · shown for context: not tested against returns, and not an input to the grade or action";
+  return `<span title="${esc(tip)}" style="white-space:nowrap;color:${old ? C.muted : GBG_COL[String(r.shade)]}">`
+       + `● ${esc(GBG_NAME[String(r.shade)])}${old ? ` <span class="muted" style="font-size:var(--fs-xs)">${esc(r.bar_date.slice(5))}</span>` : ""}</span>`;
+}
+function gbgFlipCell(tk){
+  const r = _gbgRowOf(tk, "D");
+  if(!r) return _gbgMissing("D");
+  if(r.bars_in_state == null) return `<span class="muted" title="not computed yet">—</span>`;
+  const n = +r.bars_in_state, to = r.state[0].toUpperCase() + r.state.slice(1);
+  const from = r.prev_state ? r.prev_state[0].toUpperCase() + r.prev_state.slice(1) : null;
+  const tip = (from ? `Turned ${to} from ${from} on ${r.since}` : `${to} since its readings begin, ${r.since}`)
+    + ` · ${n} finished daily bar${n === 1 ? "" : "s"} in this state, the newest included`
+    + (r.mark ? ` · on the newest bar: ${(GBG_MARK[r.mark] || {}).text || r.mark}` : "")
+    + " · shown for context: not tested against returns";
+  return `<span title="${esc(tip)}" style="white-space:nowrap">`
+       + (n === 1 ? `<b style="color:${GBG_COL[String(Math.sign(r.shade) * 2)]}">new</b>` : `<span class="mono">${n}</span>`)
+       + (from ? ` <span class="muted" style="font-size:var(--fs-xs)">from ${esc(from)}</span>` : "")
+       + (r.mark ? ` <span class="muted" style="font-size:var(--fs-xs)" title="${esc((GBG_MARK[r.mark] || {}).text || "")}">◆</span>` : "") + `</span>`;
+}
 /* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
  *
  * Replaces the echarts close-line chart. LWC is Apache-2.0 and is the ONLY TradingView product
@@ -3545,13 +3627,16 @@ let gridFilterOpen = false;
 // and sortable while hidden. Remembered per viewer.
 // Eleven, sized to FIT a 1,232px card with no sideways scroll (measured live: twelve with Sector ran
 // 1,594px). Sector moved to the full view — still filterable — and Why takes the remaining width.
-const GRID_MONITOR = ["ticker","grade","tech_rating","action","qgs_universe_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
+const GRID_MONITOR = ["ticker","grade","tech_rating","action","gbg","gbg_flip","qgs_universe_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
 const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_universe_rank: "QGS #", qgs_rank: "Buy #"};       // monitor-view headers; the tooltip keeps the full name
 let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
 // What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
 // not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
 // "All" for a column showing 31 profiles.
 function gridText(r, key){
+  // GasBrakesGas lives in LIVE.gbg, not on the matrix row; the dropdown filters on the words the cell shows
+  if(key === "gbg") return gbgLabel(r.ticker, "D");
+  if(key === "gbg_w") return gbgLabel(r.ticker, "W");
   if(key === "f_profile") return profileLabel(((typeof LIVE !== "undefined" && LIVE.suniv || {})[r.ticker] || {}).factor_profile) || "";
   return r[key];
 }
@@ -3560,7 +3645,7 @@ const FREE_TEXT_COLS = new Set(["ticker", "guidance", "grade_reason"]);
 // the filter and the sort must both resolve them through gridKey().
 // "qgs" is on the row, but what the cell SHOWS is not always what the row stores (a non-positive ROIC
 // hides it — qgsShown), so it resolves through gridKey() too.
-const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta", "qgs", ...FAC_KEYS]);
+const LIVE_NUM = new Set(["implied_cagr", "vis_pct", "rate_beta", "qgs", "gbg_flip", ...FAC_KEYS]);
 // Of those, the ones stored as a DECIMAL but typed as a PERCENT in the filter box. The bounds are
 // scaled once, in matchesFilters, by this one rule — rate_beta is a plain coefficient and is not.
 const PCT_TYPED = new Set(["implied_cagr", "vis_pct", "range_pos"]);
@@ -3621,7 +3706,7 @@ function filterOpts(rows, key, order){
   return order ? seen.sort((a,b) => (order[a] ?? 99) - (order[b] ?? 99)) : seen.sort();
 }
 const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_ORD",
-                   action: "ACTION_ORD", qgs_tier: "QGS_ORD"};
+                   action: "ACTION_ORD", qgs_tier: "QGS_ORD", gbg: "GBG_ORD", gbg_w: "GBG_ORD"};
 // Build each dropdown's options from the data actually present, ordered by the model's own ranking
 // where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
 function selectEl(id, label, value, opts, key){
@@ -4136,6 +4221,11 @@ const GRID_COLS = [
   // a box without its number hides how close a name sits to the line.
   ["grade_score","Grade pct","num","Percentile of QGS + net buyback yield in the core universe. A above 85, B above 50, C above 20, D below — before the pillar vetoes"],
   ["tech_rating","Technical","ord"], ["action","Action","ord"],
+  // GasBrakesGas, as three sortable columns (Niko, 2026-11-20). Display only: none of them is an
+  // input to the grade or the action beside it. Cells and sort keys live in indicators.js.
+  ["gbg","GBG","ord","GasBrakesGas state on daily bars: Gas (trend up), Neutral or Brakes (trend down), strong or weak. A fitted approximation of a third-party trend indicator, shown for context — not tested against returns and not an input to the grade or action"],
+  ["gbg_w","GBG weekly","ord","GasBrakesGas state on weekly bars. A name needs 110 finished weeks to have one"],
+  ["gbg_flip","GBG flip","num","Finished daily bars since the GasBrakesGas state last changed, the newest included. 'new' = it flipped on the newest bar. Sort ascending for the most recent flips"],
   // EVERY NAME HAS A QGS AND A RANK, OR SAYS WHY NOT (Niko, 2026-11-19). The only rank here used to be the
   // buy-list order, headed "QGS #": 413 of 474 names showed a dash in a column that read as "this
   // company's QGS rank", and there was no QGS number at all. Three columns now, each saying what it is.
@@ -4217,6 +4307,9 @@ function qgsRankCell(r){
 }
 function gridKey(r, k){
   if(k === "qgs") return qgsShown(r);
+  if(k === "gbg") return gbgSortKey(r.ticker, "D");          // null when there is no reading, so it sinks
+  if(k === "gbg_w") return gbgSortKey(r.ticker, "W");
+  if(k === "gbg_flip") return gbgBars(r.ticker);
   if(k === "grade") return GRADE_ORD[r.grade] ?? 9;
   if(k === "tech_rating") return TECH_ORD[r.tech_rating] ?? 9;
   if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
@@ -4279,6 +4372,8 @@ async function grid(el){
         qgs_rank: `<td>${r.qgs_rank == null ? "—" : r.qgs_rank}</td>`,
         quad_score: `<td>${r.quad_score == null ? "—" : num(r.quad_score, 0)}</td>`,
         tech_rating: `<td>${esc(techLbl(r.tech_rating))}</td>`,
+        gbg: `<td>${gbgCell(r.ticker, "D")}</td>`, gbg_w: `<td>${gbgCell(r.ticker, "W")}</td>`,
+        gbg_flip: `<td>${gbgFlipCell(r.ticker)}</td>`,
         action: `<td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>`,
         timing: `<td>${timingChip(r.timing, r.range_pos)}</td>`,
         range_pos: `<td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>`,
@@ -4329,7 +4424,7 @@ async function grid(el){
     }</tbody></table></div>`) +
     `<div style="margin-top:16px">` + card("Names", `<span id="gridN"></span>`,
       (() => {
-        const ORD = {GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QGS_ORD};
+        const ORD = {GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QGS_ORD, GBG_ORD};
         const n = activeFilterCount();
         const controls = GRID_COLS.map(([key, label, type]) => {
           const ctl = colControl(key, type, M);
