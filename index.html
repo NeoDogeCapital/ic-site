@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 20:00 · ed5116b</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 20:21 · c0fb6c3</div>
   </div>
 </section>
 
@@ -528,7 +528,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 20:00 · ed5116b</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 20:21 · c0fb6c3</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -652,6 +652,8 @@ async function enter(){
       LIVE.rbetaOk = true;
     }catch(e){ LIVE.rbeta = {}; LIVE.rbetaOk = false; }
     // Thesis watch (db/083) for the name drawer; the Theses tab reloads it. Flagged on failure.
+    try{ LIVE.tsell = {}; for(const s of await qAll("site_thesis_sell_conditions")) (LIVE.tsell[s.ticker] ||= []).push(s); }
+    catch(e){ LIVE.tsell = {}; }
     try{ LIVE.twatch = Object.fromEntries((await qAll("site_thesis_watch")).map(w => [w.ticker, w])); LIVE.twatchOk = true; }
     catch(e){ LIVE.twatch = {}; LIVE.twatchOk = false; }
     // GasBrakesGas status for the Universe and Signals columns (db/082): the stored rows without
@@ -960,7 +962,10 @@ const trendChip = t => { if(!t) return "—";
   return `<span class="chip ${cls}" title="${title}" aria-label="${title.split(":")[0]}: ${label.replace(/^\S+ /, "")}">${label}</span>`; };
 const alignBar = (v, b) => { if(v==null) return "—"; const col = v>=65?C.green:v<35?C.red:C.accent;
   return `<span class="bar"><i style="width:${Math.max(3,Math.min(100,v))}%;background:${col}"></i></span> <span class="mono" style="font-size:var(--fs-sm);color:${col}">${v.toFixed(0)}</span>`; };
-const thesisChip = s => !s ? `<span class="chip">—</span>` : `<span class="chip ${s==='BROKEN'||s==='REVIEW'?'bad':s==='WATCH'?'warn':'ok'}">${s}</span>`;
+/* Green is for INTACT and nothing else: "not assessed" and "no thesis" used to fall through to the
+ * ok colour, which is a missing reading dressed as a clean one. */
+const THESIS_LBL = {INTACT:"Intact", WATCH:"Watch", REVIEW:"Review", BROKEN:"Broken", UNASSESSED:"Not assessed", NO_THESIS:"No thesis"};
+const thesisChip = s => !s ? `<span class="chip">—</span>` : `<span class="chip ${s==='BROKEN'||s==='REVIEW'||s==='NO_THESIS'?'bad':s==='WATCH'?'warn':s==='INTACT'?'ok':''}">${THESIS_LBL[s] || s}</span>`;
 
 /* ═══ charts ═════════════════════════════════════════════════════════════ */
 const charts = [];
@@ -5838,19 +5843,32 @@ function thesisWatchBlock(tk){
     `${esc(r.reading || "")}${r.note ? `<div class="muted" style="font-size:var(--fs-xs)">${esc(r.note)}</div>` : ""}`,
     cite(r.evidence)]);
   const inv = (w.invalidation_met || []);
+  /* THE LATCHED SELL CONDITIONS (db/085): what actually reaches the grade. The nightly verdict
+   * above it comes and goes with the news window; a condition assessed as met stays here until a
+   * person confirms or dismisses it, and the line says what it is doing to the grade meanwhile. */
+  const latched = ((LIVE.tsell || {})[tk] || []).filter(s => s.thesis_version === w.thesis_version);
+  const latchHTML = !latched.length ? "" : `<div style="margin:6px 0 10px">` + latched.map(s => {
+      const what = s.status === "OPEN" ? [`OPEN since ${s.first_met}`, C.red, "The grade is held at C until this is confirmed or dismissed. Nothing has been confirmed: this is a model's reading."]
+        : s.status === "CONFIRMED" ? [`CONFIRMED ${String(s.resolved_at || "").slice(0, 10)}`, C.red, "The thesis is broken: grade D."]
+        : [`DISMISSED ${String(s.resolved_at || "").slice(0, 10)}`, C.muted, "No effect on the grade. It reopens only on evidence not seen before."];
+      return `<div style="border-left:3px solid ${what[1]};padding:4px 0 4px 10px;margin-bottom:6px">
+        <b style="color:${what[1]}">Sell condition ${esc(s.item_id)} · ${esc(what[0])}${s.reopened ? " · reopened on new evidence" : ""}</b>
+        <div>${esc(s.item_text)}</div>
+        <div class="muted" style="font-size:var(--fs-sm)">${esc(what[2])}${s.resolved_note ? " Decision: " + esc(s.resolved_note) : ""}</div>
+        ${(s.evidence || []).map(e => `<div class="muted" style="font-size:var(--fs-xs)">[${esc(e.date || "undated")}] ${esc(String(e.text || "").slice(0, 260))}</div>`).join("")}</div>`; }).join("") + `</div>`;
   const head = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
       <span class="chip ${TW_COL[w.status] || ""}">${esc(TW_LBL[w.status] || w.status)}</span>
       <span class="muted">${w.assessed} of ${w.items} items could be assessed · ${w.triggered} triggered · ${w.approaching} approaching · as of ${esc(w.as_of)}${
         w.carried ? ` · evidence unchanged since it was last read on ${esc(w.assessed_on || "—")}` : ""}</span></div>`;
-  const alerts =
-    (inv.length ? `<p style="color:${C.red}"><b>A sell condition in this thesis is assessed as met (${esc(inv.join(", "))}).</b> Whether the thesis is broken is a decision for a person; this changes nothing by itself.</p>` : "")
+  const alerts = latchHTML
+    + (inv.length && !latched.length ? `<p style="color:${C.red}"><b>A sell condition in this thesis is assessed as met (${esc(inv.join(", "))}).</b> It has not been recorded as open yet.</p>` : "")
     + ((w.floors || []).length ? `<p style="color:${C.red}">${esc(w.floors.join(" · "))}</p>` : "")
     + (w.error ? `<p class="amber">This name could not be read tonight (${esc(w.error)}), so nothing below is an assessment.</p>` : "")
     + ((w.outside || []).length ? `<h4 style="margin-top:10px">Outside what this thesis tests</h4><ul class="list">${
         w.outside.map(o => `<li>${esc(o.note || "(note withheld)")} <span class="muted">${cite(o.evidence)}</span></li>`).join("")}</ul>` : "");
   return `<div class="sec"><h4>Thesis watch</h4>${head}${alerts}
     ${rows.length ? tbl(["", "What the thesis says to watch", "Verdict", "Reading", "Evidence"], rows) : ""}
-    <p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Each verdict is a model's reading of filed quarterly figures, segment lines, this model's own state and three weeks of news, kept only if it cites evidence that was in front of it (hover an id). "Not triggered" on an event means it was not reported in that news window. R = a risk, I = a sell condition. It reports; it does not change a grade, a thesis or a position.</p></div>`;
+    <p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Each verdict is a model's reading of filed quarterly figures, segment lines, this model's own state and three weeks of news, kept only if it cites evidence that was in front of it (hover an id). "Not triggered" on an event means it was not reported in that news window. R = a risk, I = a sell condition. A sell condition assessed as met is kept open until a person resolves it and holds the grade at C meanwhile; nothing else here changes a grade, and nothing changes a thesis or a position.</p></div>`;
 }
 function thesisBlock(tk, full=false){
   const t = LIVE.theses[tk]; if(!t) return "";
@@ -5881,6 +5899,8 @@ let thesisSel = null;
 async function loadThesisWatch(){
   try{ LIVE.twatch = Object.fromEntries((await qAll("site_thesis_watch")).map(w => [w.ticker, w])); LIVE.twatchOk = true; }
   catch(e){ LIVE.twatch = {}; LIVE.twatchOk = false; }
+  try{ LIVE.tsell = {}; for(const s of await qAll("site_thesis_sell_conditions")) (LIVE.tsell[s.ticker] ||= []).push(s); }
+  catch(e){ LIVE.tsell = {}; }
 }
 async function theses(el){
   LIVE.theses = Object.fromEntries((await qAll("site_theses")).map(t => [t.ticker, t]));
@@ -5905,7 +5925,7 @@ async function theses(el){
                ...(w.floors || []),
                ...((w.outside || []).length ? [`${w.outside.length} development(s) the thesis does not test for`] : [])].join(" · "))]))
           : `<p class="muted">No holding has an item triggered or approaching.</p>`)
-        + `<p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Read nightly from each thesis's own risks and sell conditions. "Intact" means at least half of them could be assessed and none tripped. It reports; a person decides.</p>`) + `</div>`;
+        + `<p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Read nightly from each thesis's own risks and sell conditions. "Intact" means at least half of them could be assessed and none tripped. A sell condition assessed as met stays open and holds that name's grade at C until a person confirms it (grade D) or dismisses it.</p>`) + `</div>`;
     })() +
     `<div class="grid g-1-2">` +
     card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
