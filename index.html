@@ -458,7 +458,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 18:31 · f684305</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-20 18:49 · 535c426</div>
   </div>
 </section>
 
@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 18:31 · f684305</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-20 18:49 · 535c426</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2278,16 +2278,36 @@ function decodeDecisionRows(rows){
  * MATCHED ON THE BAR'S LAST SESSION. The engine dates a weekly or two-day bar by its last
  * session; aggBars() draws a bucket at its first and carries the last as `e`. The run list is
  * filled forward only INSIDE itself — never before its first entry and never past `bar_date`.
- * Blue and purple, not green and red: the candles already use those for up and down.          */
-const GBG_COL  = {"2": "#2f81f7", "1": "#8ec3ff", "0": "#e3b341", "-1": "#f2a2c9", "-2": "#bf4fd6"};
+ *
+ * COLOURS (Niko, 2026-11-20): GREEN is Gas, RED is Brakes, YELLOW is Neutral, the lighter shade
+ * the weaker trend. The first version used blue and purple because the candles already use green
+ * and red for up and down days. That worry does not apply while the painter is on: EVERY bar is
+ * then a state colour or grey, so no ordinary up-day green is left on the chart to be mistaken
+ * for Gas. What is given up is the up/down day itself, which the O/H/L/C line in the key still
+ * carries.
+ *
+ * TAGS AND ICONS ON THE PRICE BARS, the way the indicator this approximates draws them:
+ *   a TAG    a word on the bar where the STATE changes — Gas, Brakes or Neutral. A change of
+ *            strength inside a state is not a flip (the guide, section 9) and gets no tag, and
+ *            the first reading in a name's history gets none: there is no state before it to
+ *            have flipped from.
+ *   an ICON  the four marks. A DOT is the trend resuming: green under the bar in Gas, red over
+ *            it in Brakes. An ARROW is the move against the trend fading: red, pointing down,
+ *            over a Gas bar coming off an overbought reading; green, pointing up, under a Brakes
+ *            bar coming off an oversold one. They are defined on the oscillator and were first
+ *            drawn there; on the price bars is where a reader looks for them.              */
+const GBG_COL  = {"2": C.green, "1": "#a9e8cb", "0": "#f2d14b", "-1": "#f7b4b4", "-2": C.red};
 const GBG_NONE = "#5b6472";
 const GBG_NAME = {"2": "Gas · strong", "1": "Gas · weak", "0": "Neutral",
                   "-1": "Brakes · weak", "-2": "Brakes · strong"};
+const GBG_TAG  = {"1": {text: "Gas",     above: false, color: GBG_COL["2"]},
+                  "0": {text: "Neutral", above: true,  color: GBG_COL["0"]},
+                  "-1": {text: "Brakes", above: true,  color: GBG_COL["-2"]}};
 const GBG_MARK = {
-  gas_continuation:    {text: "Gas resumes",       above: false, shape: "arrowUp",   color: GBG_COL["2"]},
-  gas_correction:      {text: "Gas off its high",  above: true,  shape: "circle",    color: GBG_COL["1"]},
-  brakes_continuation: {text: "Brakes resume",     above: true,  shape: "arrowDown", color: GBG_COL["-2"]},
-  brakes_correction:   {text: "Brakes off its low", above: false, shape: "circle",   color: GBG_COL["-1"]},
+  gas_continuation:    {text: "Gas resumes",        above: false, shape: "circle",    color: GBG_COL["2"]},
+  gas_correction:      {text: "Gas off its high",   above: true,  shape: "arrowDown", color: GBG_COL["-2"]},
+  brakes_continuation: {text: "Brakes resume",      above: true,  shape: "circle",    color: GBG_COL["-2"]},
+  brakes_correction:   {text: "Brakes off its low", above: false, shape: "arrowUp",   color: GBG_COL["2"]},
 };
 // The stored row for the interval on screen, or null. The engine computes D, 2D and W, and only
 // for a name with 110 finished bars on that interval.
@@ -2312,16 +2332,35 @@ INDICATORS.gbg_trend = {
     const shade = bars.map(b => { const e = b.e || b.d;
       while(j < runs.length && runs[j][0] <= e){ cur = runs[j][1]; j++; }
       return (e < first || e > last) ? null : cur; });
-    return {vals: shade, colors: shade.map(s => s == null ? null : GBG_COL[String(s)]), none: GBG_NONE};
+    // Flips, from the STORED run list rather than from the bars on screen, so a tag sits on the
+    // bar the state changed on even when the bar before it is outside the loaded window.
+    const at = new Map(bars.map((b, i) => [b.e || b.d, i]));
+    const marks = [];
+    for(let k = 1; k < runs.length; k++){
+      const was = Math.sign(runs[k - 1][1]), now = Math.sign(runs[k][1]), i = at.get(runs[k][0]);
+      if(was === now || i === undefined) continue;          // a change of strength is not a flip
+      const t = GBG_TAG[String(now)];
+      marks.push({i, tag: true, minor: now === 0, above: t.above, shape: "square", color: t.color, text: t.text});
+    }
+    const m = (r.tail && r.tail.m) || {};
+    bars.forEach((b, i) => { const c = GBG_MARK[m[b.e || b.d]];
+      if(c && shade[i] != null) marks.push({i, tag: false, above: c.above, shape: c.shape, color: c.color, text: ""}); });
+    return {vals: shade, colors: shade.map(s => s == null ? null : GBG_COL[String(s)]), none: GBG_NONE,
+            marks, markNames: ["flip tag", "icon"], minorName: "Neutral",
+            states: bars.map(b => (GBG_MARK[m[b.e || b.d]] || {}).text || "")};
   },
-  basis: "colours each price bar by its trend. Blue is Gas (trend up), purple is Brakes (trend "
-       + "down), amber is Neutral, and the lighter shade is the weaker trend. It is a fitted "
-       + "approximation of a third-party trend indicator, not that indicator: where it was built "
-       + "it matched the original's state on 94% of bars and its exact shade on 81%. Computed "
-       + "each night on finished daily, two-day and weekly bars at split-adjusted prices, so a "
-       + "grey bar has no reading: the bar still forming, a name's first 109 bars, and every "
-       + "monthly bar. Shown for context only. It has not been tested against returns and it "
-       + "feeds no grade, action or brake.",
+  basis: "colours each price bar by its trend. Green is Gas (trend up), red is Brakes (trend "
+       + "down), yellow is Neutral, and the lighter shade is the weaker trend, so with this on a "
+       + "bar's colour no longer says whether the day closed up or down. A word marks the bar "
+       + "where the state flips to Gas, Neutral or Brakes. A dot marks the trend resuming after "
+       + "a pullback, and an arrow marks a move against the trend fading; those four icons were "
+       + "built from a description of the original and never checked against it, and they exist "
+       + "for the newest 750 bars. It is a fitted approximation of a third-party trend "
+       + "indicator, not that indicator: where it was built it matched the original's state on "
+       + "94% of bars and its exact shade on 81%. Computed each night on finished daily, two-day "
+       + "and weekly bars at split-adjusted prices, so a grey bar has no reading: the bar still "
+       + "forming, a name's first 109 bars, and every monthly bar. Shown for context only. It "
+       + "has not been tested against returns and it feeds no grade, action or brake.",
 };
 
 INDICATORS.gbg_osc = {
@@ -2338,9 +2377,6 @@ INDICATORS.gbg_osc = {
     const ix = bars.map(b => at.get(b.e || b.d));                 // undefined = no stored bar
     const pick = (arr) => ix.map(i => i === undefined || arr[i] == null ? null : arr[i]);
     const osc = pick(t.o), sq = pick(t.q), heavy = pick(t.h);
-    const marks = [];
-    bars.forEach((b, i) => { const m = (t.m || {})[b.e || b.d], cfg = m && GBG_MARK[m];
-      if(cfg && osc[i] != null) marks.push({i, above: cfg.above, shape: cfg.shape, color: cfg.color, text: ""}); });
     return [
       {vals: osc, label: "Oscillator", width: 1.8,
        // heavy volume is a brighter line; a series with no volume (null) is the plain colour
@@ -2348,7 +2384,7 @@ INDICATORS.gbg_osc = {
        states: bars.map((b, i) => { const m = (t.m || {})[b.e || b.d];
          return [m && GBG_MARK[m] ? GBG_MARK[m].text : "", heavy[i] === 1 ? "heavy volume" : ""]
            .filter(Boolean).join(" · "); }),
-       fmtVal: v => (v > 0 ? "+" : "") + v, marks},
+       fmtVal: v => (v > 0 ? "+" : "") + v},
       {vals: sq, label: "Squeeze", type: "histogram",
        colors: sq.map(q => q == null ? null : q >= 6 ? "rgba(227,179,65,.95)" : "rgba(227,179,65,.45)"),
        fmtVal: v => v >= 6 ? "6 (max)" : String(v)},
@@ -2357,10 +2393,10 @@ INDICATORS.gbg_osc = {
   basis: "six overbought and oversold readings (two RSIs, two stochastics and two Bollinger "
        + "positions) added to a whole number from −6 to +6, on the same finished bars as the "
        + "trend. The amber bars are the squeeze: how many bars in a row it has sat at zero, up to "
-       + "6. A brighter line is heavier volume than the last 28 bars' average. An arrow marks the "
-       + "trend resuming after a pullback and a dot marks it coming off an extreme; those marks "
-       + "were built from a description of the original and never checked against it. Covers the "
-       + "newest 750 finished bars, daily, two-day and weekly. Shown for context only.",
+       + "6. A brighter line is heavier volume than the last 28 bars' average. The icons these "
+       + "readings produce are drawn on the price bars by the trend toggle; this pane names one in "
+       + "its key on the bar it falls on. Covers the newest 750 finished bars, daily, two-day and "
+       + "weekly. Shown for context only.",
 };
 /* ═══ technical chart — TradingView Lightweight Charts ════════════════════════════════════════
  *
@@ -3007,14 +3043,46 @@ async function techChart(el, tk, dailyBars){
    * hid it is not. */
   const markCap = Math.max(12, Math.round((host.clientWidth || 900) / 25));
   const marksHidden = marks.length > markCap ? marks.length : 0;
-  if(marks.length && !marksHidden) LightweightCharts.createSeriesMarkers(candles,
-    marks.sort((a, b) => a.time < b.time ? -1 : 1));
-  // marks carried by a line: same cap, counted per line, and the caption names what was withheld.
-  // Counted over the range ON SCREEN, not over everything fetched: the lead-in bars to the left
-  // of the view carry marks too, and counting those hid the marks on a six-month chart because
-  // of a year of history nobody was looking at.
+  /* A PAINTER'S MARKS GO ON THE PRICE BARS, with the markers above, in ONE call: a series takes
+   * one marker set, and two calls would leave whichever came second.
+   *   ICONS (no word) take the same cap as every other marker, counted over the range ON SCREEN
+   *     rather than over everything fetched: the lead-in bars left of the view carry marks too,
+   *     and counting those hid the marks on a six-month chart because of a year nobody was
+   *     looking at.
+   *   TAGS (a word) are thinned WHERE THEY WOULD OVERLAP, not by a count. Flips cluster: a name
+   *     chopping around its average goes Neutral, Brakes, Neutral, Gas inside a week, and a
+   *     count cap passes that chart while its words sit on top of each other. A word needs about
+   *     45px, so at the current bars-per-pixel a tag is kept only if no kept tag on the SAME
+   *     side of the bars is closer than that. Newest first, and major tags before minor ones (a
+   *     Neutral tag sits between a Gas and a Brakes tag about half the time, and those two are
+   *     the ones a reader wants).
+   * What is withheld is counted in the caption, never dropped quietly — and the bar colours
+   * still show every flip, which is why a hidden word costs little. */
   const lineMarksHidden = [];
   const _markFrom = lwcViewFrom(LWCP.tf);
+  const onPrice = (marks.length && !marksHidden) ? marks.slice() : [];
+  if(PAINT && Array.isArray(PAINT[2].marks)){
+    const names = PAINT[2].markNames || ["tag", "mark"];
+    const seen = (a) => a.filter(m => bars[m.i].d >= _markFrom).length;
+    const mk = m => ({time: bars[m.i].d, position: m.above ? "aboveBar" : "belowBar",
+      color: m.color, shape: m.shape || (m.above ? "arrowDown" : "arrowUp"), text: m.text || ""});
+    const icons = PAINT[2].marks.filter(m => !m.tag);
+    if(seen(icons) > markCap) lineMarksHidden.push(`${seen(icons)} ${PAINT[1].label} ${names[1]}(s)`);
+    else icons.forEach(m => onPrice.push(mk(m)));
+    const tags = PAINT[2].marks.filter(m => m.tag);
+    const inView = Math.max(1, bars.filter(b => b.d >= _markFrom).length);
+    const gap = Math.max(1, Math.ceil(45 / ((host.clientWidth || 900) / inView)));
+    const kept = [];
+    for(const minor of [false, true])
+      tags.filter(m => !!m.minor === minor).sort((x, y) => y.i - x.i).forEach(m => {
+        if(kept.every(k => k.above !== m.above || Math.abs(k.i - m.i) >= gap)) kept.push(m); });
+    kept.forEach(m => onPrice.push(mk(m)));
+    const dropped = seen(tags) - seen(kept);
+    if(dropped) lineMarksHidden.push(`${dropped} of ${seen(tags)} ${PAINT[1].label} ${names[0]}(s) (the words would overlap)`);
+  }
+  if(onPrice.length) LightweightCharts.createSeriesMarkers(candles,
+    onPrice.sort((a, b) => a.time < b.time ? -1 : 1));
+  // marks carried by a line: same cap, counted per line
   for(const [s, ms, label] of LINEMARKS){
     const inView = ms.filter(m => bars[m.i].d >= _markFrom).length;
     if(inView > markCap){ lineMarksHidden.push(`${inView} ${label} mark(s)`); continue; }
@@ -3132,7 +3200,8 @@ async function techChart(el, tk, dailyBars){
     const foot = el.querySelector(".lwcfoot");
     if(foot) foot.insertAdjacentHTML("afterbegin",
       `<span class="amber">${esc(lineMarksHidden.join(", "))} hidden</span> — too dense to read at `
-    + `this range. Shorten the range or widen the bar interval to see them. `);
+    + `this range; the bar colours still show every change. Shorten the range or widen the bar `
+    + `interval to see them. `);
   }
   requestAnimationFrame(placeBoxes);
   chart.subscribeCrosshairMove(p => paint(p.time ? byDate[p.time] : bars[bars.length - 1]));
