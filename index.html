@@ -556,7 +556,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 20:00 · 295f7c5</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 20:58 · 9ffb7c4</div>
   </div>
 </section>
 
@@ -592,7 +592,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 20:00 · 295f7c5</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 20:58 · 9ffb7c4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -4047,7 +4047,8 @@ async function openName(tk){
   const sector = m.sector || (h && h.sector) || "";
 
   // ── 1 · thesis ────────────────────────────────────────────────────────────────────────────
-  const thesis = thesisBlock(tk, true, true);        // compact: the detail folds, nothing is dropped
+  // compact: the detail folds, nothing is dropped. A name with no thesis and a first one proposed shows the proposal.
+  const thesis = thesisBlock(tk, true, true) || (typeof thesisProposalBlock === "function" ? thesisProposalBlock(tk) : "");
   const g1 = (m.veto_reason ? `<div class="note" data-nofold style="margin:14px 0 0"><b>${m.veto === "EXIT" ? "Exit veto" : "Held down by a veto"}:</b> ${esc(m.veto_reason)}.</div>` : "")
     + (thesis || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")
               || (h ? `<div class="sec"><div class="gap"><b>No thesis is stored for this holding.</b> A held name with no locked thesis is held at grade C until one is locked.</div></div>` : ""))
@@ -6477,15 +6478,16 @@ function thesisProposalBlock(tk){
   const all = (LIVE.tprop || {})[tk] || [];
   const p = all.find(x => x.status === "PROPOSED"), last = all.find(x => x.status === "ACCEPTED" || x.status === "REJECTED");
   const txt = v => v == null ? "" : typeof v === "string" ? esc(v) : Object.entries(v).map(([k, x]) => `<b>${esc(k)}:</b> ${esc(x)}`).join(" · ");
-  const ruled = last ? `<p class="muted" style="font-size:var(--fs-sm)">Last ruling: a revision drafted against version ${last.based_on_version} was
+  const ruled = last ? `<p class="muted" style="font-size:var(--fs-sm)">Last ruling: ${last.based_on_version === 0 ? "a first thesis" : "a revision drafted against version " + last.based_on_version} was
       <b>${last.status === "ACCEPTED" ? "accepted as version " + last.accepted_version : "rejected"}</b> on ${esc(String(last.resolved_at || "").slice(0, 10))}${last.resolved_note ? ": " + esc(last.resolved_note) : ""}.</p>` : "";
   if(!p) return ruled ? `<div class="sec">${ruled}</div>` : "";
+  if(p.based_on_version === 0) return firstThesisBlock(tk, p) + (ruled ? `<div class="sec">${ruled}</div>` : "");
   const kinds = k => (p.checks || {})[k] || ["none"];
   const blind = Object.keys(p.checks || {}).filter(k => k[0] === "I" && kinds(k).join() === "none");
   return `<div class="sec" style="border-left:3px solid ${C.amber};padding-left:12px">
     <h4>A revision is proposed ${word("· not the thesis", "warn")}</h4>
     <p class="muted" style="font-size:var(--fs-sm)">Drafted ${esc(String(p.created_at).slice(0, 10))} by the thesis analyst against version ${p.based_on_version}.
-      The thesis below is unchanged until a person accepts this: <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>).</p>
+      The thesis below is unchanged until a person accepts this, on Today or with <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>).</p>
     ${p.rationale ? `<p><b>Why:</b> ${esc(p.rationale)}</p>` : ""}
     ${(p.notes || []).length ? `<p class="amber" style="font-size:var(--fs-sm)">${(p.notes || []).map(esc).join(" · ")}</p>` : ""}
     <details><summary>${(p.changes || []).length} change(s) against the current thesis</summary>
@@ -6497,6 +6499,35 @@ function thesisProposalBlock(tk){
            kinds(`I${i + 1}`).join() === "none" ? `<span class="amber">nothing collected nightly</span>` : esc(kinds(`I${i + 1}`).join(", ").replaceAll("_", " "))])])}</details>
     ${blind.length ? `<p class="muted" style="font-size:var(--fs-sm)">${blind.length} sell condition(s) (${blind.join(", ")}) could not be checked from anything collected nightly; "no sell condition met" would not cover them.</p>` : ""}
     ${ruled}</div>`;
+}
+/* A FIRST THESIS (2026-11-23): a name with no thesis, drafted by the analyst against version 0. There
+ * is nothing to compare it with, so it is shown whole, in the thesis's own layout, under a heading
+ * that says it is not one yet. Every risk and sell condition carries what could check it nightly. */
+function firstThesisBlock(tk, p){
+  const d = p.draft || {}, li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
+  const kinds = k => (p.checks || {})[k] || ["none"];
+  const chk = k => kinds(k).join() === "none" ? `<span class="amber">nothing collected nightly</span>` : esc(kinds(k).join(", ").replaceAll("_", " "));
+  return `<div class="sec" style="border-left:3px solid ${C.amber};padding-left:12px">
+    <h4>A first thesis is proposed ${word("· not a thesis yet", "warn")}</h4>
+    <p class="muted" style="font-size:var(--fs-sm)">Drafted ${esc(String(p.created_at).slice(0, 10))} by the thesis analyst from filed figures, the latest earnings call, the company's profile, estimates and three weeks of news.
+      ${esc(tk)} has no thesis until a person accepts this, on Today or with <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>). Accepting locks version 1 and buys nothing.</p>
+    ${p.rationale ? `<p><b>The analyst's note:</b> ${esc(p.rationale)}</p>` : ""}
+    ${(p.notes || []).length ? `<p class="amber" style="font-size:var(--fs-sm)">${(p.notes || []).map(esc).join(" · ")}</p>` : ""}
+    ${d.theme ? `<div class="caps" style="margin:10px 0 8px">${esc(d.theme)}</div>` : ""}
+    ${d.business ? `<p class="muted">${esc(d.business)}</p>` : ""}
+    <h4 style="margin-top:10px">The case for owning it</h4><p>${esc(d.catalyst?.summary)}</p><ul class="list">${li(d.catalyst?.drivers)}</ul>
+    <h4 style="margin-top:10px">Edge — why this company</h4><p>${esc(d.edge?.summary)}</p>
+    <ul class="list">${(d.edge?.vs_peers || []).map(v => `<li><b>vs ${esc(v.peer)}:</b> ${esc(v.advantage)}</li>`).join("")}</ul>
+    <h4 style="margin-top:10px">Risks — what would break it</h4>
+    ${tbl(["", "Risk", "Watch · trigger", "Checkable from"], (d.risks || []).map((r, i) => [`R${i + 1}`, esc(r.risk), `${esc(r.watch)}<div class="muted">${esc(r.trigger)}</div>`, chk(`R${i + 1}`)]))}
+    <h4 style="margin-top:10px">Sell if</h4>
+    ${tbl(["", "Sell condition", "Checkable from"], (d.invalidation || []).map((x, i) => [`I${i + 1}`, esc(x), chk(`I${i + 1}`)]))}
+    ${(d.upcoming || []).length ? `<h4 style="margin-top:10px">Upcoming</h4><ul class="list">${(d.upcoming || []).map(u => `<li>${esc(u.date)} — ${esc(u.event)}</li>`).join("")}</ul>` : ""}
+    <h4 style="margin-top:10px">Model view</h4><p class="muted">${esc(d.model_view)}</p>
+    ${d.confidence ? `<p class="muted"><b>Confidence:</b> ${esc(d.confidence)}</p>` : ""}
+    <details><summary>The ${(d.evidence || []).length} dated facts it rests on</summary><ul class="list">${(d.evidence || []).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.ref)}</span> — ${esc(e.fact)}</li>`).join("")}</ul></details>
+    ${(d.open_questions || []).length ? `<h4 style="margin-top:10px">What the evidence could not answer</h4><ul class="list">${li(d.open_questions)}</ul>` : ""}
+  </div>`;
 }
 let thesisSel = null;
 async function loadThesisWatch(){
@@ -6512,8 +6543,11 @@ async function theses(el){
   await loadThesisWatch();
   const T = Object.values(LIVE.theses), held = new Set(D.holdings.map(h => h.tk));
   const locked = T.filter(t => t.status === "LOCKED").length;
-  thesisSel = thesisSel && LIVE.theses[thesisSel] ? thesisSel : (T[0]||{}).ticker;
-  el.innerHTML = head("Research", "Theses", `<span class="muted">${locked} locked · ${T.length-locked} drafts awaiting review · Catalyst · Edge · Risk</span>`) +
+  // names with NO thesis and a first thesis waiting: listed first, because they are what is new
+  const firsts = Object.keys(LIVE.tprop || {}).filter(tk => !LIVE.theses[tk] && LIVE.tprop[tk].some(p => p.status === "PROPOSED" && p.based_on_version === 0)).sort();
+  const known = tk => LIVE.theses[tk] || firsts.includes(tk);
+  thesisSel = thesisSel && known(thesisSel) ? thesisSel : (firsts[0] || (T[0]||{}).ticker);
+  el.innerHTML = head("Research", "Theses", `<span class="muted">${locked} locked · ${T.length-locked} drafts awaiting review${firsts.length ? ` · ${firsts.length} first ${firsts.length === 1 ? "thesis" : "theses"} proposed` : ""} · Catalyst · Edge · Risk</span>`) +
     (() => { // what the monitor found, before the list: the names a person has to look at first
       const W = Object.values(LIVE.twatch || {}), rank = {REVIEW: 0, NO_THESIS: 1, WATCH: 2, UNASSESSED: 3, INTACT: 4};
       if(LIVE.twatchOk === false) return `<div style="margin-bottom:16px">` + card("Thesis watch", "", `<p class="amber">The monitor's readings did not load, so nothing can be said about them.</p>`) + `</div>`;
@@ -6534,12 +6568,15 @@ async function theses(el){
     })() +
     `<div class="grid g-1-2">` +
     card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
+      firsts.map(tk => `<tr data-tk="${esc(tk)}" style="cursor:pointer${tk===thesisSel?';background:rgba(106,166,248,.08)':''}">
+        <td><b>${esc(tk)}</b></td><td class="muted">${esc(((LIVE.tprop[tk].find(p => p.status === "PROPOSED") || {}).draft || {}).theme || "")}</td>
+        <td>${word("first thesis proposed", "warn")}</td><td></td></tr>`).join("") +
       T.sort((a,b) => (held.has(b.ticker)-held.has(a.ticker)) || a.ticker.localeCompare(b.ticker)).map(t => `<tr data-tk="${t.ticker}" style="cursor:pointer${t.ticker===thesisSel?';background:rgba(106,166,248,.08)':''}">
         <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted">${esc(t.theme||"")}</td>
         <td>${t.status === "LOCKED" ? word("locked", "dim") : word("draft", "bad")}</td>
         <td>${held.has(t.ticker) ? watchBadge(t.ticker) : ""}</td></tr>`).join("")
     }</tbody></table></div>`) +
-    card(thesisSel||"—", "", thesisBlock(thesisSel, true) || "<p class='muted'>No thesis yet.</p>") + `</div>`;
+    card(thesisSel||"—", "", thesisBlock(thesisSel, true) || thesisProposalBlock(thesisSel) || "<p class='muted'>No thesis yet.</p>") + `</div>`;
   el.querySelectorAll("tr[data-tk]").forEach(tr => tr.onclick = () => { thesisSel = tr.dataset.tk; theses(el); });
   el.querySelectorAll("[data-tw]").forEach(b => b.onclick = () => { thesisSel = b.dataset.tw; theses(el); });
 }
@@ -7204,8 +7241,8 @@ const Q_BTN_KIND = {
     ACT: ["Confirm", "bad", () => "The thesis is broken. The grade becomes D, and the grid and the proposal are rerun. Nothing is traded."],
     DECLINE: ["Dismiss", "", () => "The reading was wrong, or the condition was mis-specified. The grade is no longer held at C. The monitor reopens it only on evidence it has not shown before."]},
   thesis_revision: {
-    ACT: ["Accept", "ok", () => "Locks this revision as the next version of the thesis and retires the current one. Refused while a sell condition on the current thesis is open."],
-    DECLINE: ["Reject", "", () => "The locked thesis stays as it is. The weekly run does not draft this name again for 60 days."]}};
+    ACT: ["Accept", "ok", () => "Locks this draft as the next version of the thesis and retires the current one (version 1 for a name that has none; that buys nothing). Refused while a sell condition on the current thesis is open."],
+    DECLINE: ["Reject", "", () => "The locked thesis stays as it is (a name with none still has none). The weekly run does not draft this name again for 60 days."]}};
 const qBtn = (kind, ruling) => (Q_BTN_KIND[kind] && Q_BTN_KIND[kind][ruling]) || Q_BTN[ruling];
 // What a ruling is called once made: the two kinds with their own command have their own words.
 const Q_DONE = {sell_condition: {ACT: "Confirmed", DECLINE: "Dismissed"}, thesis_revision: {ACT: "Accepted", DECLINE: "Rejected"}};
@@ -7240,7 +7277,7 @@ function qActions(r){
       ${esc(String(x.result || "").split("\n").slice(0, 3).join(" "))}</div>` : "";
   const btns = ["ACT", "DECLINE", "DEFER"].map(k => { const [label, tone] = qBtn(r.kind, k);
     return `<button class="fbtn qb ${tone}${f && f.ruling === k ? " on" : ""}" data-qid="${r.id}" data-ruling="${k}" aria-expanded="${f && f.ruling === k ? "true" : "false"}">${esc(label)}</button>`; }).join("");
-  const more = r.kind === "thesis_revision" ? `<a class="muted" href="#theses" style="font-size:var(--fs-sm)">read what it changes</a>` : "";
+  const more = r.kind === "thesis_revision" ? `<a class="muted" href="#theses" style="font-size:var(--fs-sm)">${/first thesis/.test(r.title || "") ? "read the draft" : "read what it changes"}</a>` : "";
   const draft = QUI.draft[r.id] || "", n = draft.trim().length;
   const form = !f ? "" : `<div class="qform">
       <div class="qwhat"><b>${esc(qBtn(r.kind, f.ruling)[0])}.</b> ${esc(qBtn(r.kind, f.ruling)[2]())}</div>
