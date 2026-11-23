@@ -129,8 +129,8 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 .menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
 .mgrp{padding:9px 11px 3px;color:var(--dim);font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.13em;text-transform:uppercase}
 .menupanel a.on{color:var(--text);background:rgba(106,166,248,.15);box-shadow:inset 0 0 0 1px rgba(106,166,248,.28)}
-/* ⚠ THE TABS GET THEIR OWN ROW ON A DESKTOP. (Six tabs since V14; the measurement below is from
-   when there were nine and is why the rule exists.) With the brand, the as-of line, nine tabs, two group
+/* ⚠ THE TABS GET THEIR OWN ROW ON A DESKTOP. (Ten tabs and two group labels since 2026-11-23, about
+   900px; the measurement below is from when there were nine and is why the rule exists.) With the brand, the as-of line, nine tabs, two group
    labels, the build stamp, the health badge, Menu and Sign out sharing one row, a 1440px window
    showed five tabs: Signals was cut mid-word and Markets, Memo and Research sat off-screen in a
    strip whose scrollbar is hidden (measured 2026-11-17: 523px visible of 855px). A section nobody
@@ -244,8 +244,6 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .tbl.dense td.clip{overflow:hidden;text-overflow:ellipsis}
 .lock[aria-pressed="true"]{color:var(--text);border-color:var(--brand,var(--accent));background:var(--brand-soft,rgba(106,166,248,.12))}
 @media(max-width:700px){.tbl.stickfirst td:first-child .nm{max-width:96px}}   /* a pinned column must leave room to scroll past it */
-.pill{display:inline-block;font:500 var(--fs-xs) var(--mono);letter-spacing:.09em;text-transform:uppercase;
-  padding:2px 6px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);vertical-align:1px}
 .t td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
 /* A label/value table's LABEL wraps. With every cell nowrap, "Value at Risk 95% / 99% (daily)" could
    not break, so on a phone the Risk & ratios table stood 384px wide in a 342px card and pushed the
@@ -270,9 +268,13 @@ details.howto>.note{margin-top:8px}
 .tk{font-weight:700;letter-spacing:.01em}
 .nm{color:var(--dim);font-size:var(--fs-sm);max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .chip{display:inline-flex;align-items:center;gap:5px;font:500 var(--fs-sm) var(--mono);padding:3px 7px;border-radius:var(--r-sm);background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
-.chip.q1{color:var(--q1);border-color:rgba(106,166,248,.3)} .chip.q2{color:var(--q2);border-color:rgba(63,207,142,.3)}
-.chip.q3{color:var(--q3);border-color:rgba(239,100,100,.3)} .chip.q4{color:var(--q4);border-color:rgba(240,169,74,.3)}
-.chip.up{color:var(--green)} .chip.down{color:var(--red)} .chip.flat{color:var(--muted)}
+/* A BOXED BADGE IS ONE OF EIGHT SETS and is drawn only by badge() (see BADGES in the script). Every
+   other reading that used to wear a box (quad, trend, rotation, queue kind, a limit breach, "held")
+   is a WORD: the same text and tone, no box. build_live.py refuses to write a page that draws a
+   chip anywhere else. */
+.wd{white-space:nowrap} .wd.ok,.wd.up{color:var(--green)} .wd.warn{color:var(--amber)} .wd.bad,.wd.down{color:var(--red)}
+.wd.dim,.wd.flat{color:var(--muted)} .wd.q1{color:var(--q1)} .wd.q2{color:var(--q2)} .wd.q3{color:var(--q3)} .wd.q4{color:var(--q4)}
+.wd.lbl{font:600 var(--fs-xs) var(--mono);letter-spacing:.09em;text-transform:uppercase}
 .chip.bad{color:var(--red);border-color:rgba(239,100,100,.35)} .chip.warn{color:var(--amber);border-color:rgba(240,169,74,.35)} .chip.ok{color:var(--green);border-color:rgba(63,207,142,.3)}
 .bar{height:6px;border-radius:var(--r-xs);background:rgba(255,255,255,.06);width:84px;position:relative;overflow:hidden;display:inline-block;vertical-align:middle}
 .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-xs)}
@@ -303,7 +305,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 
 /* ── technical chart chrome (chart_lwc.js) ────────────────────────────────────
    Lightweight Charts draws a canvas and nothing else: every control here is ours. */
-.lwcbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.lwcbar{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .tfs,.lwcopts{display:flex;gap:3px;flex-wrap:wrap}
 .tfb,.indchip{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--line);
   border-radius:var(--r-sm);padding:4px 9px;font:500 var(--fs-sm) Inter,sans-serif;cursor:pointer;transition:color .13s,background-color .13s,border-color .13s}
@@ -316,8 +318,14 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 /* The Indicators and Signals menus: a panel under its button, each entry a name and one line.
    Until 2026-11-20 .lwcmenu had NO rule at all — the panel rendered as an unstyled block in the
    page flow, pushing the chart down when it opened. */
-.lwcmenuwrap{position:relative;display:inline-block}
-.lwcmenu{position:absolute;z-index:40;top:calc(100% + 6px);right:0;width:min(390px,90vw);max-height:480px;overflow:auto;
+/* ⚠ THE PANEL HANGS FROM THE TOOLBAR, NOT FROM ITS BUTTON (2026-11-23). It was positioned against
+   the button's own wrapper with right:0, so its left edge sat 390px to the left of wherever the
+   button happened to be. When the toolbar wrapped (any container under about 700px, which was every
+   name drawer) the button was at the left and the whole panel was outside its scrolling parent,
+   clipped: the menu opened and nothing appeared. Anchored to the toolbar's right edge and no wider
+   than the toolbar, it cannot leave the chart's own box whatever the toolbar does. */
+.lwcmenuwrap{display:inline-block}
+.lwcmenu{position:absolute;z-index:40;top:calc(100% + 6px);right:0;width:min(420px,100%);max-height:min(520px,70vh);overflow:auto;
   background:var(--panel-solid);border:1px solid var(--line2);border-radius:var(--r-md);padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
 .lwcmenu[hidden]{display:none}
 .lwcmhead{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 2px;font:700 var(--fs-md) Inter,sans-serif;color:var(--text)}
@@ -463,7 +471,11 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(3,5,8,.55);backdrop-filter:blur(2px);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
 .scrim.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(760px,100vw);background:#0d1118;border-left:1px solid var(--line2);z-index:41;transform:translateX(100%);overflow-y:auto;
+/* 1080px since 2026-11-23 (Niko: the chart's Indicators and Signals menus opened out of view). At
+   760px the chart's toolbar wrapped, its menu buttons landed at the left edge, and a panel hung from
+   a button's RIGHT edge ran off the drawer's left side, where overflow clips it. Wider, so the
+   toolbar stays on one row; the panel itself is now anchored to the toolbar (see .lwcmenu). */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(1080px,100vw);background:#0d1118;border-left:1px solid var(--line2);z-index:41;transform:translateX(100%);overflow-y:auto;
   /* ⚠ Closed = hidden, not just off-screen. Slid away with translateX alone, a drawer that had shown a
      name kept its links and chart buttons in the Tab order: keyboard users tabbed into controls they
      could not see. visibility:hidden drops it from the Tab order and the accessibility tree; the
@@ -478,6 +490,13 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .mini div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px}
 .mini b{display:block;font-size:var(--fs-lg);margin-top:4px;font-variant-numeric:tabular-nums}
 .sec{margin-top:22px}
+/* ONE DRAWER, ONE ORDER (2026-11-23): thesis, model read, chart, fundamentals, news and filings,
+   position. Each group has a heading, and the strip under the header jumps to it. */
+.dr-grp{margin:30px 0 -6px;padding-top:16px;border-top:1px solid var(--line2);font-size:var(--fs-lg);font-weight:600;color:var(--text);scroll-margin-top:12px}
+.dr-jump{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 2px}
+.dr-facts{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:8px;font-size:var(--fs-sm);color:var(--muted)}
+.pjump{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 16px}
+.pjump .caps{margin-right:4px}
 .sec h4{margin:0 0 9px;font:500 var(--fs-xs) var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
 .sec p{margin:0;color:#cdd3de;line-height:1.6}
 .sec ul{margin:0;padding-left:18px;color:#cdd3de} .sec li{margin:5px 0;line-height:1.5}
@@ -511,7 +530,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 14:00 · 599bc66</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 14:40 · dfddf77</div>
   </div>
 </section>
 
@@ -526,7 +545,13 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <a href="#today" data-v="today">Today</a>
       <a href="#book" data-v="book">Book</a>
       <a href="#buylist" data-v="buylist">Buy list</a>
+      <span class="navgrp">Research</span>
+      <a href="#universe" data-v="universe">Universe</a>
+      <a href="#theses" data-v="theses">Theses</a>
+      <a href="#signals" data-v="signals">Signals</a>
+      <span class="navgrp">Context</span>
       <a href="#market" data-v="market">Market</a>
+      <a href="#risk" data-v="risk">Risk</a>
       <a href="#evidence" data-v="evidence">Evidence</a>
       <a href="#reference" data-v="reference">Reference</a>
     </nav>
@@ -541,7 +566,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 14:00 · 599bc66</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 14:40 · dfddf77</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -874,7 +899,53 @@ const erCell = d => !d ? "—" : erNext(d) ? esc(d)
 const usd = (v, d=0) => v==null||isNaN(v) ? "—" : "$" + Number(v).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
 const cls = v => v==null ? "" : v>=0 ? "pos" : "neg";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-// A bare "Q3" in red on a name growing 39% reads as an error; the chip says what the quad means
+/* ═══ BADGES: EIGHT SETS, ONE FUNCTION (PROCESS_AUDIT_2026-11.md §6, 2026-11-23) ════════════════
+ * The page had about 25 badge vocabularies, each a boxed chip in its own colours: quad, two trend
+ * vocabularies, rotation state, queue kind, ruling, limit breaches, entry status, thesis document
+ * state, PASS/FAIL, "held", "current", score tier. A box on everything is a box on nothing.
+ *
+ * A BOX NOW MEANS ONE OF THESE EIGHT, and badge() is the only thing that draws one:
+ *   grade · action (four words) · thesis status · veto · brake state · evidence verdict ·
+ *   data freshness · alert level
+ * Everything else is word(): the same text and tone with no box. Nothing was removed from the page.
+ *
+ * ⚠ BADGES IS A REGISTRY, like HEDGED_ETFS and ANON_READABLE. badge() throws on a set that is not
+ * in it, and build_live.py refuses to write a page with a chip drawn anywhere but here, so a ninth
+ * boxed vocabulary costs an edit to this table and cannot arrive by accident.
+ * An unknown VALUE inside a known set is drawn under its own name, never dropped.
+ * Each entry: [label, tone ("ok" | "warn" | "bad" | ""), tooltip]. */
+const BADGES = {
+  grade:   {A: ["A", "ok"], B: ["B", ""], C: ["C", ""], D: ["D", "bad"]},
+  action:  {BUY_LIST: ["Buy list", "ok", "On the model's buy list: one of its highest-ranked names with no veto"],
+            HOLD: ["Hold", "", "Held, no veto against it, not in the list's top names. Nothing asks for a sale"],
+            REVIEW: ["Review", "warn", "A veto holds it down: a pillar score under its line, an open sell condition, or no locked thesis"],
+            EXIT: ["Exit", "bad", "The model's vetoes say exit: a confirmed sell condition, a composite under 5.0, or both pillar floors breached"]},
+  /* Green is for INTACT and nothing else: "not assessed" and "no thesis" used to fall through to the
+   * ok colour, which is a missing reading dressed as a clean one. */
+  thesis:  {INTACT: ["Intact", "ok"], WATCH: ["Watch", "warn"], REVIEW: ["Review", "bad"], BROKEN: ["Broken", "bad"],
+            UNASSESSED: ["Not assessed", ""], NO_THESIS: ["No thesis", "bad"]},
+  veto:    {REVIEW: ["Review veto", "warn", "A veto holds the grade at C"], EXIT: ["Exit veto", "bad", "A veto makes the grade a D"]},
+  brake:   {ACCELERATE: ["Accelerate", "ok"], RECOVERY: ["Recovery", ""], DETERIORATING: ["Deteriorating", "warn"], DEFENSIVE: ["Defensive", "bad"]},
+  verdict: {PREDICTIVE: ["Predictive", "ok", "The test found it: |t| of 2.5 or more with the same sign in both halves of the history"],
+            SUGGESTIVE: ["Suggestive", "warn", "|t| of 2.0 or more with the same sign in both halves. Not established"],
+            NOT_SHOWN: ["Not shown", "", "Tested, and the test did not support it"],
+            REFUTED: ["Refuted", "bad", "Tested, and the opposite held"],
+            UNTESTED: ["Untested", "", "No test has been possible or run"]},
+  fresh:   {STALE: ["Stale", "warn", "Not refreshed for the newest session"], RESTATED: ["Restated", "warn"],
+            UNKNOWN: ["?", "warn", "It did not load, so this is unknown"]},
+  alert:   {HIGH: ["High", "bad"], MEDIUM: ["Medium", "warn"], LOW: ["Low", ""]},
+};
+function badge(set, key, o = {}){
+  const S = BADGES[set];
+  if(!S) throw new Error(`badge: "${set}" is not one of the eight badge sets`);
+  if(key == null || key === "") return `<span class="muted">—</span>`;
+  const d = S[String(key).toUpperCase()] || [String(key), ""];
+  const tip = o.title ?? d[2] ?? "";
+  return `<span class="chip ${o.tone ?? d[1]}" data-set="${set}"${tip ? ` title="${esc(tip)}"` : ""}>${o.text ?? esc(d[0])}</span>`;
+}
+// Everything that is not one of the eight: plain text with a tone. `text` is trusted HTML.
+const word = (text, tone = "", title = "") => `<span class="wd ${tone}"${title ? ` title="${esc(title)}"` : ""}>${text}</span>`;
+// A bare "Q3" in red on a name growing 39% reads as an error; the word says what the quad means
 // where there is room (drawers), and keeps the short code with a tooltip in dense tables.
 // V13 (2026-11-18): the boxes keep their numbers. What they are built from is in D.method and is
 // spelled out in QUAD_MEANS, which every quad chip's tooltip carries — a label on new axes that
@@ -886,9 +957,9 @@ const QUAD_MEANS = () => ((typeof D !== "undefined" && D && D.method) || {}).qua
      Q4:"gross-profit growth below the universe, operating margin expanding"}
   : {Q1:"revenue and earnings both accelerating", Q2:"revenue accelerating, earnings compressing",
      Q3:"both decelerating", Q4:"revenue falling while EPS expands"};
-const qchip = (q, long = false) => q
-  ? `<span class="chip ${q.toLowerCase()}" title="${QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] + " — " + (QUAD_MEANS()[q] || "") : q}">${long && QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] : q}</span>`
-  : `<span class="chip" title="Quad not computed">—</span>`;
+const quadWord = (q, long = false) => q
+  ? word(long && QUAD_NAME[q] ? esc(q + " · " + QUAD_NAME[q]) : esc(q), q.toLowerCase(), QUAD_NAME[q] ? q + " · " + QUAD_NAME[q] + " — " + (QUAD_MEANS()[q] || "") : q)
+  : `<span class="muted" title="Quad not computed">—</span>`;
 
 /* ═══ size + factor cells (shared by the Grid and the Universe table) ═══════════════
    site_universe carries market cap and six factor percentiles for every active name. factor_scorer.py
@@ -982,15 +1053,12 @@ const TREND_LOOK = {
   BULLISH:   ["up",   "Track ▲ Bull",  "Track line (technical v2): timing context, not the grid's trend"],
   BEARISH:   ["down", "Track ▼ Bear",  "Track line (technical v2): timing context, not the grid's trend"],
 };
-const trendChip = t => { if(!t) return "—";
+const trendWord = t => { if(!t) return "—";
   const [cls, label, title] = TREND_LOOK[t] || ["flat", t, ""];
-  return `<span class="chip ${cls}" title="${title}" aria-label="${title.split(":")[0]}: ${label.replace(/^\S+ /, "")}">${label}</span>`; };
+  return `<span class="wd ${cls}" title="${title}" aria-label="${title.split(":")[0]}: ${label.replace(/^\S+ /, "")}">${label}</span>`; };
 const alignBar = (v, b) => { if(v==null) return "—"; const col = v>=65?C.green:v<35?C.red:C.accent;
   return `<span class="bar"><i style="width:${Math.max(3,Math.min(100,v))}%;background:${col}"></i></span> <span class="mono" style="font-size:var(--fs-sm);color:${col}">${v.toFixed(0)}</span>`; };
-/* Green is for INTACT and nothing else: "not assessed" and "no thesis" used to fall through to the
- * ok colour, which is a missing reading dressed as a clean one. */
-const THESIS_LBL = {INTACT:"Intact", WATCH:"Watch", REVIEW:"Review", BROKEN:"Broken", UNASSESSED:"Not assessed", NO_THESIS:"No thesis"};
-const thesisChip = s => !s ? `<span class="chip">—</span>` : `<span class="chip ${s==='BROKEN'||s==='REVIEW'||s==='NO_THESIS'?'bad':s==='WATCH'?'warn':s==='INTACT'?'ok':''}">${THESIS_LBL[s] || s}</span>`;
+const thesisBadge = (s, o) => badge("thesis", s, o);
 
 /* ═══ charts ═════════════════════════════════════════════════════════════ */
 const charts = [];
@@ -1244,7 +1312,7 @@ function about(el){
       <li>Leverage contained, capital spending not consuming the business</li>
       <li>Buybacks positive, valuation not extreme</li>
     </ul>
-    We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Buy list tab"} out of thousands listed. A new screen is
+    We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Universe tab"} out of thousands listed. A new screen is
     loaded every week or two${scr ? `; the one in use is dated ${esc(scr)}` : ""}. Every entry and exit
     is logged. A name is never dropped automatically: screen absence is surfaced for review, and holdings are exempt.`) +
   step(2, "The quadrant — growing faster than the field, and is the margin widening?", `
@@ -1337,7 +1405,7 @@ function about(el){
       <li><b>Turnover control</b> — a supported holding isn't sold merely for being outranked</li>
       <li><b>Drawdown limits</b> — the book is simulated over one year against two limits: the median path
           no worse than ${g1 ? num(g1.p50_limit * 100, 0) : "12"}% and the worst 1-in-20 path no worse than ${g1 ? num(g1.p95_limit * 100, 0) : "20"}%.
-          ${gateNow} A failure is reported as a breach on the Reference tab's risk detail; it does not trade anything.
+          ${gateNow} A failure is reported as a breach on the Risk tab; it does not trade anything.
           The book is also stress-tested against past crises and factor shocks</li>
     </ul>`) +
   step(9, "The thesis — and what would make us sell", `
@@ -1484,9 +1552,9 @@ async function signalsV2(el){
         <td>${usd(v.close,2)}</td>
         <td>${esc(m.grade || "\u2014")}</td>
         <td>${esc(m.quadrant || "\u2014")}</td>
-        <td>${trendChip(v.trend)}<div class="muted" style="font-size:var(--fs-xs)">${esc(v.trend_since||"")}</div></td>
+        <td>${trendWord(v.trend)}<div class="muted" style="font-size:var(--fs-xs)">${esc(v.trend_since||"")}</div></td>
         <td>${gbgCell(v.ticker, "D")}</td><td>${gbgCell(v.ticker, "W")}</td><td>${gbgFlipCell(v.ticker)}</td>
-        <td>${timingChip(v.timing, v.range_pos)}</td>
+        <td>${timingWord(v.timing, v.range_pos)}</td>
         <td class="mono" style="font-size:var(--fs-sm)">${usd(v.trade_low,2)} – ${usd(v.trade_high,2)}</td>
         <td class="mono" style="font-size:var(--fs-sm)">${usd(v.trend_low,2)} – ${usd(v.trend_high,2)}</td>
         <td>${num(v.rsi,0)} <span class="muted" style="font-size:var(--fs-xs)">${esc(v.rsi_regime||"")}</span></td>
@@ -1527,7 +1595,7 @@ async function signalsV2(el){
                 `<span class="muted">${esc((r.direction_prev||"").replaceAll("_"," ").toLowerCase())}</span>`,
                 `<span style="color:${c}">${esc(what)}</span>`,
                 pct(+r.high_chg,1), pct(+r.low_chg,1), pct(+r.width_chg,1),
-                timingChip(v.timing, v.range_pos)];
+                timingWord(v.timing, v.range_pos)];
       }))) + `</div>` : "") + `
   <div style="margin-top:16px">` + card("Universe technicals", `<span id="sigN"></span> \u00b7 <span id="sigSortNote" class="muted"></span>`,
     `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -3833,59 +3901,149 @@ async function gbgUniverseMaps(el){
   };
   draw();
 }
-/* ⚠ The two chart containers carry NO fixed height. techChart() renders its own chrome, chip row,
- * legend, a 420px canvas and a caption into whatever element it is given; the 340px and 360px
- * boxes these used to declare were sized for the old echarts canvas and clipped everything below
- * the plot. The class="chart" wrapper went with them for the same reason.
- */
 /* ═══ the name drawer — everything that opens when you click a ticker ═══════════════════════
  *
- * This file was chart_technical.js and held the chart as well. The chart moved to chart_lwc.js
- * (TradingView Lightweight Charts) and its computation to indicators.js; techSeries(), MARK and
- * earningsAvwap() live there now, unchanged. What is left is the drawer: the card, the header,
- * and openName(), which assembles the pillars, range bar, duration, fundamentals, card, thesis,
- * levels and last-signals blocks around whatever the chart draws.
+ * ONE DRAWER, ONE ORDER (PROCESS_AUDIT_2026-11.md §6, 2026-11-23). There were two: the holding drawer (openHolding) in
+ * the template (15 blocks, thesis first) and openName() here (11 blocks, chart first), with
+ * different content for the same company depending on which tab the click came from, and insiders
+ * shown twice in one of them. There is one now. A holding and an unheld name open the same drawer
+ * in the same order, and a holding has more in it (its thesis, its research and its position), never a
+ * different layout:
+ *
+ *   1  Thesis            the veto, the thesis and its conditions, what the company does
+ *   2  Model read        rank, grade and why, the vetoes, the pillars
+ *   3  Chart             the technical chart, risk ranges, levels, last signals
+ *   4  Fundamentals      filed figures and what moved, valuation duration, reported quarters
+ *   5  News and filings  guidance, what is ahead, what happened, insider filings (once)
+ *   6  Position          shares, cost, value                                    (holdings only)
+ *
+ * ⚠ EACH NUMBER ONCE. The old holding drawer repeated ROIC, FCF margin, net debt / EBITDA, FCF / EV
+ * and forward growth in a "Model read" grid directly above the Fundamentals table that carries the
+ * same figures with their history. They are in Fundamentals only. The research payload's
+ * "Insiders · 180 days" summary went the same way: the SEC Form 4 block is the one insider reading.
+ *
+ * ⚠ A GROUP WITH NOTHING IN IT IS NOT DRAWN, and a held name with no thesis says so in words: a
+ * blank where a thesis should be is the one gap this drawer must not hide.
+ *
+ * The two chart containers carry NO fixed height: techChart() renders its own chrome, chip row,
+ * legend, a 420px canvas and a caption into whatever element it is given.
+ * The chart itself is chart_lwc.js; its computation is indicators.js.
  */
-const techCard = (tk) => `<div class="card" style="padding:12px;margin-top:12px">
-  <div class="card-h"><div><h3>Technical setup</h3><div class="sub">trend line · risk-range bands · 52-week-low and earnings VWAP · T / B / R and TD markers</div></div></div>
-  <div id="drTech-${esc(tk)}"></div></div>`;
-async function drawTechCard(tk){
-  const el = document.getElementById(`drTech-${tk}`); if(!el) return;
-  const bars = await loadBars(tk);
-  if(bars.length) techChart(el, tk, bars);
+const DR_GROUPS = [["thesis", "Thesis"], ["model", "Model read"], ["chart", "Chart"], ["funda", "Fundamentals"],
+                   ["news", "News and filings"], ["position", "Position"]];
+// The model's read of one name, from its decision-grid row: the same cells for a holding and for a
+// name nobody owns. `gridOk` false = the grid could not be read, which is said, not shown as dashes.
+function modelReadBlock(m, gridOk){
+  if(!gridOk) return `<div class="sec"><div class="gap"><b>The decision grid could not be read.</b> So there is no rank, grade or veto to show for this name. This is a failed read, not a name without a reading.</div></div>`;
+  if(!m || !m.ticker) return `<div class="sec"><p class="muted">This name is not in the decision grid, so the model has no rank, grade or veto for it.</p></div>`;
+  const cellv = (label, v, tip = "") => `<div${tip ? ` title="${esc(tip)}"` : ""}><small>${label}</small><b>${v}</b></div>`;
+  const none = why => `<span class="muted" title="${esc(why)}">n/a</span>`;
+  return `<div class="sec"><div class="mtab">
+      ${cellv("Grade", m.grade ? esc(m.grade) + (m.grade_score != null ? ` <span class="muted" style="font-weight:400">· pct ${num(m.grade_score, 0)}</span>` : "") : "—",
+              "Percentile of QGS plus net buyback yield in the core universe, then the vetoes")}
+      ${cellv("QGS rank", m.qgs_universe_rank ?? none("No QGS rank: an input is missing"), "Place among every core company tracked, on Quality Growth Score")}
+      ${cellv("QGS × 10,000", m.qgs == null ? none("No QGS: an input is missing or not positive") : num(m.qgs * 1e4, 1), codeLbl("qgs_tier", m.qgs_tier))}
+      ${cellv("List rank", m.list_rank ?? (m.veto ? word("veto", "bad") : "—"), "Place among core names with a QGS rank and no veto; the first 25 are the buy list")}
+      ${cellv("QGS tier", esc(codeLbl("qgs_tier", m.qgs_tier)))}
+      ${cellv("Quality", esc(codeLbl("quality_profile", m.quality_profile)), "Six pass / fail quality indicators. A diagnostic, not a gate")}
+      ${cellv("Earnings quality", m.earnings_quality === "EPS_ENGINEERED" ? word(esc(codeLbl("earnings_quality", m.earnings_quality)), "bad") : esc(codeLbl("earnings_quality", m.earnings_quality)),
+              "Is EPS acceleration confirmed by gross profit? A prompt for scrutiny; it does not move the grade")}
+      ${cellv("Alignment", m.alignment == null ? "—" : num(m.alignment, 0), "Three-lens alignment score, 0 to 100. Shown for context; it selects nothing")}
+    </div>
+    ${m.grade_reason ? `<p style="margin-top:10px"><b>Why this grade:</b> ${esc(m.grade_reason)}</p>` : ""}
+    ${m.list_defer ? `<p class="amber" style="margin-top:6px">A new position waits: the name is in a 200-day downtrend. A holding is never sold on trend.</p>` : ""}
+  </div>` + pillarBlock(m);
 }
 async function openName(tk){
-  const v2 = LIVE.v2[tk] || {}, m = (LIVE.matrix||[]).find(r => r.ticker===tk) || {};
-  const held = D.holdings.some(h => h.tk===tk);
+  // The bell and the notes open a name from tabs that never loaded the grid. Load it here, so
+  // "could not be read" below only ever means a read that was tried and failed.
+  if(typeof ensureMatrix === "function") await ensureMatrix();
+  const gridOk = LIVE.matrixOk === true;
+  const v2 = LIVE.v2[tk] || {}, m = (LIVE.matrixBy || {})[tk] || (LIVE.matrix || []).find(r => r.ticker === tk) || {};
+  const h = D.holdings.find(x => x.tk === tk) || null, r = (h && h.research) || {}, g = r.guidance || {};
+  const name = h ? h.name : ((D.universe || []).find(u => u.tk === tk) || {}).name || ((LIVE.cards || {})[tk] || {}).company_name || "";
+  const sector = m.sector || (h && h.sector) || "";
+
+  // ── 1 · thesis ────────────────────────────────────────────────────────────────────────────
+  const thesis = thesisBlock(tk, true);
+  const g1 = (m.veto_reason ? `<div class="note" data-nofold style="margin:14px 0 0"><b>${m.veto === "EXIT" ? "Exit veto" : "Held down by a veto"}:</b> ${esc(m.veto_reason)}.</div>` : "")
+    + (thesis || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")
+              || (h ? `<div class="sec"><div class="gap"><b>No thesis is stored for this holding.</b> A held name with no locked thesis is held at grade C until one is locked.</div></div>` : ""))
+    + cardBlock(tk);
+  // ── 2 · model read ────────────────────────────────────────────────────────────────────────
+  const g2 = modelReadBlock(m, gridOk);
+  // ── 3 · chart ─────────────────────────────────────────────────────────────────────────────
+  const g3 = `<div class="card" style="padding:12px;margin-top:14px"><div id="nmChart"></div></div>` + rangeBar(v2)
+    + (v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
+        [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")
+    + (v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
+        .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "");
+  // ── 4 · fundamentals ──────────────────────────────────────────────────────────────────────
+  const g4 = fundaBlock(tk) + vdurBlock(tk)
+    + ((r.quarters||[]).length ? `<div class="sec"><h4>Reported results</h4><div class="chart sm" id="drQ"></div></div>` : "");
+  // ── 5 · news and filings ──────────────────────────────────────────────────────────────────
+  const g5 = ((g.statements||[]).length ? `<div class="sec"><h4>Management guidance${g.call?` · ${esc(g.call)}`:""}</h4><ul>${g.statements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : "")
+    + ((r.catalysts_ahead||[]).length || (r.risks_ahead||[]).length ? `<div class="grid g2" style="margin-top:4px">
+        ${(r.catalysts_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.green}">Catalysts ahead</h4><ul>${r.catalysts_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+        ${(r.risks_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.red}">Risks ahead</h4><ul>${r.risks_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+      </div>` : "")
+    + ((r.news||[]).length ? `<div class="sec"><h4>What happened · last two quarters</h4><div class="news">${r.news.slice(0,12).map(n=>
+        `<div class="${n.importance===1?'major':''}"><div class="d">${esc(n.date)} · ${esc(n.type)}${n.importance===1?' · major':''}</div><div class="h">${esc(n.headline)}</div><div class="w">${esc(n.why_it_matters)}</div></div>`).join("")}</div></div>` : "")
+    + insiderBlock(tk);
+  // ── 6 · position ──────────────────────────────────────────────────────────────────────────
+  const g6 = h ? `<div class="sec"><p class="muted mono" style="font-size:var(--fs-md)">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)} · ${pct(h.weight,1,false)} of the sleeve${h.sleeve ? " · " + esc(h.sleeve) : ""}</p></div>` : "";
+
+  const body = {thesis: g1, model: g2, chart: g3, funda: g4, news: g5, position: g6};
+  const shown = DR_GROUPS.filter(([k]) => body[k]);
+  // What the name is, in words. The boxed badges above this line are the action, the grade, the
+  // thesis status and the veto; everything else about it is a plain fact.
+  const facts = [h ? `held · ${pct(h.weight,1,false)} of the sleeve` : "not held",
+                 m.trend ? trendWord(m.trend) : "", m.quadrant ? quadWord(m.quadrant, true) : "",
+                 m.list_defer ? word("new entry waiting: 200-day downtrend", "warn") : ""].filter(Boolean);
   document.getElementById("drIn").innerHTML = `
-    <div class="dr-top"><div><div class="caps">${esc(m.sector||"")}</div><h2>${esc(tk)}</h2>
+    <div class="dr-top"><div><div class="caps">${esc(sector)}${h && h.sleeve ? " · " + esc(h.sleeve) : ""}</div>
+      <h2>${esc(tk)}${name ? ` <span class="muted" style="font-weight:500;font-size:var(--fs-lg)">${esc(name)}</span>` : ""}</h2>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-        ${m.list_action ? listActChip(m.list_action, m.veto_reason) : ""}${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${trendChip(m.trend)}${qchip(m.quadrant, true)}
-        ${held?'<span class="chip">held</span>':""}${m.list_defer ? '<span class="chip warn" title="A new position waits while the name is in a 200-day downtrend">entry waiting</span>' : ""}</div></div>
+        ${m.list_action ? actionBadge(m.list_action, m.veto_reason) : ""}${m.grade ? badge("grade", m.grade, {text: "Grade " + esc(m.grade), title: m.grade_reason || ""}) : ""}${
+          h ? thesisBadge(h.thesis_status, {text: "Thesis: " + esc((BADGES.thesis[h.thesis_status] || [h.thesis_status || "no status"])[0])}) : ""}${
+          m.veto ? badge("veto", m.veto, {title: m.veto_reason || ""}) : ""}</div>
+      <div class="dr-facts">${facts.map(f => `<span>${f}</span>`).join("")}</div></div>
       <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
-      <div><span class="caps">Price</span><b>${usd(v2.close,2)}</b></div>
-      <div><span class="caps">QGS rank</span><b>${m.qgs_universe_rank ?? "—"}</b></div>
-      <div><span class="caps">List rank</span><b title="${esc(m.veto_reason || "Place among core names with a QGS rank and no veto; the first 25 are the buy list")}">${m.list_rank ?? (m.veto ? "veto" : "—")}</b></div>
-      <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
+      <div><span class="caps">Price</span><b>${usd(v2.close ?? (h && h.price), 2)}</b></div>
+      <div><span class="caps">QGS rank</span><b>${!gridOk ? "?" : m.qgs_universe_rank ?? "—"}</b></div>
+      <div><span class="caps">List rank</span><b title="${esc(m.veto_reason || "Place among core names with a QGS rank and no veto; the first 25 are the buy list")}">${!gridOk ? "?" : m.list_rank ?? (m.veto ? "veto" : "—")}</b></div>
+      <div><span class="caps">Composite</span><b class="${m.composite != null && +m.composite < 6.5 ? "neg" : ""}">${num(m.composite ?? (h && h.comp))}</b></div>
+      ${h ? `<div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
+      <div><span class="caps">P&amp;L</span><b class="${cls(h.pl)}">${pct(h.pl)}</b></div>
+      <div><span class="caps">Next earnings</span><b style="font-size:var(--fs-base)">${erCell(h.next_er)}</b></div>
+      <div><span class="caps">Value</span><b>${usd(h.value)}</b></div>` : ""}
     </div>
-    ${m.veto_reason ? `<div class="note" data-nofold style="margin:10px 0"><b>${m.veto === "EXIT" ? "Exit veto" : "Held down by a veto"}:</b> ${esc(m.veto_reason)}.</div>` : ""}
-    ${held ? thesisBlock(tk, true) + cardBlock(tk) : ""}
-    ${pillarBlock(m)}
-    <div class="card" style="padding:12px"><div id="nmChart"></div></div>
-    ${rangeBar(v2)}${vdurBlock(tk)}${fundaBlock(tk)}${held ? "" : cardBlock(tk) + thesisBlock(tk, true)}
-    ${(v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
-      [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")}
-    ${(v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
-      .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "")}`;
+    <div class="dr-jump" role="navigation" aria-label="Sections of this name">${shown.map(([k, label]) => `<button class="fbtn" data-jump="dr-${k}">${label}</button>`).join("")}</div>
+    ${shown.map(([k, label]) => `<div class="dr-grp" id="dr-${k}">${label}</div>${body[k]}`).join("")}`;
+  const dr = document.getElementById("drawer");
+  document.getElementById("drIn").querySelectorAll("[data-jump]").forEach(b => b.onclick = () => {
+    const t = document.getElementById(b.dataset.jump); if(t && t.scrollIntoView) t.scrollIntoView({block: "start", behavior: "smooth"}); });
   document.getElementById("scrim").classList.add("on");
-  document.getElementById("drawer").classList.add("on");
+  dr.classList.add("on");
   drawerOpened(tk);
   loadFundaHist(tk);                      // fills the Change column once the history arrives
   loadVdurHist(tk);                       // fills the visible-share history once it arrives
-  document.getElementById("drawer").scrollTop = 0;
+  dr.scrollTop = 0;
+  const q = r.quarters || [];
+  if(q.length) setTimeout(() => { const el = document.getElementById("drQ"); if(!el) return;
+    const qq = [...q].reverse();
+    mk(el, {
+      grid:{left:56,right:44,top:24,bottom:26}, legend:{top:0,right:0,textStyle:{color:C.muted},itemWidth:10,itemHeight:6},
+      xAxis:axX({type:"category",data:qq.map(x=>x.period||x.date)}),
+      yAxis:[axY({type:"value",axisLabel:{color:C.dim,fontSize:11,formatter:v=>v>=1e9?"$"+(v/1e9).toFixed(1)+"B":"$"+(v/1e6).toFixed(0)+"M"}}),
+             axY({type:"value",splitLine:{show:false},axisLabel:{color:C.dim,fontSize:11,formatter:v=>"$"+v.toFixed(2)}})],
+      tooltip:{trigger:"axis"},
+      series:[{name:"Revenue",type:"bar",barWidth:"42%",data:qq.map(x=>x.revenue),itemStyle:{color:"rgba(106,166,248,.55)",borderRadius:[4,4,0,0]}},
+              {name:"EPS",type:"line",yAxisIndex:1,data:qq.map(x=>x.eps),symbolSize:7,lineStyle:{color:C.gold,width:2},itemStyle:{color:C.gold}}]
+    }); }, 40);
   const bars = await loadBars(tk);
-  if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
+  if(bars.length) setTimeout(() => { const el = document.getElementById("nmChart"); if(el && _drawerTk === tk) techChart(el, tk, bars); }, 60);
 }
 /* ═══ MARKET SIGNALS (db/089, scripts/market_dashboard.py) and KEITH (scripts/keith.py) ══════════
  * Broad-market indicators, rebuilt nightly, each carrying the VERDICT of a 25-year test of whether
@@ -3950,12 +4108,13 @@ function msCard(r, newest){
     : `<p class="muted" style="font-size:var(--fs-sm)">Not in a state that has predicted. It would matter when ${waits.map(([_f, s]) => esc(s.text)).join(", or ")}.</p>`;
   return `<div class="card" style="padding:12px">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap">
-      <b>${esc(r.name)}</b><span class="chip ${on.length && r.verdict !== "NOT_SHOWN" ? vc : ""}" title="${esc(vt)}">${vl}${on.length && r.verdict !== "NOT_SHOWN" ? " · active" : ""}</span></div>
+      <b>${esc(r.name)}</b>${badge("verdict", shown, {tone: on.length && r.verdict !== "NOT_SHOWN" ? vc : "", title: vt,
+        text: vl + (on.length && r.verdict !== "NOT_SHOWN" ? " · active" : "")})}</div>
     <div style="display:flex;gap:14px;align-items:baseline;margin:4px 0 6px;flex-wrap:wrap">
       <span style="font-size:var(--fs-xl,20px);font-weight:700">${msFmt(r.value, r.unit)}</span>
       <span class="muted" style="font-size:var(--fs-sm)">${r.pct == null ? "no percentile yet" : "higher than " + Math.round(r.pct * 100) + "% of its own history"}
         ${r.change_21 == null ? "" : " · 21 sessions " + msFmt(r.change_21, r.unit === "share" ? "return" : r.unit === "sessions" ? "sessions" : "points")}</span>
-      ${r.as_of && newest && r.as_of < newest ? `<span class="chip warn" title="This input was not refreshed for the newest session">as of ${esc(r.as_of)}</span>` : ""}</div>
+      ${r.as_of && newest && r.as_of < newest ? badge("fresh", "STALE", {text: "as of " + esc(r.as_of), title: "This input was not refreshed for the newest session"}) : ""}</div>
     ${msChart(r.chart, r.unit)}${state}
     <div class="muted" style="font-size:var(--fs-xs)">${esc(r.description || "")}</div></div>`;
 }
@@ -4076,8 +4235,9 @@ function _ytd(bars){
  * as "no reading", never as neutral. Rotation is what HAS been rewarded, not a forecast. */
 const ROT_STATE = {LEADING: ["Leading", "ok"], IMPROVING: ["Improving", "ok"], WEAKENING: ["Weakening", "warn"],
                    LAGGING: ["Lagging", "bad"], NEUTRAL: ["Neutral", ""]};
-const rotChip = (s, turned, prev) => !s ? `<span class="muted" title="Under 63 sessions of history">no reading</span>`
-  : `<span class="chip ${ROT_STATE[s][1]}" title="${turned ? "Crossed from " + esc((ROT_STATE[prev] || [prev])[0]) + " in the last five sessions" : "Five sessions ago: " + esc((ROT_STATE[prev] || [prev || "no reading"])[0])}">${ROT_STATE[s][0]}${turned ? " · turned" : ""}</span>`;
+const rotWord = (s, turned, prev) => !s ? `<span class="muted" title="Under 63 sessions of history">no reading</span>`
+  : word((ROT_STATE[s] || [esc(s)])[0] + (turned ? " · turned" : ""), (ROT_STATE[s] || ["", ""])[1],
+         turned ? "Crossed from " + (ROT_STATE[prev] || [prev])[0] + " in the last five sessions" : "Five sessions ago: " + (ROT_STATE[prev] || [prev || "no reading"])[0]);
 const rotPts = (v, dp = 1) => v == null ? `<span class="muted">—</span>`
   : `<span style="color:${v > 0 ? C.green : v < 0 ? C.red : C.muted}">${v > 0 ? "+" : ""}${(v * 100).toFixed(dp)}</span>`;
 function rotationNote(row, anchor){
@@ -4102,15 +4262,15 @@ async function rotationCard(el){
   const grp = g => rows.filter(r => r.grp === g).sort((a, b) => (a.rank21 ?? 99) - (b.rank21 ?? 99));
   const w = v => v == null ? `<span class="muted">—</span>` : (v * 100).toFixed(1) + "%";
   const sect = tbl(["Sector", "State", "5d", "21d", "63d", "Book", "vs SPY", "Effect"], grp("sector").map(r => { const s = bySec[r.name] || {}; return [
-    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev),
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotWord(r.state, r.turned, r.state_prev),
     rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63), s.book_weight ? w(s.book_weight) : `<span class="muted">not held</span>`,
     s.active_weight == null ? `<span class="muted">—</span>` : rotPts(s.active_weight), s.tailwind_21 == null ? `<span class="muted">—</span>` : rotPts(s.tailwind_21, 2)]; }));
   const fact = tbl(["Factor", "State", "5d", "21d", "63d", "Book's active beta", "Effect"], grp("factor").map(r => { const f = byFac[r.name] || {}; return [
-    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev),
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotWord(r.state, r.turned, r.state_prev),
     rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63), f.active_beta == null ? `<span class="muted">—</span>` : (+f.active_beta).toFixed(2),
     f.tailwind_21 == null ? `<span class="muted">—</span>` : rotPts(f.tailwind_21, 1)]; }));
   const theme = tbl(["Theme", "State", "5d", "21d", "63d"], grp("theme").map(r => [
-    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev), rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63)]));
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotWord(r.state, r.turned, r.state_prev), rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63)]));
   const spr = (bk.spreads || []).length ? tbl(["Spread", "5d", "21d", "63d"], bk.spreads.map(s => [esc(s.spread), rotPts(s.d5), rotPts(s.d21), rotPts(s.d63)])) : "";
   const rec = B.recorded_21, st = B.capital_by_sector_state || {};
   const kpi = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0">
@@ -4223,7 +4383,7 @@ async function markets(el){
 /* ═══ timing (technical v2) ═══════════════════════════════════════════════ */
 const TIMING_COL = {BUY_ZONE:C.green, ACCUMULATE_OK:"#5fbf8f", NEUTRAL:C.muted, WAIT_FOR_LOW_END:C.amber,
                     TRIM_ZONE:C.amber, AVOID_EXTENDED:C.red, NO_DATA:C.dim};
-const timingChip = (t, pos) => { if(!t) return "—";
+const timingWord = (t, pos) => { if(!t) return "—";
   const why = timingWhy(t, pos);
   return `<span style="white-space:nowrap"><span style="color:${TIMING_COL[t]||C.text}"${why ? ` title="No timing zone qualified: ${why === "mid-range" ? "price is in the middle of its range" : "price is in the lower half of its range but below the VWAP anchored at its 52-week low"}"` : ""}>${esc(timingLbl(t))}</span>${
     pos!=null?` <span class="muted">${Math.round(pos*100)}%</span>`:""}${why ? ` <span class="muted" style="font-size:var(--fs-xs)">· ${why}</span>` : ""}</span>`; };
@@ -4338,7 +4498,7 @@ function rangeBar(v2){
       ${v2.above_earnings_avwap == null ? "no earnings anchor" :
         (v2.above_earnings_avwap ? "above" : "below") + " the VWAP since earnings " + esc(v2.earnings_anchor) +
         " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>
-    ${rangeMove(v2.ticker)}${insiderBlock(v2.ticker)}`;
+    ${rangeMove(v2.ticker)}`;
 }
 
 /* ═══ GRID (decision matrix, live) ═════════════════════════════════════════ */
@@ -4542,7 +4702,7 @@ function pillarBlock(m){
              : comp >= 5 ? "WATCHLIST — under the 6.5 line" : "DNQ — under 5.0";
   const anchors = [["Moat durability", m.p1_moat], ["Economics (ROIC level)", m.p1_economics],
                    ["Reinvestment quality", m.p1_reinvestment]].filter(([,v]) => v != null);
-  return `<div class="sec"><h4>Pillars${m.score_tier ? ` <span class="chip">${esc(codeLbl("score_tier", m.score_tier))}</span>` : ""}</h4>
+  return `<div class="sec"><h4>Pillars${m.score_tier ? ` <span class="muted">· ${esc(codeLbl("score_tier", m.score_tier))}</span>` : ""}</h4>
     ${tbl(["Pillar","Weight","Score","Floor"], [
       ["<b>P1</b> Business quality", "40%", cell(m.p1, false), note(m.p1, false)],
       ["<b>P2</b> Management",       "35%", cell(m.p2, true),  note(m.p2, true)],
@@ -5108,7 +5268,7 @@ async function grid(el){
     document.getElementById("gridRows").innerHTML = shown.map(r => {
       const u = LIVE.suniv[r.ticker] || null, tag = r.universe_tag;
       const cell = {
-        ticker: `<td><b>${esc(r.ticker)}</b>${r.held?' <span class="pill">held</span>':""}</td>`,
+        ticker: `<td><b>${esc(r.ticker)}</b>${r.held ? " " + word("held", "dim lbl") : ""}</td>`,
         grade: `<td title="${esc(r.grade_reason || "")}">${r.grade}</td>`,
         grade_score: `<td title="${esc(r.grade_score == null && r.grade_reason ? String(r.grade_reason).split(";")[0] : r.grade_basis || "")}">${r.grade_score == null ? "—" : num(r.grade_score, 0)}</td>`,
         qgs: qgsCell(r), qgs_universe_rank: qgsRankCell(r),
@@ -5119,9 +5279,9 @@ async function grid(el){
         gbg_flip: `<td>${gbgFlipCell(r.ticker)}</td>`,
         action: `<td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>`,
         list_rank: `<td>${r.list_rank == null ? `<span class="muted" title="${esc(r.veto_reason ? "Held down by a veto" : "No QGS rank, or not a core name")}">—</span>` : r.list_rank}</td>`,
-        list_action: `<td>${listActChip(r.list_action, r.veto_reason)}${r.list_defer ? ` <span class="muted" style="font-size:var(--fs-xs)" title="A new position waits while the name is in a 200-day downtrend">waiting</span>` : ""}</td>`,
+        list_action: `<td>${actionBadge(r.list_action, r.veto_reason)}${r.list_defer ? ` <span class="muted" style="font-size:var(--fs-xs)" title="A new position waits while the name is in a 200-day downtrend">waiting</span>` : ""}</td>`,
         veto_reason: clip(r.veto_reason, 220),
-        timing: `<td>${timingChip(r.timing, r.range_pos)}</td>`,
+        timing: `<td>${timingWord(r.timing, r.range_pos)}</td>`,
         range_pos: `<td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>`,
         guidance: clip(r.guidance, 260),
         quadrant: `<td title="${esc(codeLbl("quad", r.quadrant))}">${esc(r.quadrant||"—")}</td>`,
@@ -5130,7 +5290,7 @@ async function grid(el){
         p1: `<td>${pillarCell(r, "p1")}</td>`, p2: `<td>${pillarCell(r, "p2")}</td>`, p3: `<td>${pillarCell(r, "p3")}</td>`,
         implied_cagr: `<td>${impliedCell(r.ticker)}</td>`, vis_pct: `<td>${visCell(r.ticker)}</td>`,
         rate_beta: `<td>${rateCell(r.ticker)}</td>`,
-        trend: `<td>${trendChip(r.trend)}</td>`,
+        trend: `<td>${trendWord(r.trend)}</td>`,
         sector: clip(r.sector, 190),
         alignment: `<td>${num(r.alignment, 0)}</td>`,
         f_profile: `<td class="muted" style="font-size:var(--fs-sm)">${esc(profileLabel((u||{}).factor_profile))}</td>`,
@@ -5240,7 +5400,7 @@ async function risk(el, title="Risk"){
   if(!R){ el.innerHTML = sectionHead(title, toggle) + card("No data", "", "Risk has not been computed for this book yet."); bindRisk(el); return; }
   const m = R.metrics||{}, mc = (R.monte_carlo||{}).drawdown_1y||{}, co = R.concentration||{}, rc = R.risk_contrib||{};
   const passTag = ok => ok == null ? `<span class="muted">not measured</span>`
-    : `<span class="chip ${ok ? "ok" : "bad"}">${ok ? "PASS" : "FAIL"}</span>`;
+    : word(ok ? "PASS" : "FAIL", (ok ? "ok" : "bad") + " lbl");
   const gates = R.gate_breaches || [];
   el.innerHTML = sectionHead(title, `${toggle} <span class="muted">as of ${R.as_of}</span>`) +
   `<div class="kpis">
@@ -5299,7 +5459,7 @@ async function proposal(el){
     by(s).length ? tbl(["Ticker","List rank","Grade","Action","Composite","Sector","Reason"],
       by(s).sort((a,b) => rank(a) - rank(b) || (a.ticker > b.ticker ? 1 : -1)).map(r => [`<b>${esc(r.ticker)}</b>`,
         mx(r.ticker).list_rank ?? `<span class="muted">—</span>`, r.grade||"—",
-        LIVE.matrixOk ? listActChip(mx(r.ticker).list_action, mx(r.ticker).veto_reason) : `<span class="muted" title="The decision grid could not be read">?</span>`,
+        LIVE.matrixOk ? actionBadge(mx(r.ticker).list_action, mx(r.ticker).veto_reason) : `<span class="muted" title="The decision grid could not be read">?</span>`,
         num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`]))
     : `<div class="muted">None.</div>`);
   el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · what the model would do to the book, inside the sector cap and the correlation limit · a proposal, not orders</div>` +
@@ -5447,11 +5607,11 @@ function regimeStrip(){
   const R = (typeof LIVE !== "undefined" && LIVE.regime) || [], F = (typeof LIVE !== "undefined" && LIVE.pfrag) || [];
   if(!R.length && !F.length) return "";
   const r = R[R.length-1], f = F[F.length-1], SC = REGIME_C();
-  const cell = (lbl, val, col) => `<span style="display:inline-flex;gap:6px;align-items:baseline">
+  const cell = (lbl, val, col, after = "") => `<span style="display:inline-flex;gap:6px;align-items:baseline">
     <span class="muted" style="font-size:var(--fs-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase">${lbl}</span>
-    <b style="${col ? `color:${col}` : ""}">${val}</b></span>`;
+    <b style="${col ? `color:${col}` : ""}">${val}</b>${after}</span>`;
   const bits = [];
-  if(r) bits.push(cell("Market", `${(+r.mfi).toFixed(1)} · ${esc(r.state)}`, SC[r.state] || C.text),
+  if(r) bits.push(cell("Market", (+r.mfi).toFixed(1), SC[r.state] || C.text, badge("brake", r.state, {title: "The brake's state, from the market fragility index"})),
                   cell("Protection budget", pct(+r.protection_budget_pct,1,false), SC[r.state] || C.text),
                   cell("Cost of cover", esc(codeLbl("cost", r.cost_state)), r.cost_state==="CHEAP"?C.green:r.cost_state==="DEAR"?C.red:C.text));
   const bg = (typeof LIVE !== "undefined" && LIVE.bridge) || null;
@@ -5614,7 +5774,7 @@ function brakeCard(){
      ${tbl(["Model", ...keys.flatMap(k => [`CAGR · ${esc(B[k].basket.screen_date)}`, "Max drawdown", "Cost/pt"])], rows)}
      <h4 style="margin:14px 0 7px;font-size:var(--fs-sm);font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">How hard to brake · Balanced, ${esc(B[keys[keys.length-1]].basket.screen_date)} basket</h4>
      ${tbl(["Equity in DEFENSIVE","CAGR","Sharpe","Max drawdown","Given up","Saved","Cost/pt"],
-        sens.map(x => [`${(+x.multiplier*100).toFixed(0)}%${Math.abs(+x.multiplier - 0.60) < 1e-9 ? ' <span class="chip">current</span>' : ""}`,
+        sens.map(x => [`${(+x.multiplier*100).toFixed(0)}%${Math.abs(+x.multiplier - 0.60) < 1e-9 ? " " + word("current", "dim lbl") : ""}`,
           pp(x.cagr_pct), (+x.sharpe).toFixed(2), `${(+x.max_drawdown_pct).toFixed(1)}%`,
           `${(+x.return_given_up_pp).toFixed(2)}pp`, `${(+x.drawdown_saved_pp).toFixed(1)}pp`,
           x.cost_per_point == null ? "—" : (+x.cost_per_point).toFixed(2)]))}
@@ -6098,17 +6258,15 @@ function plainBlock(t, badge){
  * ⚠ THREE THINGS THAT MUST NOT LOOK LIKE "FINE": a row that failed to load ("?"), a name the
  * monitor has no row for, and "could not assess" — which is the answer whenever the evidence had
  * nothing bearing on an item, and is shown in its own colour rather than left blank. */
-const TW_COL = {INTACT: "ok", WATCH: "warn", REVIEW: "bad", UNASSESSED: "", NO_THESIS: "bad"};
-const TW_LBL = {INTACT: "Intact", WATCH: "Watch", REVIEW: "Review", UNASSESSED: "Not assessed", NO_THESIS: "No thesis"};
 const TV_LBL = {NOT_TRIGGERED: "Not triggered", APPROACHING: "Approaching", TRIGGERED: "Triggered", CANNOT_ASSESS: "Could not assess"};
 const _twColor = v => v === "TRIGGERED" ? C.red : v === "APPROACHING" ? C.amber : v === "NOT_TRIGGERED" ? C.green : C.muted;
-function twChip(tk){
-  if(LIVE.twatchOk === false) return `<span class="chip warn" title="The thesis-watch rows did not load, so this is unknown">?</span>`;
+function watchBadge(tk){
+  if(LIVE.twatchOk === false) return badge("fresh", "UNKNOWN", {title: "The thesis-watch rows did not load, so this is unknown"});
   const w = (LIVE.twatch || {})[tk];
   if(!w) return `<span class="muted" title="Not a holding, or not read yet: the monitor reads held names only">—</span>`;
   const inv = (w.invalidation_met || []).length;
-  return `<span class="chip ${TW_COL[w.status] || ""}" title="${esc(w.assessed + " of " + w.items + " items assessed · as of " + w.as_of)}">${
-    esc(TW_LBL[w.status] || w.status)}${inv ? " · sell condition met" : ""}</span>`;
+  return badge("thesis", w.status, {title: w.assessed + " of " + w.items + " items assessed · as of " + w.as_of,
+    text: esc((BADGES.thesis[w.status] || [w.status])[0]) + (inv ? " · sell condition met" : "")});
 }
 function thesisWatchBlock(tk){
   const w = (LIVE.twatch || {})[tk];
@@ -6137,7 +6295,7 @@ function thesisWatchBlock(tk){
         <div class="muted" style="font-size:var(--fs-sm)">${esc(what[2])}${s.resolved_note ? " Decision: " + esc(s.resolved_note) : ""}</div>
         ${(s.evidence || []).map(e => `<div class="muted" style="font-size:var(--fs-xs)">[${esc(e.date || "undated")}] ${esc(String(e.text || "").slice(0, 260))}</div>`).join("")}</div>`; }).join("") + `</div>`;
   const head = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <span class="chip ${TW_COL[w.status] || ""}">${esc(TW_LBL[w.status] || w.status)}</span>
+      ${badge("thesis", w.status)}
       <span class="muted">${w.assessed} of ${w.items} items could be assessed · ${w.triggered} triggered · ${w.approaching} approaching · as of ${esc(w.as_of)}${
         w.carried ? ` · evidence unchanged since it was last read on ${esc(w.assessed_on || "—")}` : ""}</span></div>`;
   const alerts = latchHTML
@@ -6152,8 +6310,9 @@ function thesisWatchBlock(tk){
 }
 function thesisBlock(tk, full=false){
   const t = LIVE.theses[tk]; if(!t) return "";
-  const badge = t.status === "LOCKED" ? `<span class="chip">LOCKED v${t.version}</span>` : `<span class="chip bad">DRAFT v${t.version} · not yet reviewed</span>`;
-  const plain = plainBlock(t, badge);
+  // The document's own state (locked or a draft) is a word beside the heading, not a badge.
+  const docState = t.status === "LOCKED" ? word(`· locked v${t.version}`, "dim") : word(`· draft v${t.version} · not yet reviewed`, "bad");
+  const plain = plainBlock(t, docState);
   // The plain version is what people read; the full Catalyst · Edge · Risk record is the process
   // document (every risk carries a watch metric and a trigger) and sits behind a toggle.
   const li = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
@@ -6172,7 +6331,7 @@ function thesisBlock(tk, full=false){
     ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}
   </div>`;
   const watch = thesisProposalBlock(tk) + thesisWatchBlock(tk);
-  if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${badge}</h4>`);
+  if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${docState}</h4>`);
   return watch + plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
 }
 /* A PROPOSED THESIS REVISION (db/088, scripts/thesis_analyst.py). A model drafted it; it is NOT the
@@ -6189,7 +6348,7 @@ function thesisProposalBlock(tk){
   const kinds = k => (p.checks || {})[k] || ["none"];
   const blind = Object.keys(p.checks || {}).filter(k => k[0] === "I" && kinds(k).join() === "none");
   return `<div class="sec" style="border-left:3px solid ${C.amber};padding-left:12px">
-    <h4>A revision is proposed <span class="chip warn">not the thesis</span></h4>
+    <h4>A revision is proposed ${word("· not the thesis", "warn")}</h4>
     <p class="muted" style="font-size:var(--fs-sm)">Drafted ${esc(String(p.created_at).slice(0, 10))} by the thesis analyst against version ${p.based_on_version}.
       The thesis below is unchanged until a person accepts this: <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>).</p>
     ${p.rationale ? `<p><b>Why:</b> ${esc(p.rationale)}</p>` : ""}
@@ -6230,7 +6389,7 @@ async function theses(el){
       return `<div style="margin-bottom:16px">` + card("Thesis watch",
         `${W.length} holdings read as of ${esc(W[0].as_of)} · ${n("REVIEW")} review · ${n("WATCH")} watch · ${n("INTACT")} intact · ${n("UNASSESSED")} not assessed`,
         (hot.length ? tbl(["Ticker", "Status", "What moved"], hot.map(w => [
-          `<b style="cursor:pointer" data-tw="${esc(w.ticker)}">${esc(w.ticker)}</b>`, twChip(w.ticker),
+          `<b style="cursor:pointer" data-tw="${esc(w.ticker)}">${esc(w.ticker)}</b>`, watchBadge(w.ticker),
           esc([...(w.results || []).filter(r => r.verdict === "TRIGGERED" || r.verdict === "APPROACHING")
                  .map(r => `${r.id} ${TV_LBL[r.verdict].toLowerCase()}: ${r.text.slice(0, 80)}`),
                ...(w.floors || []),
@@ -6242,8 +6401,8 @@ async function theses(el){
     card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
       T.sort((a,b) => (held.has(b.ticker)-held.has(a.ticker)) || a.ticker.localeCompare(b.ticker)).map(t => `<tr data-tk="${t.ticker}" style="cursor:pointer${t.ticker===thesisSel?';background:rgba(106,166,248,.08)':''}">
         <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted">${esc(t.theme||"")}</td>
-        <td>${t.status==="LOCKED"?'<span class="chip">locked</span>':'<span class="chip bad">draft</span>'}</td>
-        <td>${held.has(t.ticker) ? twChip(t.ticker) : ""}</td></tr>`).join("")
+        <td>${t.status === "LOCKED" ? word("locked", "dim") : word("draft", "bad")}</td>
+        <td>${held.has(t.ticker) ? watchBadge(t.ticker) : ""}</td></tr>`).join("")
     }</tbody></table></div>`) +
     card(thesisSel||"—", "", thesisBlock(thesisSel, true) || "<p class='muted'>No thesis yet.</p>") + `</div>`;
   el.querySelectorAll("tr[data-tk]").forEach(tr => tr.onclick = () => { thesisSel = tr.dataset.tk; theses(el); });
@@ -6454,19 +6613,31 @@ function memoEvening(row, anchor){
     ${briefBody(row.payload)}
   </div>`;
 }
-/* ═══ SIX TABS (V14, 2026-11-22) ═════════════════════════════════════════════════════════════
+/* ═══ THE TABS (V14, 2026-11-22; ten since 2026-11-23) ═══════════════════════════════════════
  *
- * PROCESS_AUDIT_2026-11.md §6. The site had ten tabs, and the first screen did not say what needed
- * a decision: open sell conditions, thesis reviews and the proposal's exits sat on Research or inside
- * a drawer. Six tabs now, each one a question:
+ * PROCESS_AUDIT_2026-11.md §6. The site had ten flat tabs, and the first screen did not say what
+ * needed a decision. V14 cut it to six, each one a question. Niko, 2026-11-23: "I like the way you
+ * structured it, but too much research is hidden or hard to find. I want a universe tab still."
+ * Six had put every tracked name behind a toggle at the foot of the Buy list, the theses at the foot
+ * of Evidence, the technical readings at the foot of Market and the risk engine inside Reference.
+ * Those four are tabs again. The first three still lead, and are still what decides:
  *
  *   Today      What needs me?                 the decision queue · the book against the model · the
  *                                             brake against exposure · the day's notes
  *   Book       What do I own and why?         holdings · the book at a glance · performance
- *   Buy list   What would the model own?      the top 25 by QGS · what it would change · every name
- *   Market     What is the backdrop?          market signals · rotation · charts · trend maps
- *   Evidence   What do we believe, on what?   the hypothesis register · the forward record · theses
- *   Reference  How does it work?              the method · risk engine detail · factors
+ *   Buy list   What would the model own?      the top 25 by QGS · what it would change
+ *   — research —
+ *   Universe   What else is there?            every tracked name, every column · the quad map
+ *   Theses     Why do we own each one?        thesis watch · proposed revisions · every thesis
+ *   Signals    What are the charts doing?     technical readings for every name · trend maps
+ *   — context —
+ *   Market     What is the backdrop?          market signals · rotation · index charts · sector maps
+ *   Risk       What could hurt us?            regime · fragility · the risk engine · factors
+ *   Evidence   What do we believe, on what?   the hypothesis register · the forward record
+ *   Reference  How does it work?              the method, start to finish
+ *
+ * A long tab carries an "On this page" strip (pageJump), so a section below the first screen is one
+ * click away rather than a scroll someone has to know to make.
  *
  * EVERY VIEW IS RENDERED INTO ITS OWN BOX. The views this composes each set innerHTML on the element
  * they are given and several redraw themselves on a click. Given the tab's own element they would
@@ -6477,6 +6648,22 @@ function memoEvening(row, anchor){
  * queue that could not be read are different facts and must not look alike.
  * ═══════════════════════════════════════════════════════════════════════════════════════════════ */
 
+/* "On this page": one button per section heading after the first, rebuilt each time a tab finishes
+ * drawing (route() calls it). It sits above the page heading, as the tab's own first child, because
+ * several views redraw their own box on a click and would take a strip inside it with them.
+ * Fewer than two sections = no strip. The render harness has no selectors, so it draws none there. */
+function pageJump(el){
+  if(!el || !el.querySelectorAll) return;
+  const old = el.querySelector(".pjump"); if(old && old.remove) old.remove();
+  const heads = [...el.querySelectorAll(".pagehead")].slice(1).filter(h => h.querySelector("h2") && h.querySelector("h2").textContent.trim());
+  if(heads.length < 2) return;
+  const strip = document.createElement("div"); strip.className = "pjump";
+  strip.innerHTML = `<span class="caps">On this page</span>` + heads.map((h, i) => { h.id = h.id || `psec-${i}`; h.style.scrollMarginTop = "110px";
+    return `<button class="fbtn" data-to="${h.id}">${esc(h.querySelector("h2").textContent.trim())}</button>`; }).join("");
+  el.insertBefore(strip, el.firstChild);
+  strip.querySelectorAll("button[data-to]").forEach(b => b.onclick = () => { const t = document.getElementById(b.dataset.to);
+    if(t) t.scrollIntoView({block: "start", behavior: "smooth"}); });
+}
 const gapBox = (what, why) => `<div class="gap"><b>${esc(what)}</b> ${esc(why || "")}</div>`;
 const ptsFmt = (v, dp = 1) => v == null || isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(dp)} pts`;
 
@@ -6515,12 +6702,12 @@ function queueRow(r, today){
   const tk = r.ticker ? `<a href="#book/${esc(r.ticker)}" class="tk" style="text-decoration:none">${esc(r.ticker)}</a> ` : "";
   const title = r.ticker && r.title && r.title.startsWith(r.ticker) ? esc(r.title.slice(r.ticker.length).replace(/^[\s:]+/, "")) : esc(r.title || "");
   const when = r.status === "RULED"
-    ? `<span class="chip">${Q_RULING[r.ruling] || esc(r.ruling || "ruled")}</span>${r.ruling === "DEFER" && r.due ? `<span class="muted">back on ${esc(r.due)}</span>` : ""}`
-    : overdue ? `<span class="chip bad">Overdue since ${esc(r.due)}</span>`
+    ? `${word(Q_RULING[r.ruling] || esc(r.ruling || "ruled"), "lbl")}${r.ruling === "DEFER" && r.due ? `<span class="muted">back on ${esc(r.due)}</span>` : ""}`
+    : overdue ? word(`Overdue since ${esc(r.due)}`, "bad lbl")
     : `<span class="muted">due ${esc(r.due || "not set")}</span>`;
   const cmd = Q_OWN[r.kind] ? Q_OWN[r.kind](r) : `python run.py decide ${r.id} act|decline|defer "why"`;
   return `<div class="qrow">
-    <div><span class="chip ${tone}">${esc(label)}</span> ${tk}<span class="qt">${title}</span></div>
+    <div>${word(esc(label), tone + " lbl")} ${tk}<span class="qt">${title}</span></div>
     <div class="qmeta">${when}<span class="muted" title="Open since">since ${esc(r.opened || "?")}</span></div>
     <div class="qd">${esc(r.detail || "")}${r.status === "RULED" && r.reason ? `<br><b>Reason given:</b> ${esc(r.reason)}` : ""}
       ${r.status === "OPEN" ? `<div class="mono" style="font-size:var(--fs-xs);opacity:.75;margin-top:4px">${esc(cmd)}</div>` : ""}</div>
@@ -6541,7 +6728,7 @@ function queueCard(){
        : `<div class="muted">Nothing is open. If the queue did not run after tonight's grid, the health badge in the header names it.</div>`) +
     (ruled.length ? `<h4 style="${VDUR_H4}">Ruled, and the condition still holds</h4><div>${ruled.map(r => queueRow(r, today)).join("")}</div>` : "") +
     `<h4 style="${VDUR_H4}">Cleared in the last 30 days</h4>` +
-    (cleared.length ? `<div class="list">${cleared.map(r => `<div class="li"><span><span class="chip">${esc(qKind(r.kind)[0])}</span> ${esc(r.title || "")}</span>
+    (cleared.length ? `<div class="list">${cleared.map(r => `<div class="li"><span>${word(esc(qKind(r.kind)[0]), "dim lbl")} ${esc(r.title || "")}</span>
         <span class="muted" style="font-size:var(--fs-sm);white-space:nowrap">${r.ruling ? esc(Q_RULING[r.ruling] || r.ruling) + " · " : ""}cleared ${esc(r.cleared_on || "?")}</span></div>`).join("")}</div>`
       : `<div class="muted">None yet. An item is cleared when its condition stops holding.</div>`) +
     `<div class="note" style="margin-top:12px">A list, not an order book: nothing here trades or changes a grade. An item opens the night its condition first holds and is cleared when the condition stops holding. A ruling is made on the command line and needs a reason, which is written to the journal.</div>`);
@@ -6564,13 +6751,13 @@ function distanceCard(){
   const F = d.factors || [], fl = lim.factor_limit;
   const frow = F.map(f => { const b = f.active_beta, out = b != null && fl != null && Math.abs(b) > fl;
     return [esc(f.factor), b == null ? `<span class="muted" title="Not measured">?</span>` : `<span class="mono ${out ? "neg" : ""}">${b > 0 ? "+" : ""}${(+b).toFixed(2)}</span>`,
-            b == null ? "" : out ? `<span class="chip bad">beyond ±${num(fl, 2)}</span>` : `<span class="muted">inside</span>`]; });
+            b == null ? "" : out ? word(`beyond ±${num(fl, 2)}`, "bad") : `<span class="muted">inside</span>`]; });
   return card("The book against the model", `grid of ${esc(R.as_of || "?")} · shares are of stock capital (cash and the index fund are not names the list can hold)`,
     `<div style="font-size:var(--fs-lg)"><b>${d.on_list ?? "?"} of ${d.names ?? "?"}</b> holdings are on the buy list${
        d.list_share != null ? `, <b class="${under ? "neg" : ""}">${(d.list_share * 100).toFixed(0)}%</b> of stock capital${floor != null ? ` against a floor of ${(floor * 100).toFixed(0)}%` : ""}` : ""}.</div>
      ${bar}
      <h4 style="${VDUR_H4}">Sector cap</h4>
-     ${overN ? Object.entries(over).map(([s, w]) => `<span class="chip bad">${esc(s)} ${num(w, 1)}% of the sleeve, cap ${num(lim.sector_cap, 0)}%</span>`).join(" ")
+     ${overN ? Object.entries(over).map(([s, w]) => word(`${esc(s)} ${num(w, 1)}% of the sleeve, cap ${num(lim.sector_cap, 0)}%`, "bad")).join(" · ")
              : d.sectors_over_cap ? `<span class="muted">No sector is over the ${num(lim.sector_cap, 0)}% cap.</span>` : `<span class="muted" title="Not in the stored row">?</span>`}
      <h4 style="${VDUR_H4}">Active factor betas against SPY</h4>
      ${frow.length ? tbl(["Factor", "Active beta", `Limit ±${fl == null ? "?" : num(fl, 2)}`], frow)
@@ -6594,13 +6781,13 @@ function exposureCard(){
   const big = (cap, v, sub, tone = "") => `<span><span class="caps">${cap}</span><br><b style="font-size:var(--fs-xl)" class="${tone}">${v}</b> <span class="muted">${sub}</span></span>`;
   return card("The brake against exposure", `brake row of ${esc(b.as_of || "?")}`,
     `<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline">
-       <span><span class="caps">State</span><br><b style="font-size:var(--fs-xl);color:${SC[b.state] || C.text}">${esc(codeLbl("regime", b.state))}</b></span>
+       <span><span class="caps">State</span><br><span style="display:inline-block;margin-top:5px">${b.state ? badge("brake", b.state) : `<span class="muted" title="Not in this row">?</span>`}</span></span>
        ${big("Equity sized at", b.exposure_multiplier == null ? "?" : (b.exposure_multiplier * 100).toFixed(0) + "%", "of normal")}
        ${big("The brake's setting", tgt == null ? "?" : num(tgt, 1) + "%", tgt == null ? "not in this row" : "invested")}
        ${big("The book now", act == null ? "?" : num(act, 1) + "%", `invested · cash ${b.cash_pct == null ? "?" : num(b.cash_pct, 1) + "%"}`, over ? "neg" : "")}
      </div>
      ${gap == null ? `<div style="margin-top:10px">${gapBox("Actual against the setting could not be compared.", "One of the two figures is not in tonight's row.")}</div>`
-       : `<div style="margin-top:10px">${over ? `<span class="chip bad">${num(gap, 1)} points above the setting</span>` : `<span class="chip ${gap > 0 ? "warn" : "ok"}">${gap > 0 ? num(gap, 1) + " points above" : num(-gap, 1) + " points below"} the setting</span>`}
+       : `<div style="margin-top:10px">${over ? word(`<b>${num(gap, 1)} points above the setting</b>`, "bad") : word(`${gap > 0 ? num(gap, 1) + " points above" : num(-gap, 1) + " points below"} the setting`, gap > 0 ? "warn" : "ok")}
           ${tol == null ? "" : `<span class="muted" style="font-size:var(--fs-sm)"> · it becomes an item above ${num(tol, 0)} points while the brake is defensive</span>`}</div>`}
      <h4 style="${VDUR_H4}">What the brake asks of each client model</h4>
      ${Object.keys(M).length ? tbl(["Model", "Equity when the brake is off", "Equity the brake asks for now", "Rest in the defensive core"],
@@ -6684,7 +6871,6 @@ async function bookAll(el){
 }
 
 /* ── BUY LIST ──────────────────────────────────────────────────────────────────────────────── */
-let blAll = false;
 function pullbackFlags(){
   // {ticker: session} for the entry flag on the NEWEST flag session; null when the flags did not load.
   if(!Array.isArray(LIVE.flags)) return null;
@@ -6697,11 +6883,12 @@ function buyListCard(M){
   const nm = Object.fromEntries((D.universe || []).map(u => [u.tk, u.name]));
   const PF = pullbackFlags();
   const flagCell = tk => PF == null ? `<span class="muted" title="The technical flags did not load">?</span>`
-    : PF.by[tk] ? `<span class="chip ok" title="Above its 200-day average with RSI(14) under 35, on ${esc(PF.by[tk])}. In testing such days were a modestly better entry over the next two weeks. It says when, never which.">Pullback · ${esc(PF.by[tk].slice(5))}</span>`
+    : PF.by[tk] ? badge("alert", "LOW", {tone: "ok", text: `Pullback · ${esc(PF.by[tk].slice(5))}`,
+        title: `A low-level entry flag. Above its 200-day average with RSI(14) under 35, on ${PF.by[tk]}. In testing such days were a modestly better entry over the next two weeks. It says when, never which.`})
     : `<span class="muted">none</span>`;
-  const status = r => r.held ? `<span class="pill">held</span>`
-    : r.list_defer ? `<span class="chip warn" title="A new position waits while the name is in a 200-day downtrend. A holding is never sold on trend.">Waiting: in a downtrend</span>`
-    : `<span class="chip ok">Open to buy</span>`;
+  const status = r => r.held ? word("held", "dim lbl")
+    : r.list_defer ? word("Waiting: in a downtrend", "warn", "A new position waits while the name is in a 200-day downtrend. A holding is never sold on trend.")
+    : word("Open to buy", "ok");
   const held = L.filter(r => r.held).length, wait = L.filter(r => r.list_defer).length;
   const rows = L.map(r => `<tr data-open="${esc(r.ticker)}" tabindex="0" style="cursor:pointer">
       <td class="mono">${r.list_rank ?? "?"}</td>
@@ -6710,8 +6897,8 @@ function buyListCard(M){
       <td class="mono" title="Quality Growth Score × 10,000">${r.qgs == null ? "?" : num(r.qgs * 1e4, 1)}</td>
       <td title="${esc(r.grade_reason || "")}">${esc(r.grade || "—")}</td>
       <td class="mono">${num(r.composite)}</td>
-      <td>${r.veto ? `<span class="chip bad" title="${esc(r.veto_reason || "")}">${esc(r.veto)}</span>` : `<span class="muted">none</span>`}</td>
-      <td>${trendChip(r.trend)}</td>
+      <td>${r.veto ? badge("veto", r.veto, {title: r.veto_reason || ""}) : `<span class="muted">none</span>`}</td>
+      <td>${trendWord(r.trend)}</td>
       <td>${flagCell(r.ticker)}</td></tr>`).join("");
   return card("The buy list", `${L.length} names · ${held} held · ${L.length - held - wait} open to buy · ${wait} waiting in a downtrend`,
     (L.length ? `<div class="table-wrap"><table class="tbl"><thead><tr>${["#", "Name", "Status", "QGS", "Grade", "Composite", "Veto", "200-day state · risk", "Entry flag"]
@@ -6725,13 +6912,12 @@ function offListCard(M){
                                                                     || (a.qgs_universe_rank ?? 9e9) - (b.qgs_universe_rank ?? 9e9));
   if(!H.length) return "";
   return `<div style="margin-top:16px">` + card("Held, and not on the list", `${H.length} names · exits and reviews first`,
-    tbl(["Name", "Action", "Why", "QGS rank", "List rank"], H.map(r => [`<b>${esc(r.ticker)}</b>`, listActChip(r.list_action, r.veto_reason),
+    tbl(["Name", "Action", "Why", "QGS rank", "List rank"], H.map(r => [`<b>${esc(r.ticker)}</b>`, actionBadge(r.list_action, r.veto_reason),
       `<span class="muted">${esc(r.veto_reason || (r.list_action === "HOLD" ? "no veto; outside the list's top names" : ""))}</span>`,
       r.qgs_universe_rank ?? `<span class="muted">n/a</span>`, r.list_rank ?? `<span class="muted">—</span>`])) +
     `<div class="note" style="margin-top:10px">Nothing in the model sells a holding for being outranked or for its trend. Review and Exit come only from a veto.</div>`) + `</div>`;
 }
-async function buyList(el, forceAll){
-  if(forceAll) blAll = true;
+async function buyList(el){
   el.innerHTML = head("Buy list", "What the model would own", `<span class="muted">loading…</span>`);
   await ensureMatrix();
   if(!LIVE.matrixOk){
@@ -6741,40 +6927,59 @@ async function buyList(el, forceAll){
   }
   const M = LIVE.matrix;
   el.innerHTML = head("Buy list", "What the model would own", `<span class="muted">grid of ${esc(M[0].as_of || "?")} · rules ${esc(M[0].method || "?")}</span>`) +
-    buyListCard(M) + offListCard(M);
+    buyListCard(M) + offListCard(M) +
+    `<div class="muted" style="margin-top:12px">Every tracked name (${M.length}, with every column and the quad map) is on <a href="#universe">Universe</a>.</div>`;
   el.querySelectorAll("#blRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   await section(el, "What the model would change", b => proposal(b), `<span class="muted">adds, exits and keeps</span>`);
-  const core = M.filter(r => r.universe_tag !== "micro").length;
-  const tg = document.createElement("div"); el.appendChild(tg);
-  const all = document.createElement("div"); el.appendChild(all);
-  const drawAll = async () => {
-    tg.innerHTML = sectionHead("Every tracked name", `<button class="lock" id="blToggle" aria-expanded="${blAll}">${blAll ? "Hide" : `Show all ${M.length} names`}</button>`) +
-      (blAll ? "" : `<div class="muted">The full table (${core} core names and the micro sleeve), with every column, and the quad map. Closed by default: the list above is what decides.</div>`);
-    const b = document.getElementById("blToggle");
-    if(b) b.onclick = () => { blAll = !blAll; disposeOnly(charts.filter(c => c.getDom && all.contains && all.contains(c.getDom()))); all.innerHTML = ""; drawAll(); };
-    if(!blAll) return;
-    await section(all, "Every name", x => grid(x), "", true);
-    await section(all, "Quad map", x => universe(x), "", true);
-  };
-  await drawAll();
+}
+
+/* ── UNIVERSE ──────────────────────────────────────────────────────────────────────────────── */
+// Every tracked name, with every column, and the quad map. The buy list is what decides; this is
+// where a name is looked up, compared and filtered.
+async function universeAll(el){
+  el.innerHTML = head("Universe", "Every tracked name", `<span class="muted">loading…</span>`);
+  await ensureMatrix();
+  if(!LIVE.matrixOk){
+    el.innerHTML = head("Universe", "Every tracked name", "") +
+      gapBox("The decision grid did not load.", `So there is no table to show${LIVE.matrixErr ? " (" + LIVE.matrixErr + ")" : ""}. This is a failed read, not an empty universe.`);
+    return;
+  }
+  const M = LIVE.matrix, core = M.filter(r => r.universe_tag !== "micro").length;
+  el.innerHTML = head("Universe", "Every tracked name",
+    `<span class="muted">${core} core names${M.length > core ? ` · ${M.length - core} in the micro sleeve` : ""} · grid of ${esc(M[0].as_of || "?")} · click a row to open the name</span>`);
+  await section(el, "Every name", x => grid(x), "", true);
+  await section(el, "Quad map", x => universe(x), "", true);
+}
+
+/* ── THESES ────────────────────────────────────────────────────────────────────────────────── */
+async function thesesAll(el){
+  await ensureMatrix();
+  const b = document.createElement("div"); el.appendChild(b);
+  try{ await theses(b); }catch(e){ b.innerHTML = head("Research", "Theses") + gapBox("The theses could not be drawn.", e.message || String(e)); }
+}
+
+/* ── SIGNALS ───────────────────────────────────────────────────────────────────────────────── */
+// Technical readings are timing and risk description, never selection. They have their own tab so
+// they can be found, not because they decide anything.
+async function signalsAll(el){
+  const hb = document.createElement("div"); el.appendChild(hb);
+  hb.innerHTML = head("Signals", "What the charts are doing", `<span class="muted">timing and risk description · selects nothing</span>`);
+  await section(el, "Technical readings for every name", b => signalsV2(b), "", true);
+  await section(el, "Trend maps: holdings and sectors", b => gbgUniverseMaps(b), "", true);
 }
 
 /* ── MARKET ────────────────────────────────────────────────────────────────────────────────── */
 async function marketAll(el){
   const mb = document.createElement("div"); el.appendChild(mb);
   try{ await markets(mb); }catch(e){ mb.innerHTML = head("Market", "The backdrop") + gapBox("The market view could not be drawn.", e.message || String(e)); }
-  await section(el, "Trend maps: holdings and sectors", b => gbgUniverseMaps(b), "", true);
-  await section(el, "Technical readings for every name", b => signalsV2(b), "", true);
+  const more = document.createElement("div"); el.appendChild(more);
+  more.innerHTML = `<div class="muted" style="margin-top:14px">Technical readings for every name, and the trend maps for the holdings, are on <a href="#signals">Signals</a>.</div>`;
 }
 
 /* ── EVIDENCE ──────────────────────────────────────────────────────────────────────────────── */
 const HYP_AREA = {selection: "Selection: which names", vetoes: "Vetoes: what holds a name down", timing: "Timing: when", risk: "Risk and exposure",
                   market: "The market backdrop", data: "Data"};
-const HYP_VERDICT = {PREDICTIVE: ["Predictive", "ok", "The test found it: |t| of 2.5 or more with the same sign in both halves of the history"],
-                     SUGGESTIVE: ["Suggestive", "warn", "|t| of 2.0 or more with the same sign in both halves. Not established"],
-                     NOT_SHOWN: ["Not shown", "", "Tested, and the test did not support it"],
-                     REFUTED: ["Refuted", "bad", "Tested, and the opposite held"],
-                     UNTESTED: ["Untested", "", "No test has been possible or run"]};
+// The verdict's words and tones are BADGES.verdict (the template): one vocabulary for the register and the market signals.
 const HYP_STATUS = {ADOPTED: ["In use", "A rule rests on it"], FORWARD_TEST: ["Forward test", "Running on new data, not relied on"],
                     CONTEXT: ["Shown only", "On the page for context; it moves nothing"], REJECTED: ["Not used", "Tested and not used"]};
 // The reported paper books (scripts/paper_tracker.py REPORTED) and the date each one's FORWARD record
@@ -6808,11 +7013,11 @@ function hypForward(h){
   return "";
 }
 function hypRow(h){
-  const [vl, vt, vtip] = HYP_VERDICT[h.verdict] || [h.verdict, "", ""], [sl, stip] = HYP_STATUS[h.status] || [h.status, ""];
+  const [sl, stip] = HYP_STATUS[h.status] || [h.status, ""];
   return `<div class="hyp">
     <div class="hc">${esc(h.claim)}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="chip ${vt}" title="${esc(vtip)}">${vl}</span>
-      <span class="chip" title="${esc(stip)}">${sl}</span>${h.used_in ? `<span class="muted" style="font-size:var(--fs-sm)">${esc(h.used_in)}</span>` : ""}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${badge("verdict", h.verdict)}
+      ${word(esc(sl), "dim lbl", stip)}${h.used_in ? `<span class="muted" style="font-size:var(--fs-sm)">${esc(h.used_in)}</span>` : ""}</div>
     <div class="hr"><b>Result.</b> ${esc(h.result)}</div>
     <div class="hr" title="${esc(h.source || "")}"><b>Test.</b> ${esc(h.test)}${h.design_window ? ` Design: ${esc(h.design_window)}.` : ""}${h.holdout_window ? ` Holdout: ${esc(h.holdout_window)}.` : ""}</div>
     ${hypForward(h)}
@@ -6882,28 +7087,20 @@ async function evidence(el){
   try{ LIVE.hyp = await qAll("site_hypotheses"); LIVE.hypErr = null; }
   catch(e){ LIVE.hyp = null; LIVE.hypErr = e.message || String(e); }
   el.innerHTML = head("Evidence", "What we believe, and on what",
-    `<span class="muted">${LIVE.hyp ? plural(LIVE.hyp.length, "claim") : "the register did not load"} · forward record · theses</span>`) + hypothesisCards();
+    `<span class="muted">${LIVE.hyp ? plural(LIVE.hyp.length, "claim") : "the register did not load"} · forward record</span>`) + hypothesisCards();
   await section(el, "The forward record", b => paperRecord(b), `<span class="muted">paper books, marked nightly</span>`);
-  await ensureMatrix();
-  await section(el, "Theses", b => theses(b), "", true);
 }
 
 /* ── REFERENCE ─────────────────────────────────────────────────────────────────────────────── */
-async function reference(el, first){
-  const strip = document.createElement("div"); el.appendChild(strip);
-  strip.innerHTML = `<div class="filters" style="margin:0 0 6px"><span class="caps">Reference</span>
-    <a class="fbtn ${first === "risk" ? "" : "on"}" style="text-decoration:none" href="#about">How the model works</a>
-    <a class="fbtn ${first === "risk" ? "on" : ""}" style="text-decoration:none" href="#risk">Risk engine, factors and concentration</a></div>`;
-  const a = document.createElement("div"), r = document.createElement("div");
-  if(first === "risk"){ el.appendChild(r); el.appendChild(a); } else { el.appendChild(a); el.appendChild(r); }
-  try{ about(a); }catch(e){ a.innerHTML = gapBox("The method page could not be drawn.", e.message || String(e)); }
-  try{ await riskAll(r); }catch(e){ r.innerHTML = gapBox("The risk detail could not be drawn.", e.message || String(e)); }
+// The method, start to finish. The risk engine and the factor detail are the Risk tab.
+function reference(el){
+  try{ about(el); }catch(e){ el.innerHTML = gapBox("The method page could not be drawn.", e.message || String(e)); }
 }
 
-const VIEWS = {today, book: bookAll, buylist: buyList, market: marketAll, evidence, reference, overview: today, memo: today, holdings: bookAll, performance: bookAll, history: bookAll, universe: e => buyList(e, true), grid: e => buyList(e, true), proposal: buyList, signals: marketAll, markets: marketAll, research: evidence, theses: evidence, risk: e => reference(e, "risk"), analytics: e => reference(e, "risk"), factors: e => reference(e, "risk"), about: reference};
-const TAB_OF = {overview: "today", memo: "today", holdings: "book", performance: "book", history: "book", universe: "buylist", grid: "buylist", proposal: "buylist", signals: "market", markets: "market", research: "evidence", theses: "evidence", risk: "reference", analytics: "reference", factors: "reference", about: "reference"};
+const VIEWS = {today, book: bookAll, buylist: buyList, universe: universeAll, theses: thesesAll, signals: signalsAll, market: marketAll, risk: riskAll, evidence, reference, overview: today, memo: today, holdings: bookAll, performance: bookAll, history: bookAll, grid: universeAll, proposal: buyList, markets: marketAll, research: thesesAll, analytics: riskAll, factors: riskAll, about: reference};
+const TAB_OF = {overview: "today", memo: "today", holdings: "book", performance: "book", history: "book", grid: "universe", proposal: "buylist", markets: "market", research: "theses", analytics: "risk", factors: "risk", about: "reference"};
 // SIX TABS (V14, 2026-11-22). Every older route name still resolves: TAB_OF (build_live.py) says
-// which of the six tabs an old name now lives on, so a bookmark or a link inside a note lands on
+// which tab an old name now lives on, so a bookmark or a link inside a note lands on
 // the right tab with the right tab lit instead of silently falling back to the landing page.
 function route(){
   const HOME = typeof VIEWS.today === "function" ? "today" : "overview";
@@ -6916,21 +7113,20 @@ function route(){
   setMenu(false);
   clearCharts(); closeDrawer(true);
   const el = document.getElementById("view"); el.innerHTML = ""; window.scrollTo(0,0);
-  fn(el);
+  // The "On this page" strip is built when the tab has finished drawing (its sections arrive async),
+  // and only if the reader is still on it.
+  const at = location.hash;
+  Promise.resolve(fn(el)).then(() => { if(location.hash === at && typeof pageJump === "function") pageJump(el); }).catch(e => console.error(e));
   // A sub-path opens that name. Only holdings was handled, so every #grid/TICKER link the universe
   // morning note writes landed on the Grid tab and then sat there, which reads as a dead link.
   // The drawer needs LIVE.matrix for grade / quad / guidance and only the Grid tab loads it, so the
   // same await the Universe table's row click uses is repeated here rather than a second path.
   const sub = location.hash.split("/")[1];
   if(sub){
-    // the drawer shows the model's rank and action, which come from the grid: load it first
-    if(v === "holdings" || v === "book") (async () => { if(typeof ensureMatrix === "function") await ensureMatrix(); openHolding(sub); })();
-    else if(["grid", "universe", "signals", "buylist", "market", "markets"].includes(v)) (async () => {
-      if(typeof LIVE !== "undefined" && !LIVE.matrix && typeof qAll === "function"){
-        try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){}
-      }
-      if(typeof openName === "function") openName(sub);
-    })();
+    // ONE DRAWER (2026-11-23): whichever tab the link is on, the name opens the same way. The drawer
+    // shows the model's rank and action, which come from the grid, so that is loaded first.
+    (async () => { if(typeof ensureMatrix === "function") await ensureMatrix();
+                   if(typeof openName === "function") openName(decodeURIComponent(sub)); })();
   }
 }
 // Built from the nav's own links rather than a second hard-coded list, so a tab added to the
@@ -7108,13 +7304,10 @@ const HOLD_MONITOR = ["tk","weight","qgs_rank","grade","list_action","thesis_sta
 const mxRow = tk => (typeof LIVE !== "undefined" && LIVE.matrixBy) ? (LIVE.matrixBy[tk] || null) : null;
 const mxOk = () => typeof LIVE !== "undefined" && LIVE.matrixOk === true;
 // The four actions (V14). One vocabulary for the Book, the Buy list and the drawers.
-const LIST_ACT = {BUY_LIST: ["Buy list", "ok", "On the model's buy list: one of its highest-ranked names with no veto"],
-                  HOLD: ["Hold", "", "Held, no veto against it, not in the list's top names. Nothing asks for a sale"],
-                  REVIEW: ["Review", "warn", "A veto holds it down: a pillar score under its line, an open sell condition, or no locked thesis"],
-                  EXIT: ["Exit", "bad", "The model's vetoes say exit: a confirmed sell condition, a composite under 5.0, or both pillar floors breached"]};
-const listActChip = (a, why) => { if(!a) return `<span class="muted">—</span>`;
-  const [label, cls_, tip] = LIST_ACT[a] || [a, "", ""];
-  return `<span class="chip ${cls_}" title="${esc(tip + (why ? ". " + why : ""))}">${label}</span>`; };
+const LIST_ACT = BADGES.action;
+const actionBadge = (a, why) => { if(!a) return `<span class="muted">—</span>`;
+  const tip = (LIST_ACT[a] || [])[2] || "";
+  return badge("action", a, {title: tip + (why ? (tip ? ". " : "") + why : "")}); };
 let hCharts = [];
 let hAllCols = (() => { try { return localStorage.getItem("ic.holdings.cols") === "all"; } catch(e){ return false; } })();
 function holdings(el){
@@ -7236,21 +7429,21 @@ function drawHoldings(){
           : `<span class="muted" title="${esc(mx ? "No QGS rank: an input is missing" : "Not a ranked company")}">n/a</span>`}</td>`,
         grade: `<td title="${esc((mx || {}).grade_reason || "")}">${esc((mx || {}).grade || h.grade || "—")}</td>`,
         list_action: `<td>${!mxOk() ? `<span class="muted" title="The decision grid could not be read">?</span>`
-          : listActChip((mx || {}).list_action, (mx || {}).veto_reason)}</td>`,
+          : actionBadge((mx || {}).list_action, (mx || {}).veto_reason)}</td>`,
         value: `<td class="r mono muted">${usd(h.value)}</td>`,
         pl: `<td class="r mono ${cls(h.pl)}">${pct(h.pl)}</td>`,
         _spark: `<td><div class="spark" data-spark="${h.tk}"></div></td>`,
-        quad: `<td>${qchip(h.quad)}</td>`,
-        comp: `<td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor?' <span class="chip bad" title="P2 or P3 below 6.0">floor</span>':''}</td>`,
+        quad: `<td>${quadWord(h.quad)}</td>`,
+        comp: `<td class="r mono ${h.comp!=null&&h.comp<6.5?'neg':''}">${num(h.comp)}${floor ? " " + word("floor", "bad lbl", "P2 or P3 below 6.0") : ""}</td>`,
         align: `<td>${alignBar(h.align)}</td>`,
-        trend: `<td>${trendChip(h.trend)}</td>`,
-        timing: `<td>${typeof timingChip === "function" ? timingChip(h.timing, h.range_pos) : ""}</td>`,
+        trend: `<td>${trendWord(h.trend)}</td>`,
+        timing: `<td>${typeof timingWord === "function" ? timingWord(h.timing, h.range_pos) : ""}</td>`,
         range_pos: `<td>${typeof rangeBand === "function" ? rangeBand(h.trade_low, h.trade_high, h.range_pos, h.timing) : ""}</td>`,
         implied_cagr: `<td class="r">${typeof impliedCell === "function" ? impliedCell(h.tk) : ""}</td>`,
         fwd_rev: `<td class="mono muted" style="font-size:var(--fs-sm)">${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}</td>`,
         mcap: facCells({ticker: h.tk, universe_tag: null}),      // the size + six factor cells, as one block
         next_er: `<td class="mono muted" style="font-size:var(--fs-sm)">${erCell(h.next_er)}</td>`,
-        thesis_status: `<td>${thesisChip(h.thesis_status)}</td>`,
+        thesis_status: `<td>${thesisBadge(h.thesis_status)}</td>`,
       };
       return `<tr class="row" data-tk="${h.tk}">${shown.map(([k]) => cell[k] ?? "").join("")}</tr>`; }).join("") + cashRow(shownHead.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
@@ -7296,7 +7489,8 @@ function staleRecordMark(row, written){
     if(!hit.length) return "";
     const rs = hit.reduce((a, b) => b.max_change_bp > a.max_change_bp ? b : a), at = new Date(rs.at);
     const when = at.toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit", timeZone:"America/New_York"});
-    return ` <span class="chip warn" title="${rs.rows} daily returns from ${esc(rs.first_date)} were restated on ${esc(when)} ET, by up to ${rs.max_change_bp}bp on a day. Period returns quoted in this note (MTD, QTD, YTD) are from the record as it stood before.">written before the return record was restated · its period returns are out of date</span>`;
+    return " " + badge("fresh", "RESTATED", {text: "written before the return record was restated · its period returns are out of date",
+      title: `${rs.rows} daily returns from ${rs.first_date} were restated on ${when} ET, by up to ${rs.max_change_bp}bp on a day. Period returns quoted in this note (MTD, QTD, YTD) are from the record as it stood before.`});
   }catch(e){ return ""; }
 }
 function writtenAt(row){
@@ -7425,67 +7619,8 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeDrawer(); 
 function ema(a, n){ const k=2/(n+1); let e=null; return a.map(v=>{ e = e==null ? v : v*k + e*(1-k); return e; }); }
 function sma(a, n){ return a.map((_,i)=> i<n-1 ? null : a.slice(i-n+1,i+1).reduce((s,v)=>s+v,0)/n); }
 function sd(a, n){ return a.map((_,i)=>{ if(i<n-1) return null; const w=a.slice(i-n+1,i+1), m=w.reduce((s,v)=>s+v,0)/n; return Math.sqrt(w.reduce((s,v)=>s+(v-m)**2,0)/n); }); }
-function openHolding(tk){
-  const h = D.holdings.find(x=>x.tk===tk); if(!h) return;
-  const r = h.research || {}, g = r.guidance || {}, ins = r.insiders_180d || {};
-  const floor = (h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6);
-  const cellv = (label, v, bad) => `<div><small>${label}</small><b class="${bad?'neg':''}">${v}</b></div>`;
-  document.getElementById("drIn").innerHTML = `
-    <div class="dr-top"><div><div class="caps">${esc(h.sector||"")} · ${esc(h.sleeve||"")}</div><h2>${h.tk} <span class="muted" style="font-weight:500;font-size:var(--fs-lg)">${esc(h.name)}</span></h2>
-      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${mxOk() && mxRow(h.tk) ? listActChip(mxRow(h.tk).list_action, mxRow(h.tk).veto_reason) + (mxRow(h.tk).qgs_universe_rank != null ? ` <span class="chip" title="Place among every core company tracked, on Quality Growth Score">QGS rank ${mxRow(h.tk).qgs_universe_rank}</span>` : "") : ""} ${thesisChip(h.thesis_status)} ${trendChip(h.trend)} ${qchip(h.quad, true)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${esc(codeLbl("earnings_quality", h.eq))}</span>`:""}</div></div>
-      <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
-    <div class="mini">
-      <div><span class="caps">Price</span><b>${usd(h.price,2)}</b></div>
-      <div><span class="caps">P&amp;L</span><b class="${cls(h.pl)}">${pct(h.pl)}</b></div>
-      <div><span class="caps">Weight</span><b>${pct(h.weight,1,false)}</b></div>
-      <div><span class="caps">Next ER</span><b style="font-size:var(--fs-base)">${erCell(h.next_er)}</b></div>
-    </div>
-    ${thesisBlock(h.tk) || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")}${cardBlock(h.tk)}
-    <div class="sec"><h4>Model read</h4><div class="mtab">
-      ${cellv("Composite", num(h.comp), h.comp!=null&&h.comp<6.5)}${cellv("P1 / P2 / P3", `${num(h.p1,1)} / ${num(h.p2,1)} / ${num(h.p3,1)}`, floor)}
-      ${cellv("QGS tier", esc(codeLbl("qgs_tier", h.tier)))}${cellv("Quality", esc(codeLbl("quality_profile", h.profile)))}
-      ${cellv("Alignment", `${num(h.align,0)} ${h.bucket ? esc(codeLbl("bucket", h.bucket)) : ""}`, h.bucket==="DISTRIBUTE")}${cellv("Extension", esc(codeLbl("ext", h.ext)))}
-      ${cellv("12-1 mom (risk adj)", num(h.mom))}${cellv("Fwd rev / EPS", `${pctRaw(h.fwd_rev)} / ${pctRaw(h.fwd_eps)}`)}
-      ${cellv("ROIC", h.roic!=null?num(h.roic,1)+"%":"—")}${cellv("FCF margin", h.fcfm!=null?num(h.fcfm,1)+"%":"—")}
-      ${cellv("Net debt / EBITDA", h.nde!=null?num(h.nde,1)+"×":"—")}${cellv("FCF / EV", h.fcfev!=null?pct(h.fcfev,1,false):"—")}
-    </div></div>
-    ${techCard(h.tk)}${rangeBar(LIVE.v2[h.tk])}${vdurBlock(h.tk)}${fundaBlock(h.tk)}${(g.statements||[]).length ? `<div class="sec"><h4>Management guidance${g.call?` · ${esc(g.call)}`:""}</h4><ul>${g.statements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
-    ${(r.quarters||[]).length ? `<div class="sec"><h4>Reported results</h4><div class="chart sm" id="drQ"></div></div>` : ""}
-    <div class="grid g2" style="margin-top:4px">
-      ${(r.catalysts_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.green}">Catalysts ahead</h4><ul>${r.catalysts_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
-      ${(r.risks_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.red}">Risks ahead</h4><ul>${r.risks_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
-    </div>
-    ${(r.news||[]).length ? `<div class="sec"><h4>What happened · last two quarters</h4><div class="news">${r.news.slice(0,12).map(n=>
-      `<div class="${n.importance===1?'major':''}"><div class="d">${esc(n.date)} · ${esc(n.type)}${n.importance===1?' · major':''}</div><div class="h">${esc(n.headline)}</div><div class="w">${esc(n.why_it_matters)}</div></div>`).join("")}</div></div>` : ""}
-    ${ins.buys!=null ? `<div class="sec"><h4>Insiders · 180 days</h4><p class="muted">${ins.buys} buys (${usd(ins.buy_value)}) · ${ins.sells} sells (${usd(ins.sell_value)})</p>
-      ${(ins.notable||[]).length?`<ul>${ins.notable.slice(0,3).map(s=>`<li class="muted">${esc(s)}</li>`).join("")}</ul>`:""}</div>` : ""}
-    <div class="sec"><h4>Position</h4><p class="muted mono" style="font-size:var(--fs-md)">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)}</p></div>`;
-  document.getElementById("drawer").classList.add("on"); document.getElementById("scrim").classList.add("on");
-  drawerOpened(tk);
-  if(typeof loadFundaHist === "function") loadFundaHist(tk);   // fills the Change column
-  if(typeof loadVdurHist === "function") loadVdurHist(tk);     // fills the visible-share history
-  document.getElementById("drawer").scrollTop = 0;
-  drawTechCard(tk);
-  setTimeout(() => {
-    // The simple price / 35-EMA / 200-MA / ±1σ chart used to render here above the technical
-    // card, so every holding drawer showed two charts of the same price. The technical v2 card
-    // (track line, risk-range bands, anchored VWAPs, RSI) is strictly the better one and carries
-    // the same trend information, so this one is gone rather than duplicated.
-    const q = r.quarters || [];
-    if(q.length && document.getElementById("drQ")){
-      const qq = [...q].reverse();
-      mk(document.getElementById("drQ"), {
-        grid:{left:56,right:44,top:24,bottom:26}, legend:{top:0,right:0,textStyle:{color:C.muted},itemWidth:10,itemHeight:6},
-        xAxis:axX({type:"category",data:qq.map(x=>x.period||x.date)}),
-        yAxis:[axY({type:"value",axisLabel:{color:C.dim,fontSize:11,formatter:v=>v>=1e9?"$"+(v/1e9).toFixed(1)+"B":"$"+(v/1e6).toFixed(0)+"M"}}),
-               axY({type:"value",splitLine:{show:false},axisLabel:{color:C.dim,fontSize:11,formatter:v=>"$"+v.toFixed(2)}})],
-        tooltip:{trigger:"axis"},
-        series:[{name:"Revenue",type:"bar",barWidth:"42%",data:qq.map(x=>x.revenue),itemStyle:{color:"rgba(106,166,248,.55)",borderRadius:[4,4,0,0]}},
-                {name:"EPS",type:"line",yAxisIndex:1,data:qq.map(x=>x.eps),symbolSize:7,lineStyle:{color:C.gold,width:2},itemStyle:{color:C.gold}}]
-      });
-    }
-  }, 40);
-}
+// The holding drawer (openHolding) lived here until 2026-11-23. A holding and an unheld name now open the same drawer,
+// openName() in js/name_drawer.js, with the holding-only blocks added to it rather than a second layout.
 
 /* ═══ PERFORMANCE ════════════════════════════════════════════════════════ */
 /* ⚠⚠ DO NOT NAME THIS `performance`. It was called that until 2026-11-16, and because the page
@@ -7665,7 +7800,7 @@ function universe(el){
   }).on("click", p => { if(p.data && p.data.u && p.data.u.held) location.hash = "#holdings/" + p.data.u.tk; });
   const top = U.filter(u=>!u.held&&u.align!=null).sort((a,b)=>b.align-a.align).slice(0,10);
   document.getElementById("uTop").innerHTML = top.map(u=>`<div class="li"><span><span class="tk">${u.tk}</span> <span class="nm">${esc(u.name)}</span></span>
-    <span style="display:flex;gap:8px;align-items:center">${qchip(u.quad)} ${alignBar(u.align)}</span></div>`).join("");
+    <span style="display:flex;gap:8px;align-items:center">${quadWord(u.quad)} ${alignBar(u.align)}</span></div>`).join("");
   const secs = [...new Set(U.map(u=>u.sector||"Other"))].sort((a,b)=>U.filter(u=>(u.sector||"Other")===b).length-U.filter(u=>(u.sector||"Other")===a).length).slice(0,11).reverse();
   mk(document.getElementById("uSec"), {
     grid:{left:150,right:14,top:24,bottom:20}, legend:{top:0,right:0,textStyle:{color:C.muted},itemWidth:10,itemHeight:8},
@@ -7827,7 +7962,7 @@ function historyView(el){
             {name:"Removed",type:"bar",stack:"t",data:rem,itemStyle:{color:C.red,borderRadius:[0,0,3,3]}}]
   });
   document.getElementById("hT").innerHTML = `<thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Amount</th><th>Rationale</th></tr></thead><tbody>` +
-    TR.map(t=>`<tr><td class="mono muted" style="font-size:var(--fs-sm)">${esc(t.d ?? "—")}</td><td><span class="chip ${t.action==='BUY'?'ok':t.action==='SELL'?'bad':''}">${esc(t.action ?? "—")}</span></td>
+    TR.map(t=>`<tr><td class="mono muted" style="font-size:var(--fs-sm)">${esc(t.d ?? "—")}</td><td>${word(esc(t.action ?? "—"), (t.action==='BUY'?'ok':t.action==='SELL'?'bad':'') + " lbl")}</td>
       <td class="tk">${esc(t.tk ?? "—")}</td><td class="r mono">${num(t.shares,2)}</td><td class="r mono">${usd(t.price,2)}</td><td class="r mono">${usd(t.amount)}</td>
       <td class="muted" style="white-space:normal;min-width:260px;font-size:var(--fs-md)">${t.why ? esc(t.why) : "—"}</td></tr>`).join("") + "</tbody>";
 }
