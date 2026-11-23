@@ -494,6 +494,16 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
    position. Each group has a heading, and the strip under the header jumps to it. */
 .dr-grp{margin:30px 0 -6px;padding-top:16px;border-top:1px solid var(--line2);font-size:var(--fs-lg);font-weight:600;color:var(--text);scroll-margin-top:12px}
 .dr-jump{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 2px}
+/* A drawer block's detail, one click away. The label says what is inside. */
+details.drfold{margin-top:10px;border:1px solid var(--line);border-radius:var(--r-md);background:rgba(255,255,255,.02)}
+details.drfold>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 12px;color:var(--muted);font-size:var(--fs-md);line-height:1.4}
+details.drfold>summary::-webkit-details-marker{display:none}
+details.drfold>summary::after{content:"▾";color:var(--dim);flex:none}
+details.drfold[open]>summary::after{content:"▴"}
+details.drfold>summary:hover{color:var(--text)}
+details.drfold>.drfb{padding:2px 12px 12px}
+details.drfold>.drfb>.sec:first-child{margin-top:8px}
+.drawer details.howto{margin-top:6px}
 .dr-facts{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:8px;font-size:var(--fs-sm);color:var(--muted)}
 .pjump{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 16px}
 .pjump .caps{margin-right:4px}
@@ -530,7 +540,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 14:40 · dfddf77</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 14:47 · 3ae61ec</div>
   </div>
 </section>
 
@@ -566,7 +576,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 14:40 · dfddf77</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 14:47 · 3ae61ec</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3929,6 +3939,59 @@ async function gbgUniverseMaps(el){
  * legend, a 420px canvas and a caption into whatever element it is given.
  * The chart itself is chart_lwc.js; its computation is indicators.js.
  */
+/* CONDENSED (Niko, 2026-11-23: "I don't want to get rid of information ... Lots of methodology text in
+ * there. condense down a bit or hide in drop down buttons"). Nothing was deleted. Two mechanisms:
+ *
+ *   drFold(summary, body)   a block's DETAIL sits behind a labelled dropdown, and what stays in view
+ *                           is what a decision is checked against: the thesis snapshot and its sell
+ *                           conditions, what the monitor flagged, the pillars on one line, the range
+ *                           bar, the DCF and rate-beta figures with one sentence each.
+ *   drawerCondense()        every METHOD paragraph (.note, .method, the chart's caption) folds under
+ *                           "How this is measured". Blocks redraw themselves when their history
+ *                           arrives, so an observer re-applies it; folding is idempotent.
+ *
+ * ⚠ A WARNING IS NEVER FOLDED. A sell condition, a veto, a failed read (.gap, .amber) and the chart's
+ * "last bar is still forming" stay in view; data-nofold opts a note out (the veto, the range's
+ * readings line). A fold's label says what is inside it, so nothing is hidden behind a bare "more". */
+function drFold(summary, body, open = false){
+  if(!body || !String(body).trim()) return "";
+  return `<details class="drfold"${open ? " open" : ""}><summary><span>${summary}</span></summary><div class="drfb">${body}</div></details>`;
+}
+function drawerCondense(){
+  const root = document.getElementById("drIn");
+  if(!root || !root.querySelectorAll) return;
+  root.querySelectorAll(".note, .method").forEach(n => {
+    if(n.hasAttribute("data-nofold") || (n.closest && n.closest("details.howto")) || !n.textContent.trim()) return;
+    const d = document.createElement("details"); d.className = "howto";
+    d.innerHTML = `<summary><span class="more" style="margin-left:0">How this is measured ▾</span></summary>`;
+    n.replaceWith(d); d.appendChild(n);
+  });
+  // The chart's caption. The chart writes its warnings into it AFTER it has drawn ("the last bar is
+  // still forming", markers hidden at this range, a failure to draw), so the dropdown's label is
+  // rebuilt from whatever warnings are inside on every pass. It is rewritten only when it changed,
+  // or this would feed the observer that calls it. A failure opens the dropdown.
+  root.querySelectorAll(".lwcfoot").forEach(n => {
+    const failed = !!n.querySelector(".neg");
+    const warn = [...n.querySelectorAll(".amber, .neg")].map(a => a.textContent.trim()).filter(Boolean).join(" · ");
+    let d = n.parentElement && n.parentElement.matches && n.parentElement.matches("details.howto") ? n.parentElement : null;
+    if(!d){ d = document.createElement("details"); d.className = "howto"; d.innerHTML = "<summary></summary>"; n.replaceWith(d); d.appendChild(n); }
+    const s = d.querySelector("summary");
+    if(s && s.dataset.warn !== warn){
+      s.dataset.warn = warn;
+      s.innerHTML = `${warn ? `<span class="${failed ? "neg" : "amber"}">${esc(warn)}</span> ` : ""}<span class="more" style="margin-left:0">About this chart ▾</span>`;
+      if(failed) d.open = true;
+    }
+  });
+}
+(() => {
+  const d = document.getElementById("drIn");
+  if(!d || typeof MutationObserver === "undefined") return;       // the render harness has no observer
+  // A timer, not requestAnimationFrame: a frame callback never fires while the tab is in the
+  // background, and a drawer opened from a link in another window would stay unfolded until looked at.
+  let queued = false;
+  new MutationObserver(() => { if(queued) return; queued = true;
+    setTimeout(() => { queued = false; drawerCondense(); }, 0); }).observe(d, {childList: true, subtree: true});
+})();
 const DR_GROUPS = [["thesis", "Thesis"], ["model", "Model read"], ["chart", "Chart"], ["funda", "Fundamentals"],
                    ["news", "News and filings"], ["position", "Position"]];
 // The model's read of one name, from its decision-grid row: the same cells for a holding and for a
@@ -3952,7 +4015,9 @@ function modelReadBlock(m, gridOk){
     </div>
     ${m.grade_reason ? `<p style="margin-top:10px"><b>Why this grade:</b> ${esc(m.grade_reason)}</p>` : ""}
     ${m.list_defer ? `<p class="amber" style="margin-top:6px">A new position waits: the name is in a 200-day downtrend. A holding is never sold on trend.</p>` : ""}
-  </div>` + pillarBlock(m);
+    <p style="margin-top:10px"><b>Pillars:</b> ${pillarLine(m)}</p>
+    ${drFold("The pillars in detail: weights, floors and what P1 is made of", pillarBlock(m))}
+  </div>`;
 }
 async function openName(tk){
   // The bell and the notes open a name from tabs that never loaded the grid. Load it here, so
@@ -3965,19 +4030,20 @@ async function openName(tk){
   const sector = m.sector || (h && h.sector) || "";
 
   // ── 1 · thesis ────────────────────────────────────────────────────────────────────────────
-  const thesis = thesisBlock(tk, true);
+  const thesis = thesisBlock(tk, true, true);        // compact: the detail folds, nothing is dropped
   const g1 = (m.veto_reason ? `<div class="note" data-nofold style="margin:14px 0 0"><b>${m.veto === "EXIT" ? "Exit veto" : "Held down by a veto"}:</b> ${esc(m.veto_reason)}.</div>` : "")
     + (thesis || (r.thesis_read ? `<div class="sec"><h4>Thesis read</h4><p>${esc(r.thesis_read)}</p></div>` : "")
               || (h ? `<div class="sec"><div class="gap"><b>No thesis is stored for this holding.</b> A held name with no locked thesis is held at grade C until one is locked.</div></div>` : ""))
-    + cardBlock(tk);
+    + cardBlock(tk, thesis ? "folded" : "brief");    // a thesis already says what the company is
   // ── 2 · model read ────────────────────────────────────────────────────────────────────────
   const g2 = modelReadBlock(m, gridOk);
   // ── 3 · chart ─────────────────────────────────────────────────────────────────────────────
-  const g3 = `<div class="card" style="padding:12px;margin-top:14px"><div id="nmChart"></div></div>` + rangeBar(v2)
-    + (v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
+  const levels = (v2.levels ? `<div class="sec"><h4>Support &amp; resistance</h4>${tbl(["Type","Level","Touches"],
         [...(v2.levels.resistance||[]).map(x=>["Resistance", usd(x.px,2), x.n]), ...(v2.levels.support||[]).map(x=>["Support", usd(x.px,2), x.n])])}</div>` : "")
     + (v2.last_signals ? `<div class="sec"><h4>Last signals</h4>${tbl(["Signal","Date"], Object.entries(v2.last_signals)
         .filter(([,d])=>d).map(([k,d])=>[esc(k.replaceAll("_"," ")), esc(d)]))}</div>` : "");
+  const g3 = `<div class="card" style="padding:12px;margin-top:14px"><div id="nmChart"></div></div>` + rangeBar(v2, true)
+    + (levels ? `<div class="sec" style="margin-top:10px">${drFold("Support and resistance levels, and the date of each last signal", levels)}</div>` : "");
   // ── 4 · fundamentals ──────────────────────────────────────────────────────────────────────
   const g4 = fundaBlock(tk) + vdurBlock(tk)
     + ((r.quarters||[]).length ? `<div class="sec"><h4>Reported results</h4><div class="chart sm" id="drQ"></div></div>` : "");
@@ -3987,8 +4053,10 @@ async function openName(tk){
         ${(r.catalysts_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.green}">Catalysts ahead</h4><ul>${r.catalysts_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
         ${(r.risks_ahead||[]).length ? `<div class="sec"><h4 style="color:${C.red}">Risks ahead</h4><ul>${r.risks_ahead.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
       </div>` : "")
-    + ((r.news||[]).length ? `<div class="sec"><h4>What happened · last two quarters</h4><div class="news">${r.news.slice(0,12).map(n=>
-        `<div class="${n.importance===1?'major':''}"><div class="d">${esc(n.date)} · ${esc(n.type)}${n.importance===1?' · major':''}</div><div class="h">${esc(n.headline)}</div><div class="w">${esc(n.why_it_matters)}</div></div>`).join("")}</div></div>` : "")
+    + (() => { const N = (r.news || []).slice(0, 12); if(!N.length) return "";
+        const item = n => `<div class="${n.importance===1?'major':''}"><div class="d">${esc(n.date)} · ${esc(n.type)}${n.importance===1?' · major':''}</div><div class="h">${esc(n.headline)}</div><div class="w">${esc(n.why_it_matters)}</div></div>`;
+        return `<div class="sec"><h4>What happened · last two quarters</h4><div class="news">${N.slice(0, 4).map(item).join("")}</div>
+          ${N.length > 4 ? drFold(`${N.length - 4} earlier items`, `<div class="news">${N.slice(4).map(item).join("")}</div>`) : ""}</div>`; })()
     + insiderBlock(tk);
   // ── 6 · position ──────────────────────────────────────────────────────────────────────────
   const g6 = h ? `<div class="sec"><p class="muted mono" style="font-size:var(--fs-md)">${num(h.shares,2)} sh @ ${usd(h.avg_cost,2)} avg · value ${usd(h.value)} · ${pct(h.weight,1,false)} of the sleeve${h.sleeve ? " · " + esc(h.sleeve) : ""}</p></div>` : "";
@@ -4024,6 +4092,7 @@ async function openName(tk){
   const dr = document.getElementById("drawer");
   document.getElementById("drIn").querySelectorAll("[data-jump]").forEach(b => b.onclick = () => {
     const t = document.getElementById(b.dataset.jump); if(t && t.scrollIntoView) t.scrollIntoView({block: "start", behavior: "smooth"}); });
+  drawerCondense();                       // now, so the drawer never paints unfolded; the observer handles redraws
   document.getElementById("scrim").classList.add("on");
   dr.classList.add("on");
   drawerOpened(tk);
@@ -4483,21 +4552,27 @@ function insiderBlock(tk){
     A sale is shown as under a plan only when the filing's footnotes name a Rule 10b5-1 plan; the form's own
     plan checkbox is not in this data. Not tested against returns: something to be aware of, not a signal on its own.</div></div>`;
 }
-function rangeBar(v2){
+function rangeBar(v2, compact = false){
   if(!v2 || v2.trade_low == null) return "";
   const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
-  return `<div class="sec"><h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing ? timingLbl(v2.timing) : "")}</span></h4>
+  const top = `<h4>Risk ranges <span class="muted" style="font-weight:400">${esc(v2.timing ? timingLbl(v2.timing) : "")}</span></h4>
     <div style="position:relative;height:26px;margin:10px 0;background:linear-gradient(90deg,rgba(63,207,142,.25),rgba(255,255,255,.05),rgba(240,169,74,.25));border-radius:var(--r-xs)">
       <div style="position:absolute;left:${p*100}%;top:-4px;width:2px;height:34px;background:${C.text}"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm)" class="muted"><span>${usd(lo,2)} low</span><span>${usd(px,2)}</span><span>${usd(hi,2)} high</span></div>
-    ${tbl(["Range","Direction","Low","High"], [["Trade (1 week)", esc(v2.trade_dir), usd(v2.trade_low,2), usd(v2.trade_high,2)],
+    <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm)" class="muted"><span>${usd(lo,2)} low</span><span>${usd(px,2)}</span><span>${usd(hi,2)} high</span></div>`;
+  const table = tbl(["Range","Direction","Low","High"], [["Trade (1 week)", esc(v2.trade_dir), usd(v2.trade_low,2), usd(v2.trade_high,2)],
       ["Trend (1 month)", esc(v2.trend_dir), usd(v2.trend_low,2), usd(v2.trend_high,2)],
-      ["Tail (6 months)", esc(v2.tail_dir), usd(v2.tail_low,2), usd(v2.tail_high,2)]])}
-    <div class="note">Trend line ${esc(v2.trend)} since ${esc(v2.trend_since||"—")} · RSI ${num(v2.rsi,0)} (${esc(v2.rsi_regime)}) ·
+      ["Tail (6 months)", esc(v2.tail_dir), usd(v2.tail_low,2), usd(v2.tail_high,2)]]);
+  // data-nofold: this line is readings, not method, so the drawer's note folding leaves it alone
+  const reads = `<div class="note" data-nofold>Trend line ${esc(v2.trend)} since ${esc(v2.trend_since||"—")} · RSI ${num(v2.rsi,0)} (${esc(v2.rsi_regime)}) ·
       ${v2.above_52w_low_avwap ? "above" : "below"} the 52-week-low VWAP ·
       ${v2.above_earnings_avwap == null ? "no earnings anchor" :
         (v2.above_earnings_avwap ? "above" : "below") + " the VWAP since earnings " + esc(v2.earnings_anchor) +
-        " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>
+        " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div>`;
+  if(compact) return `<div class="sec">${top}<div style="margin-top:8px">${reads}</div>
+    ${drFold("Trade, trend and tail ranges, and where each is going", table + rangeMove(v2.ticker))}</div>`;
+  return `<div class="sec">${top}
+    ${table}
+    ${reads}</div>
     ${rangeMove(v2.ticker)}`;
 }
 
@@ -4713,9 +4788,21 @@ function pillarBlock(m){
     ${anchors.length ? `<div class="muted" style="font-size:var(--fs-sm);margin-top:8px">
       <b>P1 is the average of these three anchors:</b>
       ${anchors.map(([l,v]) => esc(l) + " <b>" + (+v).toFixed(1) + "</b>").join(" · ")}</div>` : ""}
-    <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">
+    <div class="muted method" style="font-size:var(--fs-sm);margin-top:6px">
       Valuation sits in none of the pillars by design — V12 removed it, and it lives in the quality
       score and FCF/EV only.${m.score_date ? " Scored " + esc(m.score_date) + "." : ""}</div></div>`;
+}
+// The pillars on one line, for the drawer: the three scores, the composite and its tier, with a
+// floor breach in red. The table and the anchors are pillarBlock(), one click away.
+function pillarLine(m){
+  if(m == null || (m.composite == null && m.p1 == null && m.p2 == null && m.p3 == null))
+    return `<span class="muted">No pillar score for this name yet, so it grades C on that basis alone.</span>`;
+  const v = (x, floor) => x == null ? `<span class="muted">not scored</span>` : `<b class="${floor && +x < 6 ? "neg" : ""}">${(+x).toFixed(2)}</b>`;
+  const comp = m.composite == null ? null : +m.composite;
+  const tier = comp == null ? "" : comp >= 8 ? "Tier 1" : comp >= 6.5 ? "Tier 2" : comp >= 5 ? "under the 6.5 line" : "under 5.0";
+  const breach = [["P2", m.p2], ["P3", m.p3]].filter(([, x]) => x != null && +x < 6).map(x => x[0]);
+  return `Business quality ${v(m.p1)} · Management ${v(m.p2, true)} · Financial strength ${v(m.p3, true)} · composite <b class="${comp != null && comp < 6.5 ? "neg" : ""}">${comp == null ? "—" : comp.toFixed(2)}</b>${
+    tier ? ` <span class="muted">(${tier})</span>` : ""}${breach.length ? ` · ${word(breach.join(" and ") + " below the 6.0 floor", "bad")}` : ""}`;
 }
 function fundaBlock(tk){
   const f = ((typeof LIVE !== "undefined" && LIVE.funda) || {})[tk];
@@ -4750,13 +4837,28 @@ function fundaBlock(tk){
       previous different value, not yesterday: trailing fundamentals step when a filing or screen
       lands. Hover a metric to see which pillar or indicator it feeds.</div></div>`;
 }
-function cardBlock(tk){
+function cardBlock(tk, mode){
   const c = (typeof LIVE !== "undefined" && LIVE.cards) ? LIVE.cards[tk] : null;
   if(!c || !c.card) return "";
   const k = c.card, meta = [c.sub_industry, c.ceo ? "CEO " + c.ceo : null,
     c.founding_year ? "founded " + c.founding_year : null, c.hq_country].filter(Boolean).join(" · ");
   const peers = (c.peers||[]).slice(0,6).map(p => typeof p === "string" ? p : (p.ticker||p.companyKey||""))
     .filter(Boolean);
+  // The drawer's two shorter forms. "brief": what the company does and its story stay in view, the
+  // rest folds. "folded": the whole card is one click away (a holding's thesis already says it).
+  if(mode === "brief" || mode === "folded"){
+    const rest = `${k.fundamentals ? `<h4 style="margin-top:12px">The economics</h4><p>${esc(k.fundamentals)}</p>` : ""}
+      ${k.model_read ? `<h4 style="margin-top:12px">What the model says</h4><p>${esc(k.model_read)}</p>` : ""}
+      ${k.watch ? `<h4 style="margin-top:12px">What would change it</h4><p>${esc(k.watch)}</p>` : ""}
+      ${peers.length ? `<div class="caps" style="margin-top:11px">Peers · ${peers.map(esc).join(" · ")}</div>` : ""}
+      <div class="note" style="margin-top:10px">Written from the company's filings and segment data plus the model's output on ${esc(c.as_of||"")}, and
+        regenerated when the model's read on the name changes. This is a summary, not a thesis: only held names carry a locked thesis with invalidation triggers.</div>`;
+    const top = `${meta ? `<div class="caps" style="margin:2px 0 9px">${esc(meta)}</div>` : ""}<p>${esc(k.business||"")}</p>
+      ${k.story ? `<h4 style="margin-top:12px">The story</h4><p>${esc(k.story)}</p>` : ""}`;
+    return mode === "folded"
+      ? `<div class="sec">${drFold(`About the company: ${esc(c.company_name || tk)}`, top + rest)}</div>`
+      : `<div class="sec"><h4>${esc(c.company_name || tk)}</h4>${top}${drFold("The economics, what the model says, and what would change it", rest)}</div>`;
+  }
   return `<div class="sec"><h4>${esc(c.company_name || tk)}</h4>
     ${meta ? `<div class="caps" style="margin:2px 0 9px">${esc(meta)}</div>` : ""}
     <p>${esc(k.business||"")}</p>
@@ -4898,25 +5000,25 @@ function vdurSplit(v, h, tk){
       <div class="kv"><span class="muted">Visible · next ${H}y</span><b>${pc1(s_)}</b>${RANK(p)}</div>
       <div class="kv"><span class="muted">Terminal · beyond ${H}y</span><b>${pc1(1 - s_)}</b>${RANK(p == null ? null : 100 - p)}</div>
     </div>
-    <div style="margin-top:10px">${tbl(["Horizon", "Visible", "Terminal"], hz.map(([yrs, f, used]) =>
-      [used ? `<b>${yrs} years · used</b>` : `${yrs} years`, pc1(f), f == null ? "—" : pc1(1 - f)]))}</div>
-    <p class="note" style="margin-top:7px">Same company, same price — only the horizon changes. The level is set by the
-      horizon we chose, not by the business.</p>
     <div class="kvs" style="margin-top:12px">
       <div class="kv"><span class="muted">Required FCF growth</span><b style="color:${g>=1?C.red:g>=.5?C.amber:C.text}">${pct(g,0)} a year</b></div>
       ${gap!=null?`<div class="kv"><span class="muted">vs consensus revenue</span><b class="${gap>0?"neg":"pos"}">${gap>=0?"+":""}${(gap*100).toFixed(0)} pts</b></div>`:""}
       <div class="kv"><span class="muted">If long rates rise 1%</span><b class="neg">${pct(+v.shock_100bp,1)}</b></div>
     </div>
     <p class="muted" style="${SUBP}">To justify today's price, free cash flow has to compound at
-      <b>${pct(g,0)}</b> a year for ${H} years${gap!=null?`, which is <b>${Math.abs(gap*100).toFixed(0)} points ${gap>0?"more than":"less than"}</b> the revenue growth analysts forecast`:""}.
-      ${pc1(1 - s_)} of the value sits beyond that window, so it rests on assumptions rather than
-      cash flows anyone can see yet. Discounted at the 10-year Treasury plus ${pct(+v.erp,2,false)}.
+      <b>${pct(g,0)}</b> a year for ${H} years${gap!=null?`, which is <b>${Math.abs(gap*100).toFixed(0)} points ${gap>0?"more than":"less than"}</b> the revenue growth analysts forecast`:""}.</p>
+    ${drFold("The same price at 3, " + H + " and 10 years, and how to read the percentile", `
+    <div style="margin-top:4px">${tbl(["Horizon", "Visible", "Terminal"], hz.map(([yrs, f, used]) =>
+      [used ? `<b>${yrs} years · used</b>` : `${yrs} years`, pc1(f), f == null ? "—" : pc1(1 - f)]))}</div>
+    <p class="muted" style="${SUBP}">Same company, same price: only the horizon changes. The level is set by the
+      horizon we chose, not by the business. ${pc1(1 - s_)} of the value sits beyond the ${H}-year window, so it rests on
+      assumptions rather than cash flows anyone can see yet. Discounted at the 10-year Treasury plus ${pct(+v.erp,2,false)}.
       The gap compares an FCF requirement with a revenue forecast, so read it directionally.</p>
     <p class="muted" style="${SUBP}"><b>How to read the percentile.</b> Across the ${plural(st.n,"name")} scored, the middle 90%
       sit between ${pc1(st.p5)} and ${pc1(st.p95)} visible, and the visible share ranks the names ${tight ? "identically to" : "almost the same as"}
       implied growth, backwards (rank correlation ${rho(st.rhoGrowth)}; ${rho(st.rhoShock)} with the +100bp shock).
       It is one number seen three ways, not three signals — so the percentile is the part worth reading, and the
-      level on its own says little about this company.</p>`;
+      level on its own says little about this company.</p>`)}`;
 }
 function rateBetaBlock(b, tk){
   const head = SUBH("Measured · rate beta", 18);
@@ -4939,7 +5041,8 @@ function rateBetaBlock(b, tk){
       <div class="kv"><span class="muted">Bucket</span><b style="color:${bkCol}">${bkLabel}</b></div>
       <div class="kv"><span class="muted">Market beta · R²</span><b>${num(b.mkt_beta)} · ${num(b.r2)}</b></div>
     </div>
-    <p class="muted" style="${SUBP}">${read} Measured over the last ${b.window_sessions || 252} sessions (${b.obs} usable) as this
+    <p class="muted" style="${SUBP}">${read}</p>
+    <p class="muted method" style="${SUBP}">Measured over the last ${b.window_sessions || 252} sessions (${b.obs} usable) as this
       stock's daily return on SPY and TLT: what it actually did, as against the modelled split above. The two can
       disagree, which is why both are here. The percentile is ranked across the ${Object.keys(LIVE.rbeta || {}).length} core
       companies measured; benchmark and theme ETFs and the micro sleeve are not part of it.</p>`;
@@ -4959,11 +5062,11 @@ function vdurHistory(h){
        (${d("bond_floor_share", 100, 1)} pts), percentile ${first.bond_floor_share_pct == null ? "—" : Math.round(+first.bond_floor_share_pct)}
        to ${last.bond_floor_share_pct == null ? "—" : Math.round(+last.bond_floor_share_pct)}, 10-year yield ${yld(first)} to ${yld(last)}.`;
   return head + `<p class="muted" style="${SUBP};margin-top:0">${summary}</p>
-    <div style="margin-top:8px">${tbl(["Run", "Visible", "Percentile", "Implied growth", "10y yield"], R.slice(0, 8).map(r => [
+    ${drFold(`The latest ${Math.min(8, R.length)} of ${R.length} stored runs`, `<div style="margin-top:4px">${tbl(["Run", "Visible", "Percentile", "Implied growth", "10y yield"], R.slice(0, 8).map(r => [
       esc(r.as_of), pc1(r.bond_floor_share), r.bond_floor_share_pct == null ? "—" : Math.round(+r.bond_floor_share_pct),
       r.implied_fcf_cagr == null ? "—" : pct(+r.implied_fcf_cagr, 0), yld(r)]))}</div>
-    <p class="note" style="margin-top:7px">Latest ${Math.min(8, R.length)} of ${R.length} stored runs. The level moves for every
-      name together when the 10-year yield or the price moves; the percentile is the part that is specific to this company.</p>`;
+    <p class="muted" style="${SUBP}">The level moves for every name together when the 10-year yield or the price moves;
+      the percentile is the part that is specific to this company.</p>`)}`;
 }
 // Rate beta by snapshot as a small chart. The x axis is DATE, not index: the series is weekly (reconstructed
 // from prices) until the nightly job began and daily after, so an index axis would stretch the daily
@@ -5019,17 +5122,17 @@ function rateHistory(h, b){
       ${signedNum(+first.rate_beta)} to ${signedNum(+last.rate_beta)}, ranging ${signedNum(Math.min(...bs))} to ${signedNum(Math.max(...bs))};
       distinguishable from zero (|t| 2 or more) on ${sig} of ${R.length}.${b ? "" : " It has no current rate beta (see above); this is the last stretch it could be measured."}</p>
     <div style="margin-top:8px">${asc.length > 1 ? rateSpark(asc) : ""}</div>
-    <div style="margin-top:8px">${tbl(["Snapshot", "Beta", "t", "Percentile", "Bucket"], R.slice(0, 8).map(r => [
+    ${drFold(`The latest ${Math.min(8, R.length)} snapshots, and how they were sampled`, `<div style="margin-top:4px">${tbl(["Snapshot", "Beta", "t", "Percentile", "Bucket"], R.slice(0, 8).map(r => [
       `<span style="white-space:nowrap">${esc(r.as_of)}</span>` + (r.backfilled ? ' <span class="muted" style="font-size:var(--fs-xs)">reconstructed</span>' : ""),
       signedNum(+r.rate_beta), r.rate_beta_t == null ? "—" : signedNum(+r.rate_beta_t, 1),
       r.backfilled || r.rate_beta_pct == null ? "—" : Math.round(+r.rate_beta_pct),
       r.backfilled ? "—" : bucketOf(r.duration_bucket)]))}</div>
-    <p class="note" style="margin-top:7px"><b>Not evenly sampled.</b> ${cadence} Nightly runs add a point a day from here on, so the
+    <p class="muted" style="${SUBP}"><b>Not evenly sampled.</b> ${cadence} Nightly runs add a point a day from here on, so the
       right-hand end of the chart gets denser; points are spaced by date, and the line between two dots is interpolation.
       Faint dots are snapshots where |t| is under 2 (noise); the dashed line is zero${both ? "; the gold rule marks the first nightly run" : ""}.</p>
-    <p class="note" style="margin-top:7px"><b>Point in time.</b> On a reconstructed date the beta and t-stat are exact: each is a regression on
+    <p class="muted" style="${SUBP}"><b>Point in time.</b> On a reconstructed date the beta and t-stat are exact: each is a regression on
       the price window ending that day. The percentile and bucket on those dates rank today's list of companies, not the one that existed
-      then, so they are left blank rather than shown as if they were known at the time.</p>`;
+      then, so they are left blank rather than shown as if they were known at the time.</p>`)}`;
 }
 // Fetched when a drawer opens, never at boot: the tables gain a row per name per night. The two histories
 // load together and fail separately — rate beta's view is newer (db/029), and a database that lacks it must
@@ -6238,17 +6341,23 @@ async function riskAll(el){
 }
 // The Book, Buy list, Market, Evidence and Reference tabs are composed in v14.js.
 /* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
-function plainBlock(t, badge){
+function plainBlock(t, docState, compact = false){
   const P = t.plain; if(!P) return "";
   const num = (P.numbers||[]).map(n => `<div class="kv"><span class="muted">${esc(n.label)}</span><b>${esc(n.value)}</b></div>`).join("");
   const li  = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
-  return `<div class="sec"><h4>Thesis ${badge}</h4>
+  const why = `<h4 style="margin-top:12px">Why we own it</h4><p>${esc(P.why_we_own)}</p>
+    <h4 style="margin-top:12px">Why this one</h4><p>${esc(P.edge)}</p>`;
+  const watch = `<h4 style="margin-top:12px">What we're watching</h4><ul class="list">${li(P.watch)}</ul>`;
+  const sell = `<h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>`;
+  // In the drawer the snapshot, the numbers and the sell conditions stay in view (they are what a
+  // decision is checked against); the argument and the watch list are one click away.
+  if(compact) return `<div class="sec"><h4>Thesis ${docState}</h4>
     <p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>
-    <h4 style="margin-top:12px">Why we own it</h4><p>${esc(P.why_we_own)}</p>
-    <h4 style="margin-top:12px">Why this one</h4><p>${esc(P.edge)}</p>
-    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}
-    <h4 style="margin-top:12px">What we're watching</h4><ul class="list">${li(P.watch)}</ul>
-    <h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>
+    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${sell}
+    ${drFold("Why we own it, why this one, and what we're watching", why + watch)}</div>`;
+  return `<div class="sec"><h4>Thesis ${docState}</h4>
+    <p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>${why}
+    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${watch}${sell}
   </div>`;
 }
 /* ── THESIS WATCH: is anything this thesis said to watch actually happening? (db/083) ──────────
@@ -6268,7 +6377,7 @@ function watchBadge(tk){
   return badge("thesis", w.status, {title: w.assessed + " of " + w.items + " items assessed · as of " + w.as_of,
     text: esc((BADGES.thesis[w.status] || [w.status])[0]) + (inv ? " · sell condition met" : "")});
 }
-function thesisWatchBlock(tk){
+function thesisWatchBlock(tk, compact = false){
   const w = (LIVE.twatch || {})[tk];
   if(!w) return "";
   const ev = Object.fromEntries((w.evidence || []).map(e => [e.id, e]));
@@ -6304,15 +6413,24 @@ function thesisWatchBlock(tk){
     + (w.error ? `<p class="amber">This name could not be read tonight (${esc(w.error)}), so nothing below is an assessment.</p>` : "")
     + ((w.outside || []).length ? `<h4 style="margin-top:10px">Outside what this thesis tests</h4><ul class="list">${
         w.outside.map(o => `<li>${esc(o.note || "(note withheld)")} <span class="muted">${cite(o.evidence)}</span></li>`).join("")}</ul>` : "");
+  const cols = ["", "What the thesis says to watch", "Verdict", "Reading", "Evidence"];
+  const foot = `<p class="muted method" style="font-size:var(--fs-xs);margin-top:8px">Each verdict is a model's reading of filed quarterly figures, segment lines, this model's own state and three weeks of news, kept only if it cites evidence that was in front of it (hover an id). "Not triggered" on an event means it was not reported in that news window. R = a risk, I = a sell condition. A sell condition assessed as met is kept open until a person resolves it and holds the grade at C meanwhile; nothing else here changes a grade, and nothing changes a thesis or a position.</p>`;
+  if(compact){
+    // The drawer shows what moved; every item, moved or not, is one click away.
+    const hot = (w.results || []).map((r, i) => [r, rows[i]]).filter(([r]) => r.verdict === "TRIGGERED" || r.verdict === "APPROACHING").map(x => x[1]);
+    return `<div class="sec"><h4>Thesis watch</h4>${head}${alerts}
+      ${hot.length ? tbl(cols, hot) : ""}
+      ${rows.length ? drFold(`All ${rows.length} items this thesis says to watch${hot.length ? ` (${hot.length} shown above)` : ", none triggered or approaching"}`, tbl(cols, rows) + foot) : foot}</div>`;
+  }
   return `<div class="sec"><h4>Thesis watch</h4>${head}${alerts}
-    ${rows.length ? tbl(["", "What the thesis says to watch", "Verdict", "Reading", "Evidence"], rows) : ""}
+    ${rows.length ? tbl(cols, rows) : ""}
     <p class="muted" style="font-size:var(--fs-xs);margin-top:8px">Each verdict is a model's reading of filed quarterly figures, segment lines, this model's own state and three weeks of news, kept only if it cites evidence that was in front of it (hover an id). "Not triggered" on an event means it was not reported in that news window. R = a risk, I = a sell condition. A sell condition assessed as met is kept open until a person resolves it and holds the grade at C meanwhile; nothing else here changes a grade, and nothing changes a thesis or a position.</p></div>`;
 }
-function thesisBlock(tk, full=false){
+function thesisBlock(tk, full=false, compact=false){
   const t = LIVE.theses[tk]; if(!t) return "";
   // The document's own state (locked or a draft) is a word beside the heading, not a badge.
   const docState = t.status === "LOCKED" ? word(`· locked v${t.version}`, "dim") : word(`· draft v${t.version} · not yet reviewed`, "bad");
-  const plain = plainBlock(t, docState);
+  const plain = plainBlock(t, docState, compact);
   // The plain version is what people read; the full Catalyst · Edge · Risk record is the process
   // document (every risk carries a watch metric and a trigger) and sits behind a toggle.
   const li = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
@@ -6330,7 +6448,7 @@ function thesisBlock(tk, full=false){
     <h4 style="margin-top:10px">Evidence</h4><ul class="list">${(t.evidence||[]).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.source)}</span> — ${esc(e.fact)}</li>`).join("")}</ul>
     ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}
   </div>`;
-  const watch = thesisProposalBlock(tk) + thesisWatchBlock(tk);
+  const watch = thesisProposalBlock(tk) + thesisWatchBlock(tk, compact);
   if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${docState}</h4>`);
   return watch + plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
 }
@@ -6409,6 +6527,297 @@ async function theses(el){
   el.querySelectorAll("[data-tw]").forEach(b => b.onclick = () => { thesisSel = b.dataset.tw; theses(el); });
 }
 
+/* ═══ PAPER TRADING: EVERY STRATEGY (restored 2026-11-23) ═══════════════════════════════════
+ * This card left the page on 2026-11-22 with the six-tab redesign, when 32 of the 43 paper books were
+ * retired and only the 11 reported ones were kept in view (v14.js paperRecord). Niko, 2026-11-23: "I
+ * don't see the papertrading strategies. Add them back somewhere." It is back, on the Evidence tab
+ * under the forward record, with every book the tracker has ever locked.
+ *
+ * ⚠ RETIRED IS NOT DELETED, AND IT IS NOT LIVE. paper_tracker.RETIRED books have no new lock and no
+ * mark after 2026-11-20 (RETIRED_ON); their lines end there. Each retired group says so in its name
+ * and in its note, so a line that stops is read as a book that stopped, not a book that went flat.
+ * The process group is what is reported and what the hypothesis register compares.
+ * ════════════════════════════════════════════════════════════════════════════════════════════ */
+// The registry of every book paper_tracker.py locks (its STRATS; 36 on 2026-10-16). Labels and colours are editorial,
+// so this is a registry rather than a loop over whatever the database holds, and the failure that invites is the one
+// that already happened: the stats table and the chart iterated PAPER_LABEL, so a book missing from it did not render at
+// all. value_implied_growth was invisible from 2026-10-08 and 17 more joined it on 10-16. paperCard() now diffs the data
+// against this registry and shows anything unregistered under "Unlabelled" with a warning, so the next omission is loud.
+// Strategy KEYS are never renamed here or in the tracker: they key the locked rows in ic_paper_positions and ic_paper_nav.
+const PAPER_RETIRED_ON = "2026-11-20";       // scripts/paper_tracker.py RETIRED_ON
+const PAPER_LABEL = {
+  // The process's own books (V14, first locked 2026-11-20) and the valuation test (2026-11-05)
+  proc_qgs25:"The buy list", proc_qgs25_brake:"The buy list, with the brake", proc_qgs25_no_pillar:"The buy list, no pillar vetoes",
+  proc_qgs25_defer:"The buy list, entries deferred", val_brake_kept:"Valuation test: kept", val_brake_cut:"Valuation test: cut",
+  ls_val_brake:"Valuation test: kept minus cut",
+  grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Strong Buy", tech_buy:"Technical Buy only", grade_a:"Grade A only",
+  ls_a_buy_vs_q4_weak:"Long A+Buy / Short weak Q4", ls_a_buy_vs_cd_sell:"Long A+Buy / Short C-D Sell",
+  grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
+  quad_q1:"Q1 names", quad_q2:"Q2 names", quad_q3:"Q3 names", quad_q4:"Q4 names", universe_ew:"Universe EW",
+  proposal:"Proposal", actual_book:"Today's book, paper", spy:"SPY",
+  // Duration. "Modelled" = the DCF split of a price into visible cash flows and terminal value; "Measured" = each name's
+  // observed beta to TLT with SPY held constant. The basis is in the label because the two L/S books read as opposites
+  // and are not (see PAPER_NOTES.duration), and the side each one holds is in the label for the same reason.
+  value_implied_growth:"Modelled: low implied growth", dur_terminal_heavy:"Modelled: high implied growth",
+  ls_visible_vs_terminal:"Modelled L/S: long visible / short terminal",
+  rate_long_duration:"Measured: high rate beta", rate_short_duration:"Measured: low rate beta",
+  ls_rate_duration:"Measured L/S: long high / short low beta",
+  // Factors, one pair each: the long-only "tilt" (top fifth) and its long/short (top fifth against the bottom fifth)
+  fac_value:"Value tilt", ls_fac_value:"Value L/S", fac_momentum:"Momentum tilt", ls_fac_momentum:"Momentum L/S",
+  fac_quality:"Quality tilt", ls_fac_quality:"Quality L/S", fac_lowvol:"Low-vol tilt", ls_fac_lowvol:"Low-vol L/S",
+  fac_size:"Small-cap tilt", ls_fac_size:"Small-cap L/S", fac_growth:"Growth tilt", ls_fac_growth:"Growth L/S"};
+// Colour carries the relationship. Duration: cyan = Modelled, amber = Measured, each long-only book darker than its L/S.
+// Factors: one hue per factor with the L/S a lighter tint of its tilt's hue. violet (Universe EW) and grey (SPY) are
+// the references and are kept out of both families. L/S books are also drawn dashed (any key starting ls_).
+const PAPER_COL = {proc_qgs25:C.green, proc_qgs25_brake:C.accent2, proc_qgs25_no_pillar:"#d4b25c", proc_qgs25_defer:"#c9a1ff",
+  val_brake_kept:"#a78bfa", val_brake_cut:"#c77dff", ls_val_brake:"#e0c3ff",
+  grid_ab_buy:C.green, grid_a_buy:"#2fa874", tech_buy:C.accent2, grade_a:"#c9a1ff", grade_cd:"#b66",
+  ls_a_buy_vs_q4_weak:"#e8c468", ls_a_buy_vs_cd_sell:"#d98cb3",
+  ab_not_down:"#7fd1c8", grade_ab:"#9ab", ab_tech_weak:"#d98", quad_q1:C.q.Q1, quad_q2:C.q.Q2, quad_q3:C.q.Q3, quad_q4:C.q.Q4,
+  universe_ew:C.violet, proposal:C.accent, actual_book:C.gold, spy:C.muted,
+  value_implied_growth:"#4cc9f0", dur_terminal_heavy:"#3a86d6", ls_visible_vs_terminal:"#a5e4f7",
+  rate_long_duration:"#ff9f43", rate_short_duration:"#c97a2b", ls_rate_duration:"#ffd199",
+  fac_value:"#3fcf8e", ls_fac_value:"#a1ead0", fac_momentum:"#4d8bff", ls_fac_momentum:"#a9c6ff",
+  fac_quality:"#f2c744", ls_fac_quality:"#f7e3a0", fac_lowvol:"#ec6fb0", ls_fac_lowvol:"#f6b5d7",
+  fac_size:"#ff8a5c", ls_fac_size:"#ffc3ab", fac_growth:"#35d0d0", ls_fac_growth:"#a2ecec"};
+const PAPER_FACTOR_NAME = {value:"Value", momentum:"Momentum", quality:"Quality", lowvol:"Low volatility", size:"Size (high = small)", growth:"Growth"};
+const PAPER_TIP = {   // hover text on the series name: construction and, for the duration books, which side each leg holds
+  proc_qgs25:"Top 25 by QGS among core names no veto holds down, equal weight, relocked monthly.",
+  proc_qgs25_brake:"The buy list's daily return scaled by the brake's exposure the night before; the rest in cash at zero.",
+  proc_qgs25_no_pillar:"The same list with the pillar vetoes switched off; thesis vetoes kept. Its gap to the buy list is what the pillar veto is worth.",
+  proc_qgs25_defer:"The same list, a name in a 200-day downtrend not entered until it leaves it.",
+  val_brake_kept:"Names the model would buy, outside the richest fifth on valuation.",
+  val_brake_cut:"Names the model would buy, inside the richest fifth on valuation.",
+  ls_val_brake:"Long kept, short cut at half size. Read this spread, not either leg.",
+  value_implied_growth:"MODELLED. Long the fifth of core names whose price needs the LEAST free-cash-flow growth (lowest implied FCF CAGR) = the visible-heavy end of the DCF split, read as short duration. Equal weight, fully invested.",
+  dur_terminal_heavy:"MODELLED. Long the fifth whose price needs the MOST growth (highest implied FCF CAGR) = the terminal-heavy end of the DCF split, read as long duration. Equal weight, fully invested.",
+  ls_visible_vs_terminal:"MODELLED. 100% long the visible-heavy fifth (read as SHORT duration), 50% short the terminal-heavy fifth (read as LONG duration).",
+  rate_long_duration:"MEASURED. Long the fifth with the highest TLT beta, SPY held constant: it rallies when long yields fall = long duration. Equal weight, fully invested.",
+  rate_short_duration:"MEASURED. Long the fifth with the lowest TLT beta: it has done better when long yields rose = short duration. Most of this fifth is not statistically distinguishable from zero. Equal weight, fully invested.",
+  ls_rate_duration:"MEASURED. 100% long the long-duration fifth (high TLT beta), 50% short the short-duration fifth (low TLT beta). On its face the reverse of the Modelled L/S, but in practice it holds the same side of the same names."};
+Object.entries(PAPER_FACTOR_NAME).forEach(([f, n]) => {
+  PAPER_TIP["fac_" + f] = `Long the top fifth of core names on ${n}, equal weight, fully invested.`;
+  PAPER_TIP["ls_fac_" + f] = `100% long the top fifth on ${n}, 50% short the bottom fifth.`;
+});
+// Three different questions, so three views rather than 36 undifferentiated lines. `refs` are drawn in a view whose
+// own books are younger than the references (Universe EW is what a long-only tilt has to beat; SPY is the market).
+const PAPER_GROUPS = [
+  {id:"process", name:"Process books · reported", refs:["actual_book","proposal","universe_ew","spy"],
+    keys:["proc_qgs25","proc_qgs25_brake","proc_qgs25_no_pillar","proc_qgs25_defer","val_brake_kept","val_brake_cut","ls_val_brake"]},
+  {id:"model", name:"Grid and quad books · retired", refs:[], keys:["grid_ab_buy","grid_a_buy","tech_buy","grade_a","ls_a_buy_vs_q4_weak","ls_a_buy_vs_cd_sell",
+    "grade_cd","ab_not_down","grade_ab","ab_tech_weak","quad_q1","quad_q2","quad_q3","quad_q4","universe_ew","proposal","actual_book","spy"]},
+  {id:"duration", name:"Duration · retired", refs:["universe_ew","spy"], keys:["value_implied_growth","dur_terminal_heavy","ls_visible_vs_terminal",
+    "rate_long_duration","rate_short_duration","ls_rate_duration"]},
+  {id:"factor", name:"Factors · retired", refs:["universe_ew","spy"], keys:Object.keys(PAPER_FACTOR_NAME).flatMap(f => ["fac_" + f, "ls_fac_" + f])}];
+const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];   // legend defaults, model view only
+const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
+const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
+// The first monthly lock struck on the V13 grade (a percentile rank) and the V13 quad (latest quarter).
+// Every book that selects on a grade or a quadrant holds names chosen by the V12.2 rules before this
+// date and by the V13 rules from it, so the line is one record of two selection rules.
+const PAPER_V13_LOCK = "2026-12-01";
+const PAPER_FALLBACK_COL = ["#e07a5f", "#81b29a", "#f2cc8f", "#8ab6d6", "#c8a2c8"];   // for unregistered books only
+let paperRange = "all";                      // YTD / 1Y / All
+let paperGroup = "process";
+const PAPER_RETIRED_NOTE = `<div style="margin-bottom:6px"><b style="color:var(--text)">These books were retired on ${PAPER_RETIRED_ON}.</b>
+  No new lock and no mark after that date, so every line here ends there. Their locked positions and history are kept, and
+  un-retiring one is an edit to the tracker. SPY, the equal-weight universe, the actual book and the proposal are still marked nightly.</div>`;
+// The two duration L/S books as they were actually LOCKED: how many names each side they share. Read from the locked
+// positions rather than written into the page, so it stays true after the next monthly lock. null if unavailable.
+async function paperDurationOverlap(){
+  try{
+    const ids = ["ls_visible_vs_terminal", "ls_rate_duration"];
+    const rows = await qAll("site_paper_positions", r => r.in("strategy", ids).order("strategy").order("rebalance_date").order("ticker"));
+    const latest = {}, book = {};
+    rows.forEach(r => { if(!latest[r.strategy] || r.rebalance_date > latest[r.strategy]) latest[r.strategy] = r.rebalance_date; });
+    rows.forEach(r => { if(r.rebalance_date === latest[r.strategy]) (book[r.strategy] ||= {})[r.ticker] = +r.weight; });
+    const a = book[ids[0]], b = book[ids[1]];
+    if(!a || !b) return null;
+    const o = {both_long:0, both_short:0, vis_long_rate_short:0, vis_short_rate_long:0, dates:[...new Set(ids.map(i => latest[i]))].sort()};
+    Object.keys(a).forEach(t => {
+      if(!(t in b)) return;
+      if(a[t] > 0 && b[t] > 0) o.both_long++; else if(a[t] < 0 && b[t] < 0) o.both_short++;
+      else if(a[t] > 0) o.vis_long_rate_short++; else o.vis_short_rate_long++;
+    });
+    return o;
+  }catch(e){ return null; }
+}
+const PAPER_NOTES = {
+  process: () => `<b style="color:var(--text)">The four buy-list books started at the 2026-11-20 close, so there is almost no record yet.</b>
+       Each differs from "The buy list" by exactly one rule, so a gap between two of them is that rule's effect: the brake, the pillar
+       vetoes, deferring an entry in a downtrend. The valuation test asks whether, among names the model would buy, the richest fifth does
+       worse; its first lock was struck intraday on a day SPY fell 4%, so read the kept-minus-cut spread and not either leg.
+       Nothing here is reconstructed. Returns are before costs and taxes. The hypothesis register above reads these same books.`,
+  model: () => PAPER_RETIRED_NOTE + `<b>"Today's book, paper" is not the fund's recorded performance.</b> It is the names held today at their
+       current dollar weights, re-locked monthly and marked from the first day in view, with no cash and none of the positions
+       since sold. The recorded return, cash and past holdings included, is on <a href="#performance">Performance</a>.
+       Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
+       one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
+       returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
+       unreliable regardless.
+       <div style="margin-top:6px"><b>The grade and the quadrant changed definition on 2026-11-18 (V13).</b> Books here that select on either
+       were locked under the old rules and were due to re-lock under the new ones on ${PAPER_V13_LOCK}. They were retired before that,
+       so every return here was selected under the earlier rules: the gates-based grade and the forward-versus-trailing quad.</div>`,
+  duration: ov => {
+    const same = ov ? `As locked ${ov.dates.join(" / ")}: <b>${plural(ov.both_long,"name")} are long in both books and ${ov.both_short} are short in both</b>; only
+         ${ov.vis_long_rate_short + ov.vis_short_rate_long} sit on opposite sides (${ov.vis_long_rate_short} and ${ov.vis_short_rate_long}).`
+      : `Measured 2026-10-16: 23 names long in both books, 31 short in both, 9 and 10 on opposite sides (the locked positions could not be read just now).`;
+    return PAPER_RETIRED_NOTE + `<div><b style="color:var(--text)">The two long/short books are not opposites, although they read as if they were.</b> Modelled L/S is long
+       visible-heavy names (read as short duration) and short terminal-heavy ones (read as long duration); Measured L/S is long high rate-beta names
+       (long duration) and short low ones. In this universe the two measures disagree, so the books hold the same side of the same names. ${same}</div>
+       <div style="margin-top:6px"><b>Modelled</b> = the DCF split of each price into visible cash flows and terminal value; <b>Measured</b> = each name's observed
+       beta to TLT with SPY held constant. Why they disagree: terminal share rises with implied growth, and the largest block of the high-implied-growth names is Information
+       Technology (30 of 77), which tends to move against long bonds once the market is taken out. Measured across 12 monthly vintages, the rank correlation of terminal share with rate beta is &minus;0.20 to +0.07 &mdash;
+       <b>orthogonal, not opposed</b>. (A single date, 2026-10-16, read &minus;0.27 and was quoted here as the headline; it is not representative.) The two are not rival
+       duration measures: the DCF split discounts every name at one rate and fades to one terminal growth, so its only cross-sectional variation is base FCF/EV, and
+       <b>spearman(floor share, implied growth) is &minus;1.000000 on all 27 vintages</b> &mdash; the Modelled L/S is a value spread wearing a duration label.
+       The Measured short leg is mostly noise: <b>80&ndash;88% of it has |t| &lt; 2</b>, no measurable rate beta at all. Each book is a fifth of the core universe,
+       equal weight; the L/S books run 100% long / 50% short.
+       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded.</b> These books were first locked 2026-10-16; earlier marks were rebuilt
+       from point-in-time sources on 2026-10-17. The panel is today&rsquo;s universe looking backwards, so every long-only book is flattered by survivorship &mdash;
+       <code>ic_price_history</code> holds no delisted name at all. An adversarial review on 2026-10-20 rated most of these books DO-NOT-USE; read
+       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code> before quoting any figure here.</div></div>`;
+  },
+  factor: () => PAPER_RETIRED_NOTE + `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
+       An <b>L/S</b> holds that fifth long against the bottom fifth short (100% long / 50% short, drawn dashed in the tint of its tilt's colour), which takes the market out
+       and asks whether the factor premium itself is being paid. Size is oriented so that high means small: the Small-cap books are long the smallest names.
+       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded</b>, and the honest start differs by factor: Value, Low-vol and Growth
+       begin late June 2026 because <code>pe_forward</code> and <code>beta</code> have no point-in-time source at all. Momentum, Quality and Size were rebuilt further
+       back, but the <code>companies</code> table itself only begins 2026-06-04, so <b>2026-07-01 is the first lock struck on a universe the model actually held</b>.
+       Survivorship flatters every long-only book. An adversarial review on 2026-10-20 rated most of these DO-NOT-USE &mdash; see
+       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code>.</div>`
+};
+async function paperCard(el){
+  let rows;
+  try{ rows = await qAll("site_paper_nav", r => r.order("nav_date").order("strategy")); }   // (nav_date, strategy) is unique: with only nav_date, ties let a page boundary drop or repeat rows
+  catch(e){ el.innerHTML = card("Paper trading · every strategy", "could not be loaded", gapBox("The paper record did not load.", e.message || String(e))); return; }
+  if(!rows.length){ el.innerHTML = card("Paper trading · every strategy", "empty", gapBox("The paper record has no rows.", "This is an empty table, not a strategy with no return.")); return; }
+  const all = {}; rows.forEach(r => (all[r.strategy] ||= []).push(r));
+  const lastDate = rows.reduce((a, r) => r.nav_date > a ? r.nav_date : a, "");
+  // Anything in the data the registry does not know is shown, never silently dropped.
+  const groups = PAPER_GROUPS.slice();
+  const unlabelled = Object.keys(all).filter(k => !(k in PAPER_LABEL)).sort();
+  unlabelled.forEach((k, i) => { PAPER_LABEL[k] = k + " (unlabelled)"; PAPER_COL[k] = PAPER_FALLBACK_COL[i % PAPER_FALLBACK_COL.length]; });
+  if(unlabelled.length) groups.push({id:"other", name:"Unlabelled", refs:["spy"], keys:unlabelled});
+  const avail = groups.filter(g => g.keys.some(k => all[k]));
+  if(!avail.some(g => g.id === paperGroup)) paperGroup = (avail[0] || groups[0]).id;
+  const overlap = avail.some(g => g.id === "duration") ? await paperDurationOverlap() : null;
+  const cutoff = () => {
+    // Every boundary is derived from lastDate, the newest NAV in the data, NOT from today's clock.
+    // A paper NAV is only marked when paper_tracker runs, so on a day the chain has not run yet —
+    // or the morning after a quarter turns — a clock-derived QTD would start a window the data has
+    // no marks in and the chart would read empty rather than "not marked yet".
+    if(paperRange === "qtd"){
+      const m = +lastDate.slice(5,7);
+      return `${lastDate.slice(0,4)}-${String(3 * Math.floor((m - 1) / 3) + 1).padStart(2,"0")}-01`;
+    }
+    if(paperRange === "ytd") return lastDate.slice(0,4) + "-01-01";
+    if(paperRange === "1y"){ const d = new Date(lastDate); d.setFullYear(d.getFullYear()-1); return d.toISOString().slice(0,10); }
+    return "0000-01-01";
+  };
+  const box = document.createElement("div"); box.style.marginTop = "16px"; el.appendChild(box);
+
+  const draw = () => {
+    const grp = avail.find(g => g.id === paperGroup);
+    const view = [...grp.keys, ...grp.refs.filter(k => !grp.keys.includes(k))].filter(k => all[k]);
+    // A view of young books starts at the first of them, not at the references' first day: Universe EW and SPY run from
+    // January, and drawn from there the new books would sit as a few dots at the far right of an empty chart.
+    const firstOf = k => all[k][0].nav_date;
+    const retired = ["model", "duration", "factor"].includes(grp.id);
+    const born = ["model", "other"].includes(grp.id) ? "0000-01-01" : grp.keys.filter(k => all[k]).map(firstOf).sort()[0];
+    const from = [cutoff(), born].sort().pop();
+    const by = {};
+    view.forEach(s => { const w = all[s].filter(r => r.nav_date >= from); if(w.length) by[s] = w; });
+    const days = [...new Set(Object.values(by).flat().map(r => r.nav_date))].sort();
+    const start_ = days[0], liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
+    const spyAt = d => { const r = (by.spy||[]).filter(x => x.nav_date <= d).slice(-1)[0]; return r ? +r.nav : null; };
+    const rf = (D.perf && D.perf.rf_mean) || 0;
+    const sharpe = ser => {
+      const r = ser.map(x => x.daily_return).filter(v => v != null).map(Number);
+      if(r.length < 20) return null;
+      const m = r.reduce((a,b)=>a+b,0) / r.length;
+      const sd = Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0) / (r.length-1));
+      return sd > 0 ? (m*252 - rf) / (sd*Math.sqrt(252)) : null;
+    };
+    const stats = view.filter(s => by[s]).map(s => {
+      const first = by[s][0], last = by[s].slice(-1)[0];
+      const ret = +last.nav / +first.nav - 1;
+      const s0 = spyAt(first.nav_date), s1 = spyAt(last.nav_date);
+      const bench = s0 && s1 ? s1 / s0 - 1 : null;
+      const sh = sharpe(by[s]);
+      return [`<span title="${esc(PAPER_TIP[s] || "")}"><span style="color:${PAPER_COL[s]}">&#9679;</span> ${esc(PAPER_LABEL[s])}</span>`,
+              `<span class="muted" style="font-size:var(--fs-sm)">${first.nav_date}</span>`,
+              pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
+              sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
+    });
+    const btn = (k, label) => `<button class="lock" data-range="${k}"${paperRange===k?' style="border-color:var(--brand);color:var(--text)"':""}>${label}</button>`;
+    const gbtn = g => `<button class="lock" data-group="${g.id}"${paperGroup===g.id?' style="border-color:var(--brand);color:var(--text)"':""}>${esc(g.name)}</button>`;
+    const span = grp.id === "model"
+      ? `since ${start_} · ${plural(days.length,"trading day")} · <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${plural(liveDays,"day")} since`
+      : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"}`
+          + (grp.id === "process" ? " · forward-locked, nothing reconstructed" : start_ < "2026-10-16" ? " · reconstructed before 2026-10-16" : " · forward-locked");
+    const retiredTag = retired ? ` · <b class="amber">retired ${PAPER_RETIRED_ON}: no mark after that date</b>` : "";
+    const noteHtml = grp.id === "other"
+      ? `<b style="color:var(--text)">${unlabelled.length} strateg${unlabelled.length === 1 ? "y has" : "ies have"} no label registered in this page</b> (${unlabelled.map(esc).join(", ")}) and
+         ${unlabelled.length === 1 ? "is" : "are"} shown by key. Add ${unlabelled.length === 1 ? "it" : "them"} to PAPER_LABEL, PAPER_COL and PAPER_GROUPS in build_live.py.`
+      : PAPER_NOTES[grp.id](overlap);
+    box.innerHTML = card("Paper trading · every strategy",
+      `${avail.map(gbtn).join(" ")} &nbsp; ${btn("qtd","QTD")} ${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; ${span}${retiredTag} ·
+       each series shown as cumulative % return from its first day in view`,
+      `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
+        tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
+       <div class="muted" style="margin-top:8px">${noteHtml}</div>`);
+    const series = view.filter(s => by[s]).map(s => {
+      const base = +by[s][0].nav;
+      return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3 || by[s].length < 3, symbolSize:7, connectNulls:false,
+        lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s], type:s.startsWith("ls_") ? "dashed" : "solid"},
+        itemStyle:{color:PAPER_COL[s]},
+        // cumulative % return from each series' first day in view, not an index level: the
+        // question is "how much did this strategy make", which a 100-based index makes you do
+        // arithmetic to answer.
+        data:days.map(d => { const x = by[s].find(r => r.nav_date === d); return x ? +((+x.nav / base - 1) * 100).toFixed(2) : null; })};
+    });
+    /* ⚠ "LIVE" IS PER BOOK, NOT ONE DATE (backtesting-frameworks review, 2026-11-17).
+       The marker used to sit at PAPER_LIVE_FROM, 2026-09-15, on every group. That is right for the
+       grid and quad books and WRONG for the others: the duration books went live 2026-10-08/10-16 and
+       the factor books 2026-10-16, so on those groups the chart called a month of reconstruction
+       "live" while the note printed under it said the opposite. The cut now comes from
+       PAPER_RECON_FROM (indicators.js) — the same registry the price chart's paper overlay reads,
+       itself taken from each backfill script's own LIVE_START — and the span before it is SHADED, so
+       the reconstructed stretch reads as a different kind of evidence instead of one unbroken record.
+       A group whose books cut on different dates shades to the LATEST cut: everything before it is
+       reconstructed for at least one book on screen. */
+    const shown = view.filter(s => by[s]);
+    const cuts = shown.map(s => (typeof PAPER_RECON_FROM !== "undefined" && PAPER_RECON_FROM[s]) || null).filter(Boolean).sort();
+    const liveFrom = cuts.length ? cuts[cuts.length - 1] : null;
+    const atOrAfter = d => days.find(x => x >= d);
+    const marks = [[grp.id === "model" ? PAPER_REAL_FROM : null, "model data"], [liveFrom, "live"],
+                   [grp.id === "model" ? PAPER_V13_LOCK : null, "V13 rules"]]
+      .filter(([d]) => d)
+      .map(([d,l]) => { const at = atOrAfter(d); return at && at !== days[0] ? {xAxis:at, label:{formatter:l}} : null; })
+      .filter(Boolean);
+    const liveAt = liveFrom ? atOrAfter(liveFrom) : null;
+    if(series.length && marks.length)
+      series[series.length-1].markLine = {silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dashed"},
+        label:{color:C.muted, fontSize:11}, data:marks};
+    if(series.length && liveAt && liveAt !== days[0])
+      series[series.length-1].markArea = {silent:true, itemStyle:{color:"rgba(255,255,255,.035)"},
+        label:{show:true, position:"insideTopLeft", color:C.dim, fontSize:11},
+        data:[[{name:"reconstructed", xAxis:days[0]}, {xAxis:liveAt}]]};
+    mk(document.getElementById("paperChart"), {
+      legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
+        selected:Object.fromEntries(view.filter(s => by[s]).map(s => [PAPER_LABEL[s], grp.id === "model" ? PAPER_DEFAULT.includes(s) : true]))},
+      grid:{left:56,right:16,top:20,bottom:40},
+      tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : (v > 0 ? "+" : "") + (+v).toFixed(2) + "%"},
+      xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
+      yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:C.line}},
+        axisLabel:{color:C.muted, formatter:v => (v > 0 ? "+" : "") + v + "%"}},
+      series});
+    box.querySelectorAll("button[data-range]").forEach(b => b.onclick = () => { paperRange = b.dataset.range; draw(); });
+    box.querySelectorAll("button[data-group]").forEach(b => b.onclick = () => { paperGroup = b.dataset.group; draw(); });
+  };
+  draw();
+}
 /* ═══ ALERTS — the market-technicals agent's flags, behind a bell in the header ═══════════════
  *
  * scripts/technical_alerts.py writes ic_technical_flags every night (engines/technical_alerts.py
@@ -7088,7 +7497,9 @@ async function evidence(el){
   catch(e){ LIVE.hyp = null; LIVE.hypErr = e.message || String(e); }
   el.innerHTML = head("Evidence", "What we believe, and on what",
     `<span class="muted">${LIVE.hyp ? plural(LIVE.hyp.length, "claim") : "the register did not load"} · forward record</span>`) + hypothesisCards();
-  await section(el, "The forward record", b => paperRecord(b), `<span class="muted">paper books, marked nightly</span>`);
+  await section(el, "The forward record", b => paperRecord(b), `<span class="muted">the reported paper books, marked nightly</span>`);
+  // Every book the tracker has locked, reported and retired, with its chart (paper.js).
+  await section(el, "Paper trading strategies", b => paperCard(b), `<span class="muted">every strategy · the retired ones end 2026-11-20</span>`);
 }
 
 /* ── REFERENCE ─────────────────────────────────────────────────────────────────────────────── */
