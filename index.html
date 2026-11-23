@@ -540,7 +540,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 14:47 · 3ae61ec</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 15:21 · 8298086</div>
   </div>
 </section>
 
@@ -576,7 +576,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 14:47 · 3ae61ec</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 15:21 · 8298086</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -2168,9 +2168,10 @@ const INDICATORS = {
  * `ic_paper_nav` is the out-of-sample record of whether the process beats SPY.
  * V14 (2026-11-22): eleven books are REPORTED (scripts/paper_tracker.py REPORTED: the four process
  * books first locked 2026-11-20, the actual book, the proposal, SPY, the equal-weight universe and
- * the valuation-test trio). The other 32 were RETIRED on 2026-11-20: their history is kept and they
- * are no longer offered here. The cut map below still names them, so a retired book that is ever
- * switched back on is drawn with its reconstructed span marked.
+ * the valuation-test trio). The other 32 were retired on 2026-11-22 and UN-RETIRED on 2026-11-23:
+ * they are locked and marked again, and are drawn on Evidence (paper.js). They are still not offered
+ * as overlays here. The cut map below names them, so one that is ever offered is drawn with its
+ * reconstructed span marked.
  * What follows describes the record as it stood with 39 books marked daily off monthly locks. Drawn here so a book's track can sit under the name you are looking
  * at, which is the comparison the Analytics tab cannot make.
  *
@@ -2223,10 +2224,10 @@ const PAPER_NO_RECON = ["spy", "actual_book", "proposal",
                         // absent from the backfill scripts' registries)
                         "proc_qgs25", "proc_qgs25_brake", "proc_qgs25_no_pillar", "proc_qgs25_defer"];
 
-/* WHAT GETS A TOGGLE: the reported books, and only those (V14, 2026-11-22). A retired book is not
- * offered: its membership stopped being relocked on 2026-11-20, so a line drawn past that date would
- * be a frozen book that still looks like a record. Putting a book in front of a reader costs a
- * deliberate edit here. */
+/* WHAT GETS A TOGGLE: the reported books, and only those (V14, 2026-11-22). The other 32 run again
+ * since 2026-11-23 and are on Evidence; an overlay under a price chart is a claim that the book is
+ * worth comparing a name against, and that is the reported set. Putting another book in front of a
+ * reader here costs a deliberate edit. */
 const PAPER_SHOWN = [
   ["spy",                  "SPY (benchmark)",         "#8d99ae", 1.4],
   ["actual_book",          "The actual book",         "#f0a94a", 1.8],
@@ -6527,24 +6528,19 @@ async function theses(el){
   el.querySelectorAll("[data-tw]").forEach(b => b.onclick = () => { thesisSel = b.dataset.tw; theses(el); });
 }
 
-/* ═══ PAPER TRADING: EVERY STRATEGY (restored 2026-11-23) ═══════════════════════════════════
+/* ═══ PAPER TRADING: EVERY STRATEGY, AND THE BUY-LIST RULE REPLAYED (2026-11-23) ═════════════
  * This card left the page on 2026-11-22 with the six-tab redesign, when 32 of the 43 paper books were
- * retired and only the 11 reported ones were kept in view (v14.js paperRecord). Niko, 2026-11-23: "I
- * don't see the papertrading strategies. Add them back somewhere." It is back, on the Evidence tab
- * under the forward record, with every book the tracker has ever locked.
+ * retired. Niko, 2026-11-23: "I don't see the papertrading strategies. Add them back somewhere", then
+ * "unretire the paper trading. I want those to keep running". Every book is locked monthly and marked
+ * nightly again (paper_tracker.RETIRED is empty), and all of them are here, in four groups.
  *
- * ⚠ RETIRED IS NOT DELETED, AND IT IS NOT LIVE. paper_tracker.RETIRED books have no new lock and no
- * mark after 2026-11-20 (RETIRED_ON); their lines end there. Each retired group says so in its name
- * and in its note, so a line that stops is read as a book that stopped, not a book that went flat.
- * The process group is what is reported and what the hypothesis register compares.
+ * ⚠ REPORTED IS STILL A SMALLER SET THAN RUNNING. Eleven books are what the notes quote and what the
+ * hypothesis register compares (the "Process books" group and v14.js paperRecord). The other 32 run
+ * and are drawn here; nothing reads them to make a claim.
+ *
+ * backtestCard() below is a DIFFERENT KIND OF EVIDENCE and a different table: the buy-list rule
+ * replayed from 2009 (ic_process_backtest). It is never drawn on the same axes as a paper book.
  * ════════════════════════════════════════════════════════════════════════════════════════════ */
-// The registry of every book paper_tracker.py locks (its STRATS; 36 on 2026-10-16). Labels and colours are editorial,
-// so this is a registry rather than a loop over whatever the database holds, and the failure that invites is the one
-// that already happened: the stats table and the chart iterated PAPER_LABEL, so a book missing from it did not render at
-// all. value_implied_growth was invisible from 2026-10-08 and 17 more joined it on 10-16. paperCard() now diffs the data
-// against this registry and shows anything unregistered under "Unlabelled" with a warning, so the next omission is loud.
-// Strategy KEYS are never renamed here or in the tracker: they key the locked rows in ic_paper_positions and ic_paper_nav.
-const PAPER_RETIRED_ON = "2026-11-20";       // scripts/paper_tracker.py RETIRED_ON
 const PAPER_LABEL = {
   // The process's own books (V14, first locked 2026-11-20) and the valuation test (2026-11-05)
   proc_qgs25:"The buy list", proc_qgs25_brake:"The buy list, with the brake", proc_qgs25_no_pillar:"The buy list, no pillar vetoes",
@@ -6604,11 +6600,11 @@ Object.entries(PAPER_FACTOR_NAME).forEach(([f, n]) => {
 const PAPER_GROUPS = [
   {id:"process", name:"Process books · reported", refs:["actual_book","proposal","universe_ew","spy"],
     keys:["proc_qgs25","proc_qgs25_brake","proc_qgs25_no_pillar","proc_qgs25_defer","val_brake_kept","val_brake_cut","ls_val_brake"]},
-  {id:"model", name:"Grid and quad books · retired", refs:[], keys:["grid_ab_buy","grid_a_buy","tech_buy","grade_a","ls_a_buy_vs_q4_weak","ls_a_buy_vs_cd_sell",
+  {id:"model", name:"Grid and quad books", refs:[], keys:["grid_ab_buy","grid_a_buy","tech_buy","grade_a","ls_a_buy_vs_q4_weak","ls_a_buy_vs_cd_sell",
     "grade_cd","ab_not_down","grade_ab","ab_tech_weak","quad_q1","quad_q2","quad_q3","quad_q4","universe_ew","proposal","actual_book","spy"]},
-  {id:"duration", name:"Duration · retired", refs:["universe_ew","spy"], keys:["value_implied_growth","dur_terminal_heavy","ls_visible_vs_terminal",
+  {id:"duration", name:"Duration", refs:["universe_ew","spy"], keys:["value_implied_growth","dur_terminal_heavy","ls_visible_vs_terminal",
     "rate_long_duration","rate_short_duration","ls_rate_duration"]},
-  {id:"factor", name:"Factors · retired", refs:["universe_ew","spy"], keys:Object.keys(PAPER_FACTOR_NAME).flatMap(f => ["fac_" + f, "ls_fac_" + f])}];
+  {id:"factor", name:"Factors", refs:["universe_ew","spy"], keys:Object.keys(PAPER_FACTOR_NAME).flatMap(f => ["fac_" + f, "ls_fac_" + f])}];
 const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];   // legend defaults, model view only
 const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
 const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
@@ -6619,9 +6615,9 @@ const PAPER_V13_LOCK = "2026-12-01";
 const PAPER_FALLBACK_COL = ["#e07a5f", "#81b29a", "#f2cc8f", "#8ab6d6", "#c8a2c8"];   // for unregistered books only
 let paperRange = "all";                      // YTD / 1Y / All
 let paperGroup = "process";
-const PAPER_RETIRED_NOTE = `<div style="margin-bottom:6px"><b style="color:var(--text)">These books were retired on ${PAPER_RETIRED_ON}.</b>
-  No new lock and no mark after that date, so every line here ends there. Their locked positions and history are kept, and
-  un-retiring one is an edit to the tracker. SPY, the equal-weight universe, the actual book and the proposal are still marked nightly.</div>`;
+const PAPER_TRACKED_NOTE = `<div style="margin-bottom:6px"><b style="color:var(--text)">These books run, and are not part of the reported record.</b>
+  They are locked monthly and marked nightly like the process books, but the notes and the hypothesis register do not read them.
+  They were retired for one weekend (2026-11-22 to 2026-11-23); no session closed in between, so no mark and no lock was missed.</div>`;
 // The two duration L/S books as they were actually LOCKED: how many names each side they share. Read from the locked
 // positions rather than written into the page, so it stays true after the next monthly lock. null if unavailable.
 async function paperDurationOverlap(){
@@ -6648,7 +6644,7 @@ const PAPER_NOTES = {
        vetoes, deferring an entry in a downtrend. The valuation test asks whether, among names the model would buy, the richest fifth does
        worse; its first lock was struck intraday on a day SPY fell 4%, so read the kept-minus-cut spread and not either leg.
        Nothing here is reconstructed. Returns are before costs and taxes. The hypothesis register above reads these same books.`,
-  model: () => PAPER_RETIRED_NOTE + `<b>"Today's book, paper" is not the fund's recorded performance.</b> It is the names held today at their
+  model: () => PAPER_TRACKED_NOTE + `<b>"Today's book, paper" is not the fund's recorded performance.</b> It is the names held today at their
        current dollar weights, re-locked monthly and marked from the first day in view, with no cash and none of the positions
        since sold. The recorded return, cash and past holdings included, is on <a href="#performance">Performance</a>.
        Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
@@ -6656,13 +6652,14 @@ const PAPER_NOTES = {
        returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
        unreliable regardless.
        <div style="margin-top:6px"><b>The grade and the quadrant changed definition on 2026-11-18 (V13).</b> Books here that select on either
-       were locked under the old rules and were due to re-lock under the new ones on ${PAPER_V13_LOCK}. They were retired before that,
-       so every return here was selected under the earlier rules: the gates-based grade and the forward-versus-trailing quad.</div>`,
+       were locked under the old rules and re-lock under the new ones on ${PAPER_V13_LOCK}: from that date &ldquo;Grade A&rdquo; means the top 15% by
+       ranking and each quadrant is read from the latest reported quarter. Returns on either side of that date belong to different
+       selection rules and should not be read as one record of either.</div>`,
   duration: ov => {
     const same = ov ? `As locked ${ov.dates.join(" / ")}: <b>${plural(ov.both_long,"name")} are long in both books and ${ov.both_short} are short in both</b>; only
          ${ov.vis_long_rate_short + ov.vis_short_rate_long} sit on opposite sides (${ov.vis_long_rate_short} and ${ov.vis_short_rate_long}).`
       : `Measured 2026-10-16: 23 names long in both books, 31 short in both, 9 and 10 on opposite sides (the locked positions could not be read just now).`;
-    return PAPER_RETIRED_NOTE + `<div><b style="color:var(--text)">The two long/short books are not opposites, although they read as if they were.</b> Modelled L/S is long
+    return PAPER_TRACKED_NOTE + `<div><b style="color:var(--text)">The two long/short books are not opposites, although they read as if they were.</b> Modelled L/S is long
        visible-heavy names (read as short duration) and short terminal-heavy ones (read as long duration); Measured L/S is long high rate-beta names
        (long duration) and short low ones. In this universe the two measures disagree, so the books hold the same side of the same names. ${same}</div>
        <div style="margin-top:6px"><b>Modelled</b> = the DCF split of each price into visible cash flows and terminal value; <b>Measured</b> = each name's observed
@@ -6678,7 +6675,7 @@ const PAPER_NOTES = {
        <code>ic_price_history</code> holds no delisted name at all. An adversarial review on 2026-10-20 rated most of these books DO-NOT-USE; read
        <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code> before quoting any figure here.</div></div>`;
   },
-  factor: () => PAPER_RETIRED_NOTE + `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
+  factor: () => PAPER_TRACKED_NOTE + `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
        An <b>L/S</b> holds that fifth long against the bottom fifth short (100% long / 50% short, drawn dashed in the tint of its tilt's colour), which takes the market out
        and asks whether the factor premium itself is being paid. Size is oriented so that high means small: the Small-cap books are long the smallest names.
        <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded</b>, and the honest start differs by factor: Value, Low-vol and Growth
@@ -6723,7 +6720,6 @@ async function paperCard(el){
     // A view of young books starts at the first of them, not at the references' first day: Universe EW and SPY run from
     // January, and drawn from there the new books would sit as a few dots at the far right of an empty chart.
     const firstOf = k => all[k][0].nav_date;
-    const retired = ["model", "duration", "factor"].includes(grp.id);
     const born = ["model", "other"].includes(grp.id) ? "0000-01-01" : grp.keys.filter(k => all[k]).map(firstOf).sort()[0];
     const from = [cutoff(), born].sort().pop();
     const by = {};
@@ -6756,13 +6752,12 @@ async function paperCard(el){
       ? `since ${start_} · ${plural(days.length,"trading day")} · <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${plural(liveDays,"day")} since`
       : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"}`
           + (grp.id === "process" ? " · forward-locked, nothing reconstructed" : start_ < "2026-10-16" ? " · reconstructed before 2026-10-16" : " · forward-locked");
-    const retiredTag = retired ? ` · <b class="amber">retired ${PAPER_RETIRED_ON}: no mark after that date</b>` : "";
     const noteHtml = grp.id === "other"
       ? `<b style="color:var(--text)">${unlabelled.length} strateg${unlabelled.length === 1 ? "y has" : "ies have"} no label registered in this page</b> (${unlabelled.map(esc).join(", ")}) and
          ${unlabelled.length === 1 ? "is" : "are"} shown by key. Add ${unlabelled.length === 1 ? "it" : "them"} to PAPER_LABEL, PAPER_COL and PAPER_GROUPS in build_live.py.`
       : PAPER_NOTES[grp.id](overlap);
     box.innerHTML = card("Paper trading · every strategy",
-      `${avail.map(gbtn).join(" ")} &nbsp; ${btn("qtd","QTD")} ${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; ${span}${retiredTag} ·
+      `${avail.map(gbtn).join(" ")} &nbsp; ${btn("qtd","QTD")} ${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; ${span} ·
        each series shown as cumulative % return from its first day in view`,
       `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
         tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
@@ -6817,6 +6812,60 @@ async function paperCard(el){
     box.querySelectorAll("button[data-group]").forEach(b => b.onclick = () => { paperGroup = b.dataset.group; draw(); });
   };
   draw();
+}
+
+/* ── THE BUY-LIST RULE, REPLAYED FROM 2009 (ic_process_backtest, scripts/process_backtest_load.py) ──
+ * Niko, 2026-11-23: "for the new ones we added, take it back further in a backtest." The four process
+ * paper books were first locked on 2026-11-20. Their RULE has a history: the research replay.
+ *
+ * ⚠ ITS OWN CARD, ITS OWN TABLE, ITS OWN AXIS. A replay is not a paper book: annual filed
+ * fundamentals, trailing growth where the live score uses consensus forward growth, a company list
+ * of survivors only, no pillar scores and no theses (so no veto of either kind), and every rule was
+ * chosen on this same history. Each row says which paper book it stands behind and HOW IT DIFFERS,
+ * in the engine's own words (the `differs` column), and the card says "upper bound, not a forecast".
+ * Three states that must not look alike: the read failed, the table is empty (the load is local and
+ * has not been run), and loaded. Growth of 100 on a LOG axis: on a linear one 17 years of compounding
+ * draws the first decade as a flat line. Month-end points; the statistics are from daily rows. */
+async function backtestCard(el){
+  let B, N;
+  try{ B = await qAll("site_process_backtest_books", r => r.order("position"));
+       N = await qAll("site_process_backtest", r => r.order("nav_date").order("book")); }
+  catch(e){ el.innerHTML = card("The buy-list rule, replayed", "could not be loaded", gapBox("The backtest did not load.", e.message || String(e))); return; }
+  if(!B.length){ el.innerHTML = card("The buy-list rule, replayed", "not loaded",
+      gapBox("No backtest is stored.", "It is loaded locally from the research replay (scripts/process_backtest_load.py). This is an empty table, not a rule with no history.")); return; }
+  const by = {}; N.forEach(r => (by[r.book] ||= []).push([r.nav_date, +r.nav]));
+  const dates = [...new Set(N.map(r => r.nav_date))].sort();
+  const p1 = v => v == null ? "—" : (v * 100).toFixed(1) + "%";
+  const pts = v => v == null ? "" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(1)} pts`;
+  const COL = {bt_qgs25: C.green, bt_qgs25_brake: C.accent2, bt_qgs25_not_down: "#c9a1ff", bt_screen: C.accent, bt_spy: C.muted};
+  const stands = b => b.analog_of ? `stands behind <b>${esc(typeof paperName === "function" ? paperName(b.analog_of) : b.analog_of)}</b>` : "a reference";
+  const rows = B.map(b => [
+    `<span style="color:${COL[b.book] || C.text}">&#9679;</span> <b>${esc(b.label)}</b><div class="nm">${stands(b)}</div>`,
+    `<span class="mono">${p1(+b.cagr)}</span>`,
+    b.excess_cagr == null ? `<span class="muted">—</span>` : `<span class="mono ${cls(+b.excess_cagr)}">${pts(+b.excess_cagr)}</span> <span class="muted">t ${(+b.excess_t).toFixed(1)}</span>`,
+    `<span class="mono">${p1(+b.vol)}</span>`, b.sharpe == null ? "—" : `<span class="mono">${(+b.sharpe).toFixed(2)}</span>`,
+    `<span class="mono neg">${p1(+b.max_drawdown)}</span>`,
+    b.turnover == null ? `<span class="muted">—</span>` : `<span class="mono">${(+b.turnover * 100).toFixed(0)}%</span>`]);
+  const first = B.map(b => b.first_date).sort()[0], last = B.map(b => b.last_date).sort().slice(-1)[0];
+  const loaded = B.map(b => String(b.loaded_at || "").slice(0, 10)).sort().slice(-1)[0];
+  el.innerHTML = card("The buy-list rule, replayed", `${esc(first)} to ${esc(last)} · ${B[0].sessions} sessions · monthly rebalance, equal weight, net of 10bp a side · loaded ${esc(loaded)}`,
+    `<div class="gap" style="margin-bottom:12px"><b>A backtest, not the paper record.</b> The paper books above start on 2026-11-20 and are locked forward. This is their rule run over history, on different data. It is an upper bound, not a forecast: every rule in it was chosen on these same years.</div>
+     ${tbl(["Book", "A year", "Against SPY, a year", "Volatility", "Sharpe", "Worst drawdown", "Turnover a year"], rows)}
+     <div class="chart tall" id="btChart" style="margin-top:14px"></div>
+     <h4 style="${VDUR_H4}">How each differs from the paper book it stands behind</h4>
+     <ul class="list">${B.filter(b => b.differs).map(b => `<li><b>${esc(b.label)}.</b> ${esc(b.rule)} <span class="muted">${esc(b.differs)}</span></li>`).join("")}</ul>
+     <div class="note" style="margin-top:12px">Source: ${esc(B[0].source)}. Sharpe is over the risk-free rate. "Against SPY" is the mean monthly return minus SPY's, times twelve, with a Newey-West t. The chart is growth of 100 on a log scale at month ends; every statistic is computed from daily returns. It is not updated nightly: it changes when the replay is rerun.</div>`);
+  mk(document.getElementById("btChart"), {
+    legend:{top:0,right:0,textStyle:{color:C.muted},icon:"roundRect",itemWidth:12,itemHeight:3},
+    grid:{left:60,right:16,top:28,bottom:28},
+    tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : Math.round(v).toLocaleString()},
+    xAxis:axX({type:"category",data:dates,boundaryGap:false}),
+    yAxis:axY({type:"log", min:50, axisLabel:{color:C.dim,fontSize:11,formatter:v => Math.round(v).toLocaleString()}}),
+    series:B.filter(b => by[b.book]).map(b => { const m = Object.fromEntries(by[b.book]);
+      return {name:b.label, type:"line", symbol:"none", connectNulls:true,
+              lineStyle:{width:b.book === "bt_qgs25" ? 2.2 : 1.4, color:COL[b.book], type:b.book === "bt_spy" ? "dashed" : "solid"},
+              itemStyle:{color:COL[b.book]}, data:dates.map(d => m[d] == null ? null : +m[d].toFixed(2))}; })
+  });
 }
 /* ═══ ALERTS — the market-technicals agent's flags, behind a bell in the header ═══════════════
  *
@@ -7393,7 +7442,8 @@ const HYP_STATUS = {ADOPTED: ["In use", "A rule rests on it"], FORWARD_TEST: ["F
                     CONTEXT: ["Shown only", "On the page for context; it moves nothing"], REJECTED: ["Not used", "Tested and not used"]};
 // The reported paper books (scripts/paper_tracker.py REPORTED) and the date each one's FORWARD record
 // starts. Before that date actual_book is recorded history and universe_ew is a reconstruction, so
-// neither is drawn from earlier. A book not in this list is retired and is not shown.
+// neither is drawn from earlier. A book not in this list still runs (all 32 were un-retired on 2026-11-23)
+// and is on the strategies card below; it is not part of the REPORTED record this table is.
 const PAPER_REPORTED = [
   ["proc_qgs25",           "The buy list",                      "2026-11-20", "Top 25 by QGS among core names no veto holds down, equal weight, relocked monthly"],
   ["proc_qgs25_brake",     "The buy list, with the brake",      "2026-11-20", "The same book's daily return scaled by the brake's exposure the night before; the rest in cash at zero"],
@@ -7478,8 +7528,8 @@ async function paperRecord(el){
   el.innerHTML = card("The forward paper record", `marked to ${esc(newest || "?")} · each book from the date its own forward record starts`,
     tbl(["Book", "Record from", "Sessions", "Return", "SPY, same dates", "Against SPY"], PAPER_REPORTED.map(line)) +
     (dates.length > 1 ? `<div class="chart tall" id="prChart" style="margin-top:14px"></div>`
-      : `<div class="gap" style="margin-top:14px"><b>No chart yet.</b> The process books were first locked at the ${esc(start || "2026-11-20")} close, and one date is not a line. It draws from the second session.</div>`) +
-    `<div class="note" style="margin-top:12px" data-nofold>The four process books started on 2026-11-20: each differs from the first by exactly one rule, so a gap between two of them is that rule's effect. The books that tested single ingredients were retired on that date and are not shown; their locked positions and history are kept. Nothing here is reconstructed: a book's line starts where its forward record does. Returns are before costs and taxes.</div>`);
+      : `<div class="gap" style="margin-top:14px"><b>No chart yet.</b> The process books were first locked at the ${esc(start || "2026-11-20")} close, and one date is not a line. It draws from the second session. Their rule's history is the replay below.</div>`) +
+    `<div class="note" style="margin-top:12px" data-nofold>The four process books started on 2026-11-20: each differs from the first by exactly one rule, so a gap between two of them is that rule's effect. The 32 books that test single ingredients still run and are in "Paper trading strategies" below; they are not part of this reported record. Nothing here is reconstructed: a book's line starts where its forward record does. Returns are before costs and taxes.</div>`);
   if(dates.length > 1){
     const PC = {proc_qgs25: C.green, proc_qgs25_brake: C.accent2, proc_qgs25_no_pillar: C.gold, proc_qgs25_defer: "#c9a1ff", actual_book: C.amber, universe_ew: C.accent, spy: C.muted};
     mk(document.getElementById("prChart"), {
@@ -7498,8 +7548,10 @@ async function evidence(el){
   el.innerHTML = head("Evidence", "What we believe, and on what",
     `<span class="muted">${LIVE.hyp ? plural(LIVE.hyp.length, "claim") : "the register did not load"} · forward record</span>`) + hypothesisCards();
   await section(el, "The forward record", b => paperRecord(b), `<span class="muted">the reported paper books, marked nightly</span>`);
-  // Every book the tracker has locked, reported and retired, with its chart (paper.js).
-  await section(el, "Paper trading strategies", b => paperCard(b), `<span class="muted">every strategy · the retired ones end 2026-11-20</span>`);
+  // The buy-list rule over history: a backtest in its own table, never on a paper book's axes (paper.js).
+  await section(el, "The buy-list rule, replayed from 2009", b => backtestCard(b), `<span class="muted">a backtest, not the paper record</span>`);
+  // Every book the tracker locks, reported and tracked, with its chart (paper.js).
+  await section(el, "Paper trading strategies", b => paperCard(b), `<span class="muted">all 43 books, locked monthly and marked nightly</span>`);
 }
 
 /* ── REFERENCE ─────────────────────────────────────────────────────────────────────────────── */
