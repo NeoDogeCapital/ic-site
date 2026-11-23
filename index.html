@@ -424,6 +424,22 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .qrow .qt{font-weight:600}
 .qrow .qd{grid-column:1/-1;color:var(--muted);font-size:var(--fs-sm);line-height:1.45}
 .qmeta{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;font-size:var(--fs-sm)}
+/* Ruling from the page (db/096): three buttons per item, one form open at a time. */
+.qact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.qact .qb{color:var(--text);min-width:76px}
+.qact .qb.bad{border-color:rgba(239,100,100,.4);color:var(--red)} .qact .qb.ok{border-color:rgba(63,207,142,.35);color:var(--green)}
+.qact .qb:hover,.qform .fbtn:hover{border-color:rgba(106,166,248,.45)} .qact .qb.on{color:var(--text)}
+.qform{margin-top:9px;padding:12px;border:1px solid var(--line2);border-radius:var(--r-md);background:rgba(255,255,255,.02);display:grid;gap:9px;max-width:760px}
+.qform .qwhat{color:var(--text);line-height:1.45}
+.qform textarea{resize:vertical;min-height:76px;font:inherit;font-size:var(--fs-base);line-height:1.45;color:var(--text)}
+.qform textarea:focus{border-color:rgba(106,166,248,.55)}
+.qform .qgo{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qform .fbtn:disabled{opacity:.5;cursor:not-allowed}
+.qform .qsend{color:var(--text)}
+.qpend{margin-top:9px;padding:10px 12px;border:1px solid rgba(240,169,74,.3);border-radius:var(--r-md);display:grid;gap:5px;color:var(--muted);line-height:1.45}
+.qfail{margin-top:9px;padding:10px 12px;border:1px solid rgba(239,100,100,.35);border-radius:var(--r-md);color:var(--text);line-height:1.45}
+.qfail b{color:var(--red)}
+@media (max-width:640px){ .qrow{grid-template-columns:minmax(0,1fr)} .qmeta{justify-content:flex-start} }
 .gap{border:1px dashed var(--line);border-radius:var(--r-md);padding:12px 14px;color:var(--muted)}
 .gap b{color:var(--text)}
 .hyp{padding:12px 2px;border-top:1px solid var(--line)}
@@ -540,7 +556,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 18:00 · 8298086</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 18:35 · 295f7c5</div>
   </div>
 </section>
 
@@ -576,7 +592,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 18:00 · 8298086</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 18:35 · 295f7c5</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -7138,6 +7154,19 @@ async function loadDecisions(){
   catch(e){ LIVE.queue = null; LIVE.queueErr = e.message || String(e); }
   try{ const r = await qAll("site_book_distance"); LIVE.distance = r.length ? r[0] : false; LIVE.distanceErr = null; }
   catch(e){ LIVE.distance = null; LIVE.distanceErr = e.message || String(e); }
+  await loadRulings();
+}
+// Rulings made on this page (db/096). A click FILES a request; scripts/apply_rulings.py applies it
+// through the command line's own functions. `canRule` is asked of the database, never assumed: an
+// account that cannot rule sees the command line instead of buttons, and the database refuses it
+// either way.
+async function loadRulings(){
+  try{ LIVE.rulings = await qAll("site_ruling_requests"); LIVE.rulingsErr = null; }
+  catch(e){ LIVE.rulings = null; LIVE.rulingsErr = e.message || String(e); }
+  if(LIVE.canRule == null){
+    try{ const {data, error} = await SB.rpc("site_can_rule"); if(error) throw error; LIVE.canRule = data === true; }
+    catch(e){ LIVE.canRule = false; LIVE.canRuleErr = e.message || String(e); }
+  }
 }
 
 /* ── TODAY ─────────────────────────────────────────────────────────────────────────────────── */
@@ -7154,22 +7183,146 @@ const Q_RULING = {ACT: "Acting on it", DECLINE: "Declined", DEFER: "Deferred"};
 // Two kinds are ruled with their own command, which is also what clears them from the queue.
 const Q_OWN = {sell_condition: r => `python run.py thesis confirm ${r.ticker} ${r.item_key} "why"   (or: thesis dismiss)`,
                thesis_revision: r => `python run.py thesis accept ${r.ticker} "why"   (or: thesis reject)`};
+const qCmd = r => Q_OWN[r.kind] ? Q_OWN[r.kind](r) : `python run.py decide ${r.id} act|decline|defer "why"`;
+// The command line for ONE ruling on an item: what a button on this page is the same as.
+const qCmdFor = (r, k) => r.kind === "sell_condition" && k !== "DEFER" ? `python run.py thesis ${k === "ACT" ? "confirm" : "dismiss"} ${r.ticker} ${r.item_key} "why"`
+  : r.kind === "thesis_revision" && k !== "DEFER" ? `python run.py thesis ${k === "ACT" ? "accept" : "reject"} ${r.ticker} "why"`
+  : `python run.py decide ${r.id} ${String(k).toLowerCase()} "why"`;
+
+/* RULING FROM THE PAGE (Niko, 2026-11-23). Three buttons on every live item. The button's WORD and
+   the sentence under it say what the ruling does for that kind of item, because Act on a sell
+   condition (the grade becomes D) is not Act on a sector cap (a record that you are dealing with
+   it). The routing itself is engines/decisions.OWN_COMMANDS; this table is its labels. */
+const qWindow = () => { const n = LIVE.distance && LIVE.distance.payload && LIVE.distance.payload.limits && LIVE.distance.payload.limits.ruling_sessions;
+  return n ? `${n} sessions` : "the ruling window"; };
+const Q_BTN = {
+  ACT: ["Act", "", () => "You are doing what the item asks. The trade or the change is still yours to make: this records that you are, and why. The item stays listed as ruled until its condition clears."],
+  DECLINE: ["Decline", "", () => "Considered, and not doing it. The item is not reopened while the same condition persists."],
+  DEFER: ["Defer", "", () => `Postponed by ${qWindow()}. It comes back as open after that.`]};
+const Q_BTN_KIND = {
+  sell_condition: {
+    ACT: ["Confirm", "bad", () => "The thesis is broken. The grade becomes D, and the grid and the proposal are rerun. Nothing is traded."],
+    DECLINE: ["Dismiss", "", () => "The reading was wrong, or the condition was mis-specified. The grade is no longer held at C. The monitor reopens it only on evidence it has not shown before."]},
+  thesis_revision: {
+    ACT: ["Accept", "ok", () => "Locks this revision as the next version of the thesis and retires the current one. Refused while a sell condition on the current thesis is open."],
+    DECLINE: ["Reject", "", () => "The locked thesis stays as it is. The weekly run does not draft this name again for 60 days."]}};
+const qBtn = (kind, ruling) => (Q_BTN_KIND[kind] && Q_BTN_KIND[kind][ruling]) || Q_BTN[ruling];
+// What a ruling is called once made: the two kinds with their own command have their own words.
+const Q_DONE = {sell_condition: {ACT: "Confirmed", DECLINE: "Dismissed"}, thesis_revision: {ACT: "Accepted", DECLINE: "Rejected"}};
+const qDone = r => (Q_DONE[r.kind] && Q_DONE[r.kind][r.ruling]) || Q_RULING[r.ruling] || String(r.ruling || "ruled");
+const Q_MIN = 8, Q_MAX = 2000, Q_SLOW_MS = 10 * 60 * 1000;
+// What is open on the page: one form at a time, and what has been typed in each (kept across redraws).
+const QUI = {form: null, draft: {}, err: {}, busy: false, timer: null};
+const qTime = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}); };
+// The newest request on an item, if it still says something the row does not: one being applied, or
+// one that was not applied and has not been superseded by a later ruling on the row.
+function qLatest(r){
+  const all = (LIVE.rulings || []).filter(x => x.queue_id === r.id).sort((a, b) => b.id - a.id);
+  const x = all[0];
+  if(!x) return null;
+  if(x.status === "PENDING") return x;
+  if((x.status === "REFUSED" || x.status === "FAILED") && !(r.ruled_at && r.ruled_at > x.requested_at)
+     && Date.now() - new Date(x.applied_at || x.requested_at).getTime() < 3 * 86400000) return x;
+  return null;
+}
+function qActions(r){
+  const x = qLatest(r);
+  if(x && x.status === "PENDING"){
+    const slow = Date.now() - new Date(x.requested_at).getTime() > Q_SLOW_MS;
+    return `<div class="qpend" data-nofold>${word(`${esc(qBtn(r.kind, x.ruling)[0])} sent ${esc(qTime(x.requested_at))}`, "warn lbl")}
+      <span>${slow ? `It has not been applied after ten minutes, so the cloud job may not have started. It is applied tonight at the latest; <span class="mono">python run.py decide apply</span> does it now.`
+                   : "Being applied, usually within about two minutes. This page checks every 15 seconds."}</span>
+      <div><b>Reason given:</b> ${esc(x.reason)}</div></div>`;
+  }
+  if(!LIVE.canRule) return r.status === "OPEN" ? `<div class="mono" style="font-size:var(--fs-xs);opacity:.75;margin-top:4px">${esc(qCmd(r))}</div>` : "";
+  const f = QUI.form && QUI.form.id === r.id ? QUI.form : null;
+  const notApplied = x ? `<div class="qfail" role="alert" data-nofold><b>Your ${esc(qBtn(r.kind, x.ruling)[0].toLowerCase())} of ${esc(qTime(x.requested_at))} was not applied.</b>
+      ${esc(String(x.result || "").split("\n").slice(0, 3).join(" "))}</div>` : "";
+  const btns = ["ACT", "DECLINE", "DEFER"].map(k => { const [label, tone] = qBtn(r.kind, k);
+    return `<button class="fbtn qb ${tone}${f && f.ruling === k ? " on" : ""}" data-qid="${r.id}" data-ruling="${k}" aria-expanded="${f && f.ruling === k ? "true" : "false"}">${esc(label)}</button>`; }).join("");
+  const more = r.kind === "thesis_revision" ? `<a class="muted" href="#theses" style="font-size:var(--fs-sm)">read what it changes</a>` : "";
+  const draft = QUI.draft[r.id] || "", n = draft.trim().length;
+  const form = !f ? "" : `<div class="qform">
+      <div class="qwhat"><b>${esc(qBtn(r.kind, f.ruling)[0])}.</b> ${esc(qBtn(r.kind, f.ruling)[2]())}</div>
+      <textarea class="input qwhy" data-qid="${r.id}" rows="3" maxlength="${Q_MAX}" aria-label="Why: the reason for this ruling"
+        placeholder="Why, in a sentence or more. Required: it is written to the journal with the ruling.">${esc(draft)}</textarea>
+      <div class="qgo"><button class="fbtn on qsend" data-qid="${r.id}" ${QUI.busy || n < Q_MIN ? "disabled" : ""}>${QUI.busy ? "Sending…" : `Record: ${esc(qBtn(r.kind, f.ruling)[0].toLowerCase())}`}</button>
+        <button class="fbtn qcancel" data-qid="${r.id}" ${QUI.busy ? "disabled" : ""}>Cancel</button>
+        <span class="muted qcount" style="font-size:var(--fs-sm)">${n < Q_MIN ? `${Q_MIN - n} more character${Q_MIN - n === 1 ? "" : "s"} needed` : `${n} of ${Q_MAX}`}</span></div>
+      ${QUI.err[r.id] ? `<div class="qfail" role="alert" data-nofold><b>Not recorded.</b> ${esc(QUI.err[r.id])}</div>` : ""}
+      <div class="muted" style="font-size:var(--fs-xs)">The same as <span class="mono">${esc(qCmdFor(r, f.ruling))}</span></div>
+    </div>`;
+  return `${notApplied}<div class="qact">${r.status === "RULED" ? `<span class="muted" style="font-size:var(--fs-sm)">Change the ruling:</span>` : ""}${btns}${more}</div>${form}`;
+}
 function queueRow(r, today){
   const [label, tone] = qKind(r.kind);
   const overdue = r.status === "OPEN" && r.due && r.due < today;
   const tk = r.ticker ? `<a href="#book/${esc(r.ticker)}" class="tk" style="text-decoration:none">${esc(r.ticker)}</a> ` : "";
   const title = r.ticker && r.title && r.title.startsWith(r.ticker) ? esc(r.title.slice(r.ticker.length).replace(/^[\s:]+/, "")) : esc(r.title || "");
   const when = r.status === "RULED"
-    ? `${word(Q_RULING[r.ruling] || esc(r.ruling || "ruled"), "lbl")}${r.ruling === "DEFER" && r.due ? `<span class="muted">back on ${esc(r.due)}</span>` : ""}`
+    ? `${word(esc(qDone(r)), "lbl")}${r.ruling === "DEFER" && r.due ? `<span class="muted">back on ${esc(r.due)}</span>` : ""}`
     : overdue ? word(`Overdue since ${esc(r.due)}`, "bad lbl")
     : `<span class="muted">due ${esc(r.due || "not set")}</span>`;
-  const cmd = Q_OWN[r.kind] ? Q_OWN[r.kind](r) : `python run.py decide ${r.id} act|decline|defer "why"`;
-  return `<div class="qrow">
+  return `<div class="qrow" id="qrow-${r.id}">
     <div>${word(esc(label), tone + " lbl")} ${tk}<span class="qt">${title}</span></div>
     <div class="qmeta">${when}<span class="muted" title="Open since">since ${esc(r.opened || "?")}</span></div>
     <div class="qd">${esc(r.detail || "")}${r.status === "RULED" && r.reason ? `<br><b>Reason given:</b> ${esc(r.reason)}` : ""}
-      ${r.status === "OPEN" ? `<div class="mono" style="font-size:var(--fs-xs);opacity:.75;margin-top:4px">${esc(cmd)}</div>` : ""}</div>
+      ${qActions(r)}</div>
   </div>`;
+}
+// One listener on the card, so a redraw never has to rewire anything.
+function queueWire(box){
+  if(!box || box.dataset.wired) return;
+  box.dataset.wired = "1";
+  const redraw = (focus) => { box.innerHTML = queueCard();
+    if(focus){ const t = box.querySelector(`textarea.qwhy[data-qid="${focus}"]`); if(t){ t.focus(); t.setSelectionRange(t.value.length, t.value.length); } } };
+  box.addEventListener("click", async ev => {
+    const b = ev.target.closest ? ev.target.closest("button") : null;
+    if(!b || !b.dataset.qid || QUI.busy) return;
+    const id = +b.dataset.qid;
+    if(b.classList.contains("qb")){
+      QUI.form = QUI.form && QUI.form.id === id && QUI.form.ruling === b.dataset.ruling ? null : {id, ruling: b.dataset.ruling};
+      delete QUI.err[id]; redraw(QUI.form ? id : null); return;
+    }
+    if(b.classList.contains("qcancel")){ QUI.form = null; delete QUI.err[id]; redraw(); queuePoll(box); return; }
+    if(b.classList.contains("qsend") && QUI.form && QUI.form.id === id){
+      const why = (QUI.draft[id] || "").trim(), ruling = QUI.form.ruling;
+      if(why.length < Q_MIN) return;
+      QUI.busy = true; delete QUI.err[id]; redraw();
+      let res = null, msg = null;
+      try{ res = await SB.rpc("site_rule_decision", {p_id: id, p_ruling: ruling, p_reason: why}); if(res.error) msg = res.error.message || String(res.error); }
+      catch(e){ msg = "It could not be sent (" + (e.message || String(e)) + "). Nothing was recorded."; }
+      QUI.busy = false;
+      if(msg){ QUI.err[id] = msg; redraw(id); return; }
+      // The request is stored. Show it as SENT, never as ruled: the row changes when the job has applied it.
+      delete QUI.draft[id]; QUI.form = null;
+      (LIVE.rulings ||= []).push({id: res.data, queue_id: id, ruling, reason: why, status: "PENDING", requested_at: new Date().toISOString()});
+      redraw(); queuePoll(box);
+    }
+  });
+  box.addEventListener("input", ev => {
+    const t = ev.target;
+    if(!t.classList || !t.classList.contains("qwhy")) return;
+    const id = +t.dataset.qid; QUI.draft[id] = t.value;
+    const n = t.value.trim().length, form = t.closest(".qform");
+    const send = form && form.querySelector(".qsend"), ct = form && form.querySelector(".qcount");
+    if(send) send.disabled = n < Q_MIN;
+    if(ct) ct.textContent = n < Q_MIN ? `${Q_MIN - n} more character${Q_MIN - n === 1 ? "" : "s"} needed` : `${n} of ${Q_MAX}`;
+  });
+}
+// While a ruling is being applied, read the queue again every 15 seconds. Never redraws under a
+// form someone is typing in (the read is kept and drawn when the form closes). A timer, not
+// requestAnimationFrame, which does not fire in a background tab.
+function queuePoll(box){
+  clearTimeout(QUI.timer);
+  const pending = (LIVE.rulings || []).some(x => x.status === "PENDING" && Date.now() - new Date(x.requested_at).getTime() < 3 * Q_SLOW_MS);
+  if(!pending) return;
+  QUI.timer = setTimeout(async () => {
+    if(!document.body.contains(box)) return;                        // another tab was opened
+    try{ LIVE.queue = await qAll("site_decision_queue"); LIVE.queueErr = null; LIVE.rulings = await qAll("site_ruling_requests"); }catch(e){ /* keep what is drawn; try again */ }
+    if(!QUI.form && !QUI.busy && document.body.contains(box)) box.innerHTML = queueCard();
+    queuePoll(box);
+  }, 15000);
 }
 function queueCard(){
   const Q = LIVE.queue, today = _todayISO();
@@ -7187,9 +7340,9 @@ function queueCard(){
     (ruled.length ? `<h4 style="${VDUR_H4}">Ruled, and the condition still holds</h4><div>${ruled.map(r => queueRow(r, today)).join("")}</div>` : "") +
     `<h4 style="${VDUR_H4}">Cleared in the last 30 days</h4>` +
     (cleared.length ? `<div class="list">${cleared.map(r => `<div class="li"><span>${word(esc(qKind(r.kind)[0]), "dim lbl")} ${esc(r.title || "")}</span>
-        <span class="muted" style="font-size:var(--fs-sm);white-space:nowrap">${r.ruling ? esc(Q_RULING[r.ruling] || r.ruling) + " · " : ""}cleared ${esc(r.cleared_on || "?")}</span></div>`).join("")}</div>`
+        <span class="muted" style="font-size:var(--fs-sm);white-space:nowrap">${r.ruling ? esc(qDone(r)) + " · " : ""}cleared ${esc(r.cleared_on || "?")}</span></div>`).join("")}</div>`
       : `<div class="muted">None yet. An item is cleared when its condition stops holding.</div>`) +
-    `<div class="note" style="margin-top:12px">A list, not an order book: nothing here trades or changes a grade. An item opens the night its condition first holds and is cleared when the condition stops holding. A ruling is made on the command line and needs a reason, which is written to the journal.</div>`);
+    `<div class="note" style="margin-top:12px">A list, not an order book: nothing here trades or changes a grade. An item opens the night its condition first holds and is cleared when the condition stops holding. A ruling needs a reason, which is written to the journal. ${LIVE.canRule ? "It is made with the buttons on each item or on the command line: a click files the ruling, and a cloud job applies it through the same code as the command line, usually within about two minutes. Until then the item says \"sent\", not ruled." : "It is made on the command line."}${LIVE.rulings == null ? ` <span class="amber">The record of rulings made on this page could not be loaded${LIVE.rulingsErr ? " (" + esc(LIVE.rulingsErr) + ")" : ""}, so a ruling still being applied is not shown as sent.</span>` : ""}</div>`);
 }
 function distanceCard(){
   const R = LIVE.distance;
@@ -7304,8 +7457,10 @@ async function today(el){
   const Q = LIVE.queue, nOpen = Q ? Q.filter(r => r.status === "OPEN").length : null;
   el.innerHTML = head("Today", "What needs a decision",
       `<span class="muted">${nOpen == null ? "the queue did not load" : plural(nOpen, "open item")} · ${plural(D.holdings.length, "holding")} · book ${usd(D.book_value)}</span>`) +
-    (typeof regimeStrip === "function" ? regimeStrip() : "") + queueCard() +
+    (typeof regimeStrip === "function" ? regimeStrip() : "") + `<div id="qbox">${queueCard()}</div>` +
     `<div class="grid g2" style="margin-top:16px">${distanceCard()}${exposureCard()}</div>`;
+  const qbox = el.querySelector ? el.querySelector("#qbox") : null;
+  if(qbox){ queueWire(qbox); queuePoll(qbox); }
   const nb = document.createElement("div"); el.appendChild(nb);
   try{ dailyBrief(nb); }catch(e){ nb.innerHTML = sectionHead("Notes") + gapBox("The notes could not be drawn.", e.message || String(e)); }
 }
