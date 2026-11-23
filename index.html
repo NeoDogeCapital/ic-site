@@ -129,7 +129,8 @@ nav.tabs a.on{color:var(--text);background:var(--brand-soft);box-shadow:inset 0 
 .menupanel a:hover{color:var(--text);background:rgba(255,255,255,.055)}
 .mgrp{padding:9px 11px 3px;color:var(--dim);font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.13em;text-transform:uppercase}
 .menupanel a.on{color:var(--text);background:rgba(106,166,248,.15);box-shadow:inset 0 0 0 1px rgba(106,166,248,.28)}
-/* ⚠ THE TABS GET THEIR OWN ROW ON A DESKTOP. With the brand, the as-of line, nine tabs, two group
+/* ⚠ THE TABS GET THEIR OWN ROW ON A DESKTOP. (Six tabs since V14; the measurement below is from
+   when there were nine and is why the rule exists.) With the brand, the as-of line, nine tabs, two group
    labels, the build stamp, the health badge, Menu and Sign out sharing one row, a 1440px window
    showed five tabs: Signals was cut mid-word and Markets, Memo and Research sat off-screen in a
    strip whose scrollbar is hidden (measured 2026-11-17: 523px visible of 855px). A section nobody
@@ -405,6 +406,23 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 /* daily note on the Holdings tab */
 .brief{border-color:rgba(175,100,82,.28);background:linear-gradient(180deg,rgba(175,100,82,.07),rgba(255,255,255,.012))}
 .brief h3{margin:3px 0 0;font-size:var(--fs-xl);line-height:1.25;font-weight:650}
+/* The daily brief (V14): the day's notes as sections of ONE block, not one card each. */
+.dbrief{border:1px solid var(--line);border-radius:var(--r-md);padding:4px 16px 12px;background:rgba(255,255,255,.012)}
+.dbrief > .card{border:0;border-top:1px solid var(--line);border-radius:0;background:none;margin:0;padding:16px 0 14px;box-shadow:none}
+.dbrief > .card:first-of-type{border-top:0}
+.dbrief .brief h3{font-size:var(--fs-lg)}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;padding:11px 2px;border-top:1px solid var(--line)}
+.qrow:first-child{border-top:0}
+.qrow .qt{font-weight:600}
+.qrow .qd{grid-column:1/-1;color:var(--muted);font-size:var(--fs-sm);line-height:1.45}
+.qmeta{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;font-size:var(--fs-sm)}
+.gap{border:1px dashed var(--line);border-radius:var(--r-md);padding:12px 14px;color:var(--muted)}
+.gap b{color:var(--text)}
+.hyp{padding:12px 2px;border-top:1px solid var(--line)}
+.hyp:first-child{border-top:0}
+.hyp .hc{font-weight:600;line-height:1.4}
+.hyp .hr{color:var(--muted);font-size:var(--fs-sm);line-height:1.5;margin-top:4px}
+.hyp .hf{font-size:var(--fs-sm);margin-top:5px;font-family:var(--mono)}
 .brief.universe{border-color:rgba(63,207,142,.28);background:linear-gradient(180deg,rgba(63,207,142,.06),rgba(255,255,255,.012));margin-bottom:16px}
 .brief.morning{border-color:rgba(106,166,248,.3);background:linear-gradient(180deg,rgba(106,166,248,.07),rgba(255,255,255,.012));margin-bottom:16px}
 .memotag{display:inline-block;font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.1em;text-transform:uppercase;
@@ -493,7 +511,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 02:26 · da624b5</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 08:14 · 599bc66</div>
   </div>
 </section>
 
@@ -505,17 +523,12 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div><b>Integrity Compounders</b><div class="caps" id="asof" style="font-size:var(--fs-xs);letter-spacing:.16em"></div></div>
     </div>
     <nav class="tabs" id="tabs">
-      <a href="#overview" data-v="overview">Overview</a>
-      <a href="#holdings" data-v="holdings">Holdings</a>
-      <a href="#performance" data-v="performance">Performance</a>
-      <a href="#risk" data-v="risk">Risk</a>
-      <span class="navgrp">Universe</span>
-      <a href="#universe" data-v="universe">Universe</a>
-      <a href="#signals" data-v="signals">Signals</a>
-      <a href="#markets" data-v="markets">Markets</a>
-      <span class="navgrp">Process</span>
-      <a href="#memo" data-v="memo">Memo</a>
-      <a href="#research" data-v="research">Research</a>
+      <a href="#today" data-v="today">Today</a>
+      <a href="#book" data-v="book">Book</a>
+      <a href="#buylist" data-v="buylist">Buy list</a>
+      <a href="#market" data-v="market">Market</a>
+      <a href="#evidence" data-v="evidence">Evidence</a>
+      <a href="#reference" data-v="reference">Reference</a>
     </nav>
     <div class="bellwrap">
       <button class="lock bellbtn" id="bellbtn" aria-haspopup="true" aria-expanded="false" aria-controls="bellpanel"
@@ -528,7 +541,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 02:26 · da624b5</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 08:14 · 599bc66</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -774,10 +787,13 @@ async function enter(){
     // Also skip while the page is hidden: a backgrounded tab does not need a re-render.
     try{
       await loadQuotes();
-      const v = (location.hash||"#overview").slice(1).split("/")[0];
+      const v = (location.hash||"#today").slice(1).split("/")[0];
       const drawerOpen = !!document.querySelector(".drawer.on");
       const filtering = document.activeElement && ["INPUT","SELECT","TEXTAREA"].includes(document.activeElement.tagName);
-      if(["overview","holdings"].includes(v) && !drawerOpen && !filtering && !document.hidden) route();
+      // Only the holdings table depends on live quotes, and it redraws in its own box: a full
+      // re-route scrolled a long tab back to the top every minute.
+      if(["book","holdings","performance","history"].includes(v) && !drawerOpen && !filtering && !document.hidden
+         && typeof bookHoldBox !== "undefined" && bookHoldBox && document.contains(bookHoldBox)){ disposeOnly(hCharts); holdings(bookHoldBox); }
     }catch(e){}
   }, 60000);
 }
@@ -1073,6 +1089,7 @@ const sentenceCase = v => { const s = String(v).replaceAll("_", " ").toLowerCase
 const codeLbl = (field, v) => (v == null || v === "") ? "—"
   : ((CODE_LBL[field] || {})[v] ?? (field === "tech_rating" ? techLbl(v) : field === "timing" ? timingLbl(v) : sentenceCase(v)));
 const ENUM_LBL = {tech_rating: techLbl, timing: timingLbl, action: v => codeLbl("action", v),
+                  list_action: v => ({BUY_LIST: "Buy list", HOLD: "Hold", REVIEW: "Review", EXIT: "Exit"}[v] || v),
                   qgs_tier: v => codeLbl("qgs_tier", v), quadrant: v => codeLbl("quad", v),
                   earnings_quality: v => codeLbl("earnings_quality", v), trend: v => codeLbl("trend", v),
                   quality_profile: v => codeLbl("quality_profile", v)};
@@ -1180,7 +1197,7 @@ function renderSortNote(noteId, clearId, cols, get, set, draw){
 // Where the live record stands, in one sentence. st = {from, cum, bench_cum, beta, alpha_ann, t_alpha}.
 function aboutStanding(st){
   if(!st || st.cum == null || st.bench_cum == null)
-    return `the live record is not in the payload, so nothing is claimed here. See <a href="#performance">Performance</a>.`;
+    return `the live record is not in the payload, so nothing is claimed here. See the <a href="#book">Book tab</a>.`;
   const risk = st.beta == null ? "" : st.beta > 1.05 ? ` while carrying more market risk than the index (beta ${num(st.beta)})`
              : ` at a beta of ${num(st.beta)}`;
   const sig = st.t_alpha == null ? "" : Math.abs(st.t_alpha) >= 2 ? ` (t = ${num(st.t_alpha, 1)})`
@@ -1212,8 +1229,10 @@ function about(el){
      capital honestly. We want to own them while the numbers are improving rather than deteriorating, and to
      buy them at sensible points rather than after they have run.
      <br><br><b>How the process is organised:</b> a quality screen defines the universe; every name in it goes
-     through the same quantitative process; the analytics produce a grade and a timing read; the portfolio is
-     built from those outputs; each position carries a written thesis with the conditions that would make us sell.
+     through the same quantitative process; the names are ranked and the highest-ranked that no veto holds down
+     form the buy list; the portfolio is built from that list inside stated limits; each position carries a
+     written thesis with the conditions that would make us sell; and anything that needs a decision is put in
+     front of a person, with a due date, on the Today tab.
    </div></div>` +
   step(1, "The universe — a quality screen, not the whole market", `
     We never start from every listed company. The starting list comes from a Fiscal screen that only admits
@@ -1225,7 +1244,7 @@ function about(el){
       <li>Leverage contained, capital spending not consuming the business</li>
       <li>Buybacks positive, valuation not extreme</li>
     </ul>
-    We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Universe tab"} out of thousands listed. A new screen is
+    We currently track ${nTracked ? `<b>${nTracked}</b> names` : "the names on the Buy list tab"} out of thousands listed. A new screen is
     loaded every week or two${scr ? `; the one in use is dated ${esc(scr)}` : ""}. Every entry and exit
     is logged. A name is never dropped automatically: screen absence is surfaced for review, and holdings are exempt.`) +
   step(2, "The quadrant — growing faster than the field, and is the margin widening?", `
@@ -1277,27 +1296,38 @@ function about(el){
     Neither is a company whose return on invested capital is zero or negative: the score multiplies its parts,
     so a negative return produces a number that means nothing. It is graded C and labelled "not ranked", which
     says the score does not describe it, not that it is a middling company. The vetoes still apply to it.`) +
-  step(6, "Technicals — timing, never thesis", `
-    Technicals decide <i>when</i>, never <i>what</i>:
+  step(6, "Technicals: timing and risk, never selection", `
+    A chart never decides <i>which</i> name. It is read for two things:
     <ul class="list">
-      <li><b>Trend rating</b> (Strong uptrend → Strong downtrend) from the 200-day trend. Its job is risk: names in an
-          uptrend have had a materially lower chance of a large drawdown. We don't initiate into a downtrend.</li>
-      <li><b>Timing</b> from where price sits in its expected range, whether buyers since the 52-week low and
-          since the last earnings report are in profit, and recent bottom or reversal signals. It reads
-          from Low in range to Top of range, or No zone when price qualifies for none: a position, not an
-          instruction, read beside the action.</li>
+      <li><b>The 200-day state</b> (uptrend, flat, downtrend) describes risk. Name by name, a downtrend has gone
+          with about twice the chance of a fall of more than 20% over the next three months, and no higher or
+          lower average return. So a <i>new</i> position waits while a name is in a downtrend, and a holding is
+          never sold for its trend.</li>
+      <li><b>One entry flag</b>: a buy-list name above its 200-day average whose RSI(14) falls under 35. In
+          testing such days were a modestly better entry over the next two weeks, in both halves of the
+          history, and the difference was gone within three months. Suggestive, not established.</li>
     </ul>
-    Each piece was backtested before use; what failed — a second trend line, RSI regimes, exhaustion counts
-    alone — was left out.`) +
-  step(7, "The decision grid", `
-    Grade × trend rating gives the action (accumulate, starter, hold, review, trim, reduce, exit) and timing
-    paces it. "Accumulate · low in range" is a qualified name at the low end of its range; "Accumulate ·
-    upper third of range" is the same company, extended. The grid is a default, not a cage — discretionary overrides are
-    allowed and documented.`) +
+    Everything else on a chart (the track line, the risk ranges, the trend-state colours, volume and insider
+    flags) is description. What was tested and failed is listed on the Evidence tab: holding only names above
+    their 200-day average, buying oversold large caps as a strategy, and a breakout method all lost to the
+    index after 2014.`) +
+  step(7, "The buy list, and four actions", `
+    The list is the 25 highest-ranked core names on Quality Growth Score that no veto holds down. In the
+    17-year replay of this process that selection was the part with evidence behind it; requiring a technical
+    Buy rating on top of it cost return and doubled the trading. Each name the model has a view on carries one
+    of four actions:
+    <ul class="list">
+      <li><b>Buy list</b>: in the list's top names</li>
+      <li><b>Hold</b>: held, nothing against it, outside the top names. Nothing asks for a sale</li>
+      <li><b>Review</b>: a veto holds it down (a pillar score under its line, an open sell condition, no locked thesis)</li>
+      <li><b>Exit</b>: a confirmed sell condition, a composite under 5.0, or both pillar floors breached</li>
+    </ul>
+    The older grade × technical grid is still computed every night and shown in the full table, labelled as
+    such. It no longer decides. Discretionary overrides are allowed and are written down with their reason.`) +
   step(8, "Building the portfolio", `
     <ul class="list">
-      <li><b>Buy from the top of the list</b> — among the names the grid would buy, open slots are filled
-          from the highest Quality Growth Score down</li>
+      <li><b>Buy from the top of the list</b>: open slots are filled from the buy list in rank order,
+          skipping a name whose entry is waiting on a downtrend</li>
       <li><b>Three position sizes</b> — 2% starter, 4% full, 6% the most we will deliberately
           allocate to one name. A winner that drifts above 6% is left alone; nothing is trimmed
           for getting large, and a reduction is always a decision someone makes and records</li>
@@ -1307,7 +1337,7 @@ function about(el){
       <li><b>Turnover control</b> — a supported holding isn't sold merely for being outranked</li>
       <li><b>Drawdown limits</b> — the book is simulated over one year against two limits: the median path
           no worse than ${g1 ? num(g1.p50_limit * 100, 0) : "12"}% and the worst 1-in-20 path no worse than ${g1 ? num(g1.p95_limit * 100, 0) : "20"}%.
-          ${gateNow} A failure is reported as a breach on Overview and Risk; it does not trade anything.
+          ${gateNow} A failure is reported as a breach on the Reference tab's risk detail; it does not trade anything.
           The book is also stress-tested against past crises and factor shocks</li>
     </ul>`) +
   step(9, "The thesis — and what would make us sell", `
@@ -1320,22 +1350,29 @@ function about(el){
           that is not a risk to a business.</li>
     </ul>
     Theses are drafted from primary data, reviewed, then locked. Reviews are quarterly, plus whenever a trigger fires.`) +
-  step(10, "Monitoring, and how a position ends", `
-    Prices refresh through the day. After each close the whole chain reruns: signals, technicals, grid, proposal,
-    risk, income and volatility. A position ends when the thesis breaks, a pillar floor is breached, the grade
-    falls to D, a risk trigger fires, or a portfolio limit forces it out. A falling price alone is not an exit —
-    it is a reason to re-check the thesis.`) +
-  step(11, "What we have proven — and what we haven't", `
+  step(10, "Monitoring, decisions, and how a position ends", `
+    Prices refresh through the day. After each close the whole chain reruns: data, ranks, vetoes, the buy list,
+    the proposal, risk, the thesis monitor and the notes. Anything that then needs a person becomes an item in
+    the <b>decision queue</b> on the Today tab, with a due date: a veto on a holding, a sell condition assessed
+    as met, a sector over its cap, a factor exposure beyond its limit, a thesis revision waiting. An item is
+    ruled on with a reason, which is recorded, and it clears when its condition stops holding. A position ends
+    when the thesis breaks, a pillar floor is breached, a sell condition is confirmed, or a portfolio limit
+    forces it out. A falling price alone is not an exit: it is a reason to re-check the thesis.`) +
+  step(11, "What is supported, and what is not", `
     <ul class="list">
       <li><b>Where we stand:</b> <span id="abStand">${aboutStanding(standing0)}</span></li>
-      <li><b>What the tests support:</b> trend state helps avoid large drawdowns, and buying qualified names at
-          the low end of their range beat buying them extended. In the one point-in-time backtest (January 2024
-          to September 2026, 33 months, grades from a trailing-data proxy) names graded A or B <i>and</i> in an
-          uptrend beat the equal-weighted universe by about 0.6% a month, t = 1.2 — not statistically conclusive.
-          The trend filter did that work: the grade on its own did not beat the universe in that test.</li>
-      <li><b>What we do about it:</b> since September 2026 every variant — the grid's picks, the proposal, the
-          quads, and the real book — is tracked forward monthly against SPY, unedited. That record, not a
-          backtest, is what will show whether the process adds value.</li>
+      <li><b>What the tests support:</b> the screen's quality floors (removing them cost about 2 points a year);
+          ranking on Quality Growth Score (the top 25 returned 19.8% a year against 14.5% for the index in a
+          replay from 2009, a result found on the same history it is reported on); and scaling exposure by the
+          fragility brake, which cut the replay's worst drawdown from about 37% to 25% for about a point and a
+          half of return a year.</li>
+      <li><b>What they do not support:</b> the quad as a way to pick names, a technical rating on top of the
+          rank, and holding only names in an uptrend. The pillar scores have no history and could not be tested
+          at all.</li>
+      <li><b>What we do about it:</b> every claim, its test and its verdict is on the Evidence tab, each with the
+          result that would end it. Four paper books started on 2026-11-20 record the process itself going
+          forward: the buy list, the same with the brake, the same without the pillar vetoes, and the same with
+          the entry deferral. That record, not a replay, is what will show whether the process adds value.</li>
     </ul>`) +
   `<div class="note" style="margin-top:18px">Integrity Wealth Partners · internal research tool.
      Nothing here is a recommendation or an offer.</div>`;
@@ -1411,7 +1448,7 @@ function sigKey(v, k, M){
   return n(v[k]);
 }
 async function signalsV2(el){
-  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">loading…</span>`);
+  el.innerHTML = sectionHead("Technical readings for every name", `<span class="muted">loading…</span>`);
   if(!Object.keys(LIVE.v2).length) LIVE.v2 = Object.fromEntries((await qAll("site_technicals_v2")).map(t => [t.ticker, t]));
   // Only the newest 300 are ever shown (sliced to 120 below), but this used qAll, which pages the
   // ENTIRE view: 12,167 rows / 2.24 MB over 13 serial requests to render 120. Ask for what is used.
@@ -1472,7 +1509,7 @@ async function signalsV2(el){
                    l => { sigSort = l; }, draw);
   };
   const ev = LIVE.events.slice(0, 120);
-  el.innerHTML = head("Universe", "Technical analysis", `<span class="muted">${plural(V.length,"name")} incl. micro sleeve and held ETFs · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
+  el.innerHTML = sectionHead("Technical readings for every name", `<span class="muted">${plural(V.length,"name")} incl. micro sleeve and held ETFs · as of ${V[0]?.as_of||"—"} · click a row for the chart</span>`) +
   `<div class="kpis">
     ${kpi("Trend line bullish", T_COUNT.BULLISH, `${T_COUNT.BEARISH} bearish`, T_COUNT.BULLISH>T_COUNT.BEARISH?"pos":"neg")}
     ${kpi("Low in range", count("timing","BUY_ZONE"), "lower third, above the 52-week-low anchor", "pos")}
@@ -2050,8 +2087,13 @@ const INDICATORS = {
 
 /* ═══ PAPER STRATEGY BOOKS — the forward record, as an overlay ═══════════════════════════════
  *
- * `ic_paper_nav` is the out-of-sample record of whether the process beats SPY: 39 books marked
- * daily off monthly locks. Drawn here so a book's track can sit under the name you are looking
+ * `ic_paper_nav` is the out-of-sample record of whether the process beats SPY.
+ * V14 (2026-11-22): eleven books are REPORTED (scripts/paper_tracker.py REPORTED: the four process
+ * books first locked 2026-11-20, the actual book, the proposal, SPY, the equal-weight universe and
+ * the valuation-test trio). The other 32 were RETIRED on 2026-11-20: their history is kept and they
+ * are no longer offered here. The cut map below still names them, so a retired book that is ever
+ * switched back on is drawn with its reconstructed span marked.
+ * What follows describes the record as it stood with 39 books marked daily off monthly locks. Drawn here so a book's track can sit under the name you are looking
  * at, which is the comparison the Analytics tab cannot make.
  *
  * ⚠⚠ MOST OF THIS RECORD IS RECONSTRUCTED, AND THE CHART SAYS SO IN THE LINE ITSELF.
@@ -2098,21 +2140,26 @@ const PAPER_RECON_FROM = {
 // 40th book added to paper_tracker lands in neither list and is caught instead of defaulting
 // into the clean one -- a new book silently labelled "forward record" is the worse failure.
 const PAPER_NO_RECON = ["spy", "actual_book", "proposal",
-                        "val_brake_kept", "val_brake_cut", "ls_val_brake"];
+                        "val_brake_kept", "val_brake_cut", "ls_val_brake",
+                        // V14: first locked 2026-11-20 and never reconstructed (they are deliberately
+                        // absent from the backfill scripts' registries)
+                        "proc_qgs25", "proc_qgs25_brake", "proc_qgs25_no_pillar", "proc_qgs25_defer"];
 
-/* WHAT GETS A TOGGLE, AND WHY EACH ONE. Eight of the 39, not all: 39 toggles is a menu nobody
- * reads, and the point of a registry is that putting something in front of a reader costs a
- * deliberate edit. The full cut map above still covers all 39, so adding one is a one-line
- * change here and the honesty machinery already applies to it. */
+/* WHAT GETS A TOGGLE: the reported books, and only those (V14, 2026-11-22). A retired book is not
+ * offered: its membership stopped being relocked on 2026-11-20, so a line drawn past that date would
+ * be a frozen book that still looks like a record. Putting a book in front of a reader costs a
+ * deliberate edit here. */
 const PAPER_SHOWN = [
-  ["spy",                  "SPY (benchmark)",     "#8d99ae", 1.4],
-  ["actual_book",          "The actual book",     "#f0a94a", 1.8],
-  ["universe_ew",          "Universe EW",         "#6aa6f8", 1.2],
-  ["value_implied_growth", "Value: implied gr.",  "#26a69a", 1.4],
-  ["fac_value",            "Factor: value",       "#4db6ac", 1.2],
-  ["dur_terminal_heavy",   "Terminal-heavy",      "#ef5350", 1.2],
-  ["val_brake_kept",       "VAL brake: kept",     "#a78bfa", 1.4],
-  ["val_brake_cut",        "VAL brake: cut",      "#c77dff", 1.4],
+  ["spy",                  "SPY (benchmark)",         "#8d99ae", 1.4],
+  ["actual_book",          "The actual book",         "#f0a94a", 1.8],
+  ["universe_ew",          "Universe EW",             "#6aa6f8", 1.2],
+  ["proc_qgs25",           "Buy list",                "#3fcf8e", 1.8],
+  ["proc_qgs25_brake",     "Buy list + brake",        "#8fbcff", 1.2],
+  ["proc_qgs25_no_pillar", "Buy list, no pillar veto","#d4b25c", 1.2],
+  ["proc_qgs25_defer",     "Buy list, deferred entry","#c9a1ff", 1.2],
+  ["proposal",             "The proposal",            "#e07a5f", 1.2],
+  ["val_brake_kept",       "VAL brake: kept",         "#a78bfa", 1.4],
+  ["val_brake_cut",        "VAL brake: cut",          "#c77dff", 1.4],
 ];
 
 /* ⚠ ONE REBASE ANCHOR FOR EVERY DRAWN SERIES, AND IT IS THE LATEST START AMONG THEM.
@@ -2178,6 +2225,15 @@ const PAPER_NOTE = {
   actual_book: "The real holdings, marked. ⚠ It is NOT a replica, but it does predate the "
      + "tracker's first lock (2026-09-15): before that it is recorded history rather than a "
      + "prospective lock, which is a weaker claim than the solid line implies.",
+  proc_qgs25: "The model's buy list as a book: the 25 highest by QGS among core names no veto holds "
+     + "down, equal weight, relocked monthly. First locked at the 2026-11-20 close; nothing before it.",
+  proc_qgs25_brake: "The buy-list book's daily return scaled by the brake's exposure the night before, "
+     + "the rest in cash at zero. Derived from that book: it holds no positions of its own.",
+  proc_qgs25_no_pillar: "The buy list with the pillar vetoes switched off. Its gap to the buy-list book "
+     + "is the forward test of those vetoes.",
+  proc_qgs25_defer: "The buy list, a name in a 200-day downtrend not entered until it leaves it. Its "
+     + "gap to the buy-list book is the forward test of the deferral.",
+  proposal: "What the proposal engine would hold, equal weight.",
   universe_ew: "Every active name, equal weighted — what the bench did, and the baseline any "
      + "tilt has to beat before it has earned anything.",
   value_implied_growth: "One half of the ONE result the 2026-10-20 review supported: +17.95% "
@@ -2873,7 +2929,8 @@ const INDICATORS_DATEKEY = {site_market_regime: "as_of", site_portfolio_fragilit
                             site_paper_nav: "nav_date", site_gasbrakesgas: "timeframe"};
 
 // Server-side narrowing, for a view that serves far more than the chart draws. site_paper_nav
-// holds all 39 paper books (~8,000 rows) and the registry exposes 8 of them, so the other 31 are
+// holds every paper book ever marked, retired ones included (~8,000 rows), and the registry
+// exposes only the reported ones, so the rest are
 // filtered in Postgres instead of fetched over the wire and thrown away. DECLARED per view: a
 // view with no entry here is fetched whole, which is correct but not free.
 const INDICATORS_QUERY = {
@@ -3803,15 +3860,16 @@ async function openName(tk){
   document.getElementById("drIn").innerHTML = `
     <div class="dr-top"><div><div class="caps">${esc(m.sector||"")}</div><h2>${esc(tk)}</h2>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-        ${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${qchip(m.quadrant, true)}${trendChip(m.trend)}${trendChip(v2.trend)}
-        ${held?'<span class="chip">held</span>':""}</div></div>
+        ${m.list_action ? listActChip(m.list_action, m.veto_reason) : ""}${m.grade?`<span class="chip">grade ${m.grade}</span>`:""}${trendChip(m.trend)}${qchip(m.quadrant, true)}
+        ${held?'<span class="chip">held</span>':""}${m.list_defer ? '<span class="chip warn" title="A new position waits while the name is in a 200-day downtrend">entry waiting</span>' : ""}</div></div>
       <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
       <div><span class="caps">Price</span><b>${usd(v2.close,2)}</b></div>
-      <div><span class="caps">Timing</span><b style="font-size:var(--fs-md)">${timingChip(v2.timing, v2.range_pos)}</b></div>
-      <div><span class="caps">Guidance</span><b style="font-size:var(--fs-md)">${esc(m.guidance||"—")}</b></div>
+      <div><span class="caps">QGS rank</span><b>${m.qgs_universe_rank ?? "—"}</b></div>
+      <div><span class="caps">List rank</span><b title="${esc(m.veto_reason || "Place among core names with a QGS rank and no veto; the first 25 are the buy list")}">${m.list_rank ?? (m.veto ? "veto" : "—")}</b></div>
       <div><span class="caps">Composite</span><b>${num(m.composite)}</b></div>
     </div>
+    ${m.veto_reason ? `<div class="note" data-nofold style="margin:10px 0"><b>${m.veto === "EXIT" ? "Exit veto" : "Held down by a veto"}:</b> ${esc(m.veto_reason)}.</div>` : ""}
     ${held ? thesisBlock(tk, true) + cardBlock(tk) : ""}
     ${pillarBlock(m)}
     <div class="card" style="padding:12px"><div id="nmChart"></div></div>
@@ -4070,7 +4128,7 @@ async function rotationCard(el){
     <div class="note" style="margin-top:10px">Columns 5d / 21d / 63d are returns in excess of SPY, in points. State: Leading = ahead over 63 and 21 sessions;
       Weakening = ahead over 63, behind over 21; Improving = behind over 63, ahead over 21; Lagging = behind on both. A move inside a small band
       (sectors 2.0 and 1.0 points, factors 1.1 and 0.6) counts as flat. "Effect" for a sector is the book's weight minus SPY's, times the sector's
-      21-session excess, using today's weights: an approximation, and the exact attribution is on the Performance tab. For a factor it is the book's
+      21-session excess, using today's weights: an approximation, and the exact attribution is on the Book tab. For a factor it is the book's
       active beta times the factor's excess; the factors overlap, so those do not add up. This describes what has been rewarded. It is not a forecast
       and it feeds no grade, proposal or sizing.</div></div>`;
 }
@@ -4298,8 +4356,13 @@ let gridFilterOpen = false;
 // and sortable while hidden. Remembered per viewer.
 // Eleven, sized to FIT a 1,232px card with no sideways scroll (measured live: twelve with Sector ran
 // 1,594px). Sector moved to the full view — still filterable — and Why takes the remaining width.
-const GRID_MONITOR = ["ticker","grade","tech_rating","action","gbg","gbg_flip","qgs_universe_rank","timing","quadrant","composite","p1","p2","p3","grade_reason"];
-const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_universe_rank: "QGS #", qgs_rank: "Buy #"};       // monitor-view headers; the tooltip keeps the full name
+// V14 (2026-11-22): ORDERED BY EVIDENCE. The default columns lead with what the tests support and
+// what decides: the QGS rank, the place on the buy list, the grade, the model's action, the veto
+// and the pillar scores behind it, then the 200-day state as a risk descriptor. The technical
+// rating, timing, the quad and the three trend-state columns are behind "All columns": none of
+// them is an input to the list, and five of the old fourteen defaults were those.
+const GRID_MONITOR = ["ticker","qgs_universe_rank","list_rank","grade","list_action","veto_reason","composite","p1","p2","p3","trend","grade_reason"];
+const GRID_SHORT = {p1: "P1", p2: "P2", p3: "P3", qgs_universe_rank: "QGS #", qgs_rank: "V13 buy #", list_rank: "List #", trend: "200-day · risk"};       // monitor-view headers; the tooltip keeps the full name
 let gAllCols = (() => { try { return localStorage.getItem("ic.grid.cols") === "all"; } catch(e){ return false; } })();
 // What a text/dropdown filter compares: the value the CELL shows. Factor profile lives in LIVE.suniv,
 // not on the matrix row, so counting r[key] found zero values and built a dropdown holding only
@@ -4376,7 +4439,8 @@ function filterOpts(rows, key, order){
   const seen = [...new Set(rows.map(r => gridText(r, key)).filter(Boolean))];
   return order ? seen.sort((a,b) => (order[a] ?? 99) - (order[b] ?? 99)) : seen.sort();
 }
-const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_ORD",
+const LIST_ORD = {BUY_LIST: 0, HOLD: 1, REVIEW: 2, EXIT: 3};
+const COL_ORDER = {grade: "GRADE_ORD", tech_rating: "TECH_ORD", timing: "TIMING_ORD", list_action: "LIST_ORD",
                    action: "ACTION_ORD", qgs_tier: "QGS_ORD", gbg: "GBG_ORD", gbg_w: "GBG_ORD"};
 // Build each dropdown's options from the data actually present, ordered by the model's own ranking
 // where one exists (grade A→D, technical rating, timing) and alphabetically otherwise.
@@ -4391,7 +4455,7 @@ function selectEl(id, label, value, opts, key){
 // The machinery and the rank orders (GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QUAD_ORD) moved
 // to sorting.js so Signals could use the SAME sort rather than a second one. Only the state --
 // which table is sorted how -- stays here, because it is per-table.
-let gridSort = [{k:"grade", d:1}];
+let gridSort = [{k:"qgs_universe_rank", d:1}];
 // ── FUNDAMENTALS ─────────────────────────────────────────────────────────────
 // The card was pure prose. These are the numbers behind it, read straight from the model's own
 // columns, plus how each has MOVED across the vintages in company_market_data. Trailing
@@ -4891,7 +4955,13 @@ const GRID_COLS = [
   // proposal buys from the top of the QGS rank, and the quad is a score as well as a box — a letter or
   // a box without its number hides how close a name sits to the line.
   ["grade_score","Grade pct","num","Percentile of QGS + net buyback yield in the core universe. A above 85, B above 50, C above 20, D below — before the pillar vetoes"],
-  ["tech_rating","Technical","ord"], ["action","Action","ord"],
+  // V14 (2026-11-22): the decision path. list_rank orders every core name with a real QGS rank and
+  // no veto; the first 25 are the buy list. list_action is the model's action in four words.
+  ["list_rank","List rank","num","The name's place among core names with a QGS rank and no veto, by QGS. The first 25 are the buy list. Blank for a name a veto holds down or with no rank"],
+  ["list_action","Action","ord","The model's action: Buy list (in the list's top 25), Hold, Review (a veto holds it down) or Exit. Blank for a name that is neither held nor on the list"],
+  ["veto_reason","Veto","txt","Why a veto holds the name down, in words: a pillar score under its line, an open or confirmed sell condition, no locked thesis. Blank when there is none"],
+  ["tech_rating","Technical","ord"],
+  ["action","V13 grid action","ord","The grade × technical grid's action. Still computed every night; since V14 it is no longer what decides (in testing it cost return against the QGS list alone)"],
   // GasBrakesGas, as three sortable columns (Niko, 2026-11-20). Display only: none of them is an
   // input to the grade or the action beside it. Cells and sort keys live in indicators.js.
   ["gbg","GBG","ord","GasBrakesGas state on daily bars: Gas (trend up), Neutral or Brakes (trend down), strong or weak. A fitted approximation of a third-party trend indicator, shown for context — not tested against returns and not an input to the grade or action"],
@@ -4985,6 +5055,8 @@ function gridKey(r, k){
   if(k === "tech_rating") return TECH_ORD[r.tech_rating] ?? 9;
   if(k === "timing") return TIMING_ORD[r.timing] ?? 9;
   if(k === "action") return ACTION_ORD[r.action] ?? 99;
+  if(k === "list_action") return LIST_ORD[r.list_action] ?? null;      // null sinks: not held, not on the list
+  if(k === "list_rank") return r.list_rank == null ? null : +r.list_rank;
   if(k === "qgs_tier") return QGS_ORD[r.qgs_tier] ?? 9;
   // Quadrant fell through to the string branch below, where `?? ""` made a MISSING quad an empty
   // string rather than null -- so unquadded names floated to the TOP of an ascending sort instead
@@ -5046,6 +5118,9 @@ async function grid(el){
         gbg: `<td>${gbgCell(r.ticker, "D")}</td>`, gbg_w: `<td>${gbgCell(r.ticker, "W")}</td>`,
         gbg_flip: `<td>${gbgFlipCell(r.ticker)}</td>`,
         action: `<td><span style="color:${ACT_COL[r.action]||C.text}">${esc(codeLbl("action", r.action))}</span></td>`,
+        list_rank: `<td>${r.list_rank == null ? `<span class="muted" title="${esc(r.veto_reason ? "Held down by a veto" : "No QGS rank, or not a core name")}">—</span>` : r.list_rank}</td>`,
+        list_action: `<td>${listActChip(r.list_action, r.veto_reason)}${r.list_defer ? ` <span class="muted" style="font-size:var(--fs-xs)" title="A new position waits while the name is in a 200-day downtrend">waiting</span>` : ""}</td>`,
+        veto_reason: clip(r.veto_reason, 220),
         timing: `<td>${timingChip(r.timing, r.range_pos)}</td>`,
         range_pos: `<td>${rangeBand(r.trade_low, r.trade_high, r.range_pos, r.timing)}</td>`,
         guidance: clip(r.guidance, 260),
@@ -5088,14 +5163,14 @@ async function grid(el){
                    l => { gridSort = l; }, draw);
     document.querySelectorAll("#gridRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
   };
-  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · grade × technical rating → action</div>` +
-    card("Grid", "names per cell · click a cell to filter", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${techLbl(t)}</th>`).join("")}</tr></thead><tbody>${
+  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${M[0]?.as_of||"—"} · every tracked name, in QGS rank order</div>` +
+    card("Grade × technical grid (V13)", "still computed each night, no longer the decision path · names per cell · click a cell to filter the table on that action", `<div class="table-wrap"><table class="tbl"><thead><tr><th>Grade</th>${techs.map(t=>`<th>${techLbl(t)}</th>`).join("")}</tr></thead><tbody>${
       grades.map(g => `<tr><td><b>${g}</b></td>${techs.map(t => { const c = cell(g,t); const a = c[0]?.action || "";
         return `<td data-act="${a}" style="cursor:pointer"><div style="color:${ACT_COL[a]||C.muted}">${esc(codeLbl("action", a))}</div><div class="muted">${c.length} · ${c.filter(r=>r.held).length} held</div></td>`; }).join("")}</tr>`).join("")
     }</tbody></table></div>`) +
     `<div style="margin-top:16px">` + card("Names", `<span id="gridN"></span>`,
       (() => {
-        const ORD = {GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QGS_ORD, GBG_ORD};
+        const ORD = {GRADE_ORD, TECH_ORD, TIMING_ORD, ACTION_ORD, QGS_ORD, GBG_ORD, LIST_ORD};
         const n = activeFilterCount();
         const controls = GRID_COLS.map(([key, label, type]) => {
           const ctl = colControl(key, type, M);
@@ -5112,7 +5187,7 @@ async function grid(el){
           <label class="check"><input type="checkbox" id="gheld" ${gridFilter.held?"checked":""}> Holdings only</label>
           <button class="lock" id="gtoggle">${gridFilterOpen ? "Hide" : "Filter columns"}${n ? ` (${n})` : ""}</button>
           ${n ? `<button class="lock" id="gclear">Clear all</button>` : ""}
-          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: ${GRID_MONITOR.length} columns. On: all ${GRID_COLS.length} — adds sector, the risk range, guidance, QGS tier, implied growth, visible share, rate beta, 200-day trend, alignment, factor profile, size and the six factors">All columns</button>
+          <button class="lock" id="gcols" aria-pressed="${gAllCols}" title="Off: ${GRID_MONITOR.length} columns, ordered by evidence. On: all ${GRID_COLS.length}, adding the technical rating, the V13 grid action, timing, the risk range, guidance, quad, QGS and its tier, implied growth, visible share, rate beta, sector, alignment, factor profile, size, the six factors and the three trend-state columns">All columns</button>
           <span class="muted" id="sortNote" style="font-size:var(--fs-sm);margin-left:auto"></span>
         </div>
         <div class="filters colfilters" ${gridFilterOpen ? "" : "hidden"}>${controls}</div>`;
@@ -5210,20 +5285,29 @@ async function risk(el, title="Risk"){
 function bindRisk(el){ el.querySelectorAll("button[data-b]").forEach(b => b.onclick = () => { riskBook = b.dataset.b; route(); }); }
 function tbl(h, rows){ return `<div class="table-wrap"><table class="tbl"><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; }
 
-/* ═══ PROPOSAL (live) ═══════════════════════════════════════════════════════ */
+/* ═══ PROPOSAL (live) ═══════════════════════════════════════════════════════
+   What the model would do to the book: keep, add, exit. Under V14 it fills open slots from the buy
+   list in QGS order, inside the sector cap and the correlation limit. It is a proposal: nothing here
+   is an order, and nothing is traded by the system. The paper record moved to the Evidence tab. */
 async function proposal(el){
   el.innerHTML = `<div class="muted">loading…</div>`;
   if(!LIVE.proposal) LIVE.proposal = await qAll("site_proposal");
   const P = LIVE.proposal, by = s => P.filter(r => r.status===s);
-  const sect = (s, sub) => card(`${s} (${by(s).length})`, sub, tbl(["Ticker","Grade","Action","Technical","Composite","Sector","Reason"],
-    by(s).sort((a,b)=>(a.grade>b.grade?1:-1)).map(r => [`<b>${esc(r.ticker)}</b>`, r.grade||"—", esc(codeLbl("action", r.action)), esc(techLbl(r.tech_rating)), num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`])));
-  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · built by the analytics, overrides documented · not orders</div>` +
-    sect("KEEP", "held and supported by the grid") + `<div style="margin-top:16px">${sect("ADD","ranked on fundamentals, within sector and correlation limits")}</div>` +
-    `<div style="margin-top:16px">${sect("EXIT","grid no longer supports ownership, or a limit forces it out")}</div>`;
-  await paperCard(el);
+  const mx = tk => (LIVE.matrixBy || {})[tk] || {};
+  const rank = r => mx(r.ticker).list_rank ?? 9999;
+  const sect = (s, sub) => card(`${s === "KEEP" ? "Keep" : s === "ADD" ? "Add" : "Exit"} (${by(s).length})`, sub,
+    by(s).length ? tbl(["Ticker","List rank","Grade","Action","Composite","Sector","Reason"],
+      by(s).sort((a,b) => rank(a) - rank(b) || (a.ticker > b.ticker ? 1 : -1)).map(r => [`<b>${esc(r.ticker)}</b>`,
+        mx(r.ticker).list_rank ?? `<span class="muted">—</span>`, r.grade||"—",
+        LIVE.matrixOk ? listActChip(mx(r.ticker).list_action, mx(r.ticker).veto_reason) : `<span class="muted" title="The decision grid could not be read">?</span>`,
+        num(r.composite), esc(r.sector||""), `<span class="muted">${esc(r.reason||"")}</span>`]))
+    : `<div class="muted">None.</div>`);
+  el.innerHTML = `<div class="sub" style="margin:-8px 0 14px">as of ${P[0]?.as_of||"—"} · what the model would do to the book, inside the sector cap and the correlation limit · a proposal, not orders</div>` +
+    (P.length ? "" : `<div class="gap"><b>No proposal rows were returned.</b> The proposal step may not have run; this is not "no changes proposed".</div>`) +
+    sect("ADD", "new positions from the buy list, in rank order, each at a 2% starter") +
+    `<div style="margin-top:16px">${sect("EXIT", "a veto says exit, or the sector cap or the correlation limit forces it out")}</div>` +
+    `<div style="margin-top:16px">${sect("KEEP", "held, and nothing in the model or the limits says otherwise")}</div>`;
 }
-
-
 /* ═══ ANALYTICS (movers · benchmarks · income · vol regimes · geography · fundamentals · news) ═══ */
 // Jensen's alpha, matching engines.stats.jensen_alpha: the intercept on EXCESS returns. A constant
 // daily risk-free rate (the record's mean bill rate) leaves beta unchanged and moves the intercept by
@@ -5380,7 +5464,7 @@ function regimeStrip(){
   return `<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;margin:0 0 16px;padding:11px 14px;
     border:1px solid var(--line);border-radius:var(--r-md);background:rgba(106,166,248,.05)">
     ${bits.join("")}
-    <a href="#analytics" class="muted" style="font-size:var(--fs-sm);margin-left:auto;align-self:center">Regime dashboard →</a>
+    <a href="#risk" class="muted" style="font-size:var(--fs-sm);margin-left:auto;align-self:center">Regime detail</a>
    </div>`;
 }
 function regimeCard(){
@@ -5727,11 +5811,6 @@ function anValuationCard(X){
         pctFlat(h.gm,0), pctFlat(h.fcfm,0), pct(h.fcfev,1,false), num(h.nde,1), pctRaw(h.fwd_rev,0),
         pctRaw(h.fwd_eps,0), num(h.beta), fmtCap(h.mcap)])) + `</div>`);
 }
-function anNewsCard(X){
-  return card("News flow", "holdings · last two quarters · from Fiscal research", `<div class="table-wrap">` +
-    tbl(["Date","Holding","Headline","Why it matters"], X.news.map(n =>
-      [esc(n.date), `<b>${n.tk}</b>`, esc(n.headline), `<span class="muted">${esc(n.why_it_matters||"")}</span>`])) + `</div>`);
-}
 function anDrawSkill(X){
   const sp = X.pairs(X.benches.SPY), st = X.stats.SPY;
   mk(document.getElementById("anScatter"), {tooltip:{trigger:"item", formatter:p => `SPY ${(p.value[0]*100).toFixed(2)}% · book ${(p.value[1]*100).toFixed(2)}%`},
@@ -5997,34 +6076,7 @@ async function riskAll(el){
     anDrawVol(X); anDrawGeo(X);
   }
 }
-// WHAT DO I OWN. The positions, their fundamentals, and the same book through time.
-async function holdingsAll(el){
-  holdings(el);
-  let X = null;
-  try{ X = await anLoad(); }catch(e){}
-  if(X){
-    const box = document.createElement("div"); el.appendChild(box);
-    box.innerHTML = sectionHead("Fundamentals") + anValuationCard(X);
-  }
-  await section(el, "The book through time", b => historyView(b));
-}
-// WHAT IS OUT THERE. Grid and Universe were the same ~454 names with two overlapping tables on two
-// tabs — the quad scatter and the grade x technical matrix are two views of one population, and
-// nobody should have to hold a ticker in their head while switching tabs to see its other columns.
-// The heavier table goes last.
-async function universeAll(el){
-  universe(el);
-  // the map before the grid: thirty sessions of every holding, or of every sector, at a glance,
-  // and then the table to sort and filter it (gbg_map.js writes its own card heading)
-  await section(el, "Trend map", b => gbgUniverseMaps(b), "", true);
-  await section(el, "Decision grid", b => grid(b));
-}
-// WHY DO WE OWN IT. Both process documents, in one place: the locked record per name, and the book
-// the model would build if it were starting today.
-async function research(el){
-  await theses(el);
-  await section(el, "Proposed portfolio", b => proposal(b));
-}
+// The Book, Buy list, Market, Evidence and Reference tabs are composed in v14.js.
 /* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
 function plainBlock(t, badge){
   const P = t.plain; if(!P) return "";
@@ -6198,259 +6250,6 @@ async function theses(el){
   el.querySelectorAll("[data-tw]").forEach(b => b.onclick = () => { thesisSel = b.dataset.tw; theses(el); });
 }
 
-/* ═══ forward track record (paper) ══════════════════════════════════════════ */
-// The registry of every book paper_tracker.py locks (its STRATS; 36 on 2026-10-16). Labels and colours are editorial,
-// so this is a registry rather than a loop over whatever the database holds, and the failure that invites is the one
-// that already happened: the stats table and the chart iterated PAPER_LABEL, so a book missing from it did not render at
-// all. value_implied_growth was invisible from 2026-10-08 and 17 more joined it on 10-16. paperCard() now diffs the data
-// against this registry and shows anything unregistered under "Unlabelled" with a warning, so the next omission is loud.
-// Strategy KEYS are never renamed here or in the tracker: they key the locked rows in ic_paper_positions and ic_paper_nav.
-const PAPER_LABEL = {grid_ab_buy:"A/B + Buy/Strong Buy", grid_a_buy:"A + Buy/Strong Buy", tech_buy:"Technical Buy only", grade_a:"Grade A only",
-  ls_a_buy_vs_q4_weak:"Long A+Buy / Short weak Q4", ls_a_buy_vs_cd_sell:"Long A+Buy / Short C-D Sell",
-  grade_cd:"Grades C/D", ab_not_down:"A/B, not downtrend", grade_ab:"Grade A or B", ab_tech_weak:"A/B, technically weak",
-  quad_q1:"Q1 names", quad_q2:"Q2 names", quad_q3:"Q3 names", quad_q4:"Q4 names", universe_ew:"Universe EW",
-  proposal:"Proposal", actual_book:"Today's book, paper", spy:"SPY",
-  // Duration. "Modelled" = the DCF split of a price into visible cash flows and terminal value; "Measured" = each name's
-  // observed beta to TLT with SPY held constant. The basis is in the label because the two L/S books read as opposites
-  // and are not (see PAPER_NOTES.duration), and the side each one holds is in the label for the same reason.
-  value_implied_growth:"Modelled: low implied growth", dur_terminal_heavy:"Modelled: high implied growth",
-  ls_visible_vs_terminal:"Modelled L/S: long visible / short terminal",
-  rate_long_duration:"Measured: high rate beta", rate_short_duration:"Measured: low rate beta",
-  ls_rate_duration:"Measured L/S: long high / short low beta",
-  // Factors, one pair each: the long-only "tilt" (top fifth) and its long/short (top fifth against the bottom fifth)
-  fac_value:"Value tilt", ls_fac_value:"Value L/S", fac_momentum:"Momentum tilt", ls_fac_momentum:"Momentum L/S",
-  fac_quality:"Quality tilt", ls_fac_quality:"Quality L/S", fac_lowvol:"Low-vol tilt", ls_fac_lowvol:"Low-vol L/S",
-  fac_size:"Small-cap tilt", ls_fac_size:"Small-cap L/S", fac_growth:"Growth tilt", ls_fac_growth:"Growth L/S"};
-// Colour carries the relationship. Duration: cyan = Modelled, amber = Measured, each long-only book darker than its L/S.
-// Factors: one hue per factor with the L/S a lighter tint of its tilt's hue. violet (Universe EW) and grey (SPY) are
-// the references and are kept out of both families. L/S books are also drawn dashed (any key starting ls_).
-const PAPER_COL = {grid_ab_buy:C.green, grid_a_buy:"#2fa874", tech_buy:C.accent2, grade_a:"#c9a1ff", grade_cd:"#b66",
-  ls_a_buy_vs_q4_weak:"#e8c468", ls_a_buy_vs_cd_sell:"#d98cb3",
-  ab_not_down:"#7fd1c8", grade_ab:"#9ab", ab_tech_weak:"#d98", quad_q1:C.q.Q1, quad_q2:C.q.Q2, quad_q3:C.q.Q3, quad_q4:C.q.Q4,
-  universe_ew:C.violet, proposal:C.accent, actual_book:C.gold, spy:C.muted,
-  value_implied_growth:"#4cc9f0", dur_terminal_heavy:"#3a86d6", ls_visible_vs_terminal:"#a5e4f7",
-  rate_long_duration:"#ff9f43", rate_short_duration:"#c97a2b", ls_rate_duration:"#ffd199",
-  fac_value:"#3fcf8e", ls_fac_value:"#a1ead0", fac_momentum:"#4d8bff", ls_fac_momentum:"#a9c6ff",
-  fac_quality:"#f2c744", ls_fac_quality:"#f7e3a0", fac_lowvol:"#ec6fb0", ls_fac_lowvol:"#f6b5d7",
-  fac_size:"#ff8a5c", ls_fac_size:"#ffc3ab", fac_growth:"#35d0d0", ls_fac_growth:"#a2ecec"};
-const PAPER_FACTOR_NAME = {value:"Value", momentum:"Momentum", quality:"Quality", lowvol:"Low volatility", size:"Size (high = small)", growth:"Growth"};
-const PAPER_TIP = {   // hover text on the series name: construction and, for the duration books, which side each leg holds
-  value_implied_growth:"MODELLED. Long the fifth of core names whose price needs the LEAST free-cash-flow growth (lowest implied FCF CAGR) = the visible-heavy end of the DCF split, read as short duration. Equal weight, fully invested.",
-  dur_terminal_heavy:"MODELLED. Long the fifth whose price needs the MOST growth (highest implied FCF CAGR) = the terminal-heavy end of the DCF split, read as long duration. Equal weight, fully invested.",
-  ls_visible_vs_terminal:"MODELLED. 100% long the visible-heavy fifth (read as SHORT duration), 50% short the terminal-heavy fifth (read as LONG duration).",
-  rate_long_duration:"MEASURED. Long the fifth with the highest TLT beta, SPY held constant: it rallies when long yields fall = long duration. Equal weight, fully invested.",
-  rate_short_duration:"MEASURED. Long the fifth with the lowest TLT beta: it has done better when long yields rose = short duration. Most of this fifth is not statistically distinguishable from zero. Equal weight, fully invested.",
-  ls_rate_duration:"MEASURED. 100% long the long-duration fifth (high TLT beta), 50% short the short-duration fifth (low TLT beta). On its face the reverse of the Modelled L/S, but in practice it holds the same side of the same names."};
-Object.entries(PAPER_FACTOR_NAME).forEach(([f, n]) => {
-  PAPER_TIP["fac_" + f] = `Long the top fifth of core names on ${n}, equal weight, fully invested.`;
-  PAPER_TIP["ls_fac_" + f] = `100% long the top fifth on ${n}, 50% short the bottom fifth.`;
-});
-// Three different questions, so three views rather than 36 undifferentiated lines. `refs` are drawn in a view whose
-// own books are younger than the references (Universe EW is what a long-only tilt has to beat; SPY is the market).
-const PAPER_GROUPS = [
-  {id:"model", name:"Grid and quad books", refs:[], keys:["grid_ab_buy","grid_a_buy","tech_buy","grade_a","ls_a_buy_vs_q4_weak","ls_a_buy_vs_cd_sell",
-    "grade_cd","ab_not_down","grade_ab","ab_tech_weak","quad_q1","quad_q2","quad_q3","quad_q4","universe_ew","proposal","actual_book","spy"]},
-  {id:"duration", name:"Duration", refs:["universe_ew","spy"], keys:["value_implied_growth","dur_terminal_heavy","ls_visible_vs_terminal",
-    "rate_long_duration","rate_short_duration","ls_rate_duration"]},
-  {id:"factor", name:"Factors", refs:["universe_ew","spy"], keys:Object.keys(PAPER_FACTOR_NAME).flatMap(f => ["fac_" + f, "ls_fac_" + f])}];
-const PAPER_DEFAULT = ["grid_a_buy", "ls_a_buy_vs_cd_sell", "ls_a_buy_vs_q4_weak", "actual_book", "spy"];   // legend defaults, model view only
-const PAPER_LIVE_FROM = "2026-09-15";   // live from here; before it the series is reconstructed
-const PAPER_REAL_FROM = "2026-06-25";   // before this the grade is a filings-only proxy, not the model grade
-// The first monthly lock struck on the V13 grade (a percentile rank) and the V13 quad (latest quarter).
-// Every book that selects on a grade or a quadrant holds names chosen by the V12.2 rules before this
-// date and by the V13 rules from it, so the line is one record of two selection rules.
-const PAPER_V13_LOCK = "2026-12-01";
-const PAPER_FALLBACK_COL = ["#e07a5f", "#81b29a", "#f2cc8f", "#8ab6d6", "#c8a2c8"];   // for unregistered books only
-let paperRange = "all";                      // YTD / 1Y / All
-let paperGroup = "model";
-// The two duration L/S books as they were actually LOCKED: how many names each side they share. Read from the locked
-// positions rather than written into the page, so it stays true after the next monthly lock. null if unavailable.
-async function paperDurationOverlap(){
-  try{
-    const ids = ["ls_visible_vs_terminal", "ls_rate_duration"];
-    const rows = await qAll("site_paper_positions", r => r.in("strategy", ids).order("strategy").order("rebalance_date").order("ticker"));
-    const latest = {}, book = {};
-    rows.forEach(r => { if(!latest[r.strategy] || r.rebalance_date > latest[r.strategy]) latest[r.strategy] = r.rebalance_date; });
-    rows.forEach(r => { if(r.rebalance_date === latest[r.strategy]) (book[r.strategy] ||= {})[r.ticker] = +r.weight; });
-    const a = book[ids[0]], b = book[ids[1]];
-    if(!a || !b) return null;
-    const o = {both_long:0, both_short:0, vis_long_rate_short:0, vis_short_rate_long:0, dates:[...new Set(ids.map(i => latest[i]))].sort()};
-    Object.keys(a).forEach(t => {
-      if(!(t in b)) return;
-      if(a[t] > 0 && b[t] > 0) o.both_long++; else if(a[t] < 0 && b[t] < 0) o.both_short++;
-      else if(a[t] > 0) o.vis_long_rate_short++; else o.vis_short_rate_long++;
-    });
-    return o;
-  }catch(e){ return null; }
-}
-const PAPER_NOTES = {
-  model: () => `<b>"Today's book, paper" is not the fund's recorded performance.</b> It is the names held today at their
-       current dollar weights, re-locked monthly and marked from the first day in view, with no cash and none of the positions
-       since sold. The recorded return, cash and past holdings included, is on <a href="#performance">Performance</a>.
-       Both long/short series run 100% long against 50% short (gross 150%, net +50% long):
-       one shorts Q4 names rated Sell, the other shorts grade C/D names rated Sell. Sharpe is annualised from each series' own daily
-       returns over the risk-free rate; it needs 20 trading days (younger series show their day count), and a short history makes it
-       unreliable regardless.
-       <div style="margin-top:6px"><b>The grade and the quadrant changed definition on 2026-11-18 (V13).</b> Books here that select on either
-       were locked under the old rules and re-lock under the new ones on ${PAPER_V13_LOCK}: from that date &ldquo;Grade A&rdquo; means the top 15% by
-       ranking and each quadrant is read from the latest reported quarter. Returns on either side of that date belong to different
-       selection rules and should not be read as one record of either.</div>`,
-  duration: ov => {
-    const same = ov ? `As locked ${ov.dates.join(" / ")}: <b>${plural(ov.both_long,"name")} are long in both books and ${ov.both_short} are short in both</b>; only
-         ${ov.vis_long_rate_short + ov.vis_short_rate_long} sit on opposite sides (${ov.vis_long_rate_short} and ${ov.vis_short_rate_long}).`
-      : `Measured 2026-10-16: 23 names long in both books, 31 short in both, 9 and 10 on opposite sides (the locked positions could not be read just now).`;
-    return `<div><b style="color:var(--text)">The two long/short books are not opposites, although they read as if they were.</b> Modelled L/S is long
-       visible-heavy names (read as short duration) and short terminal-heavy ones (read as long duration); Measured L/S is long high rate-beta names
-       (long duration) and short low ones. In this universe the two measures disagree, so the books hold the same side of the same names. ${same}</div>
-       <div style="margin-top:6px"><b>Modelled</b> = the DCF split of each price into visible cash flows and terminal value; <b>Measured</b> = each name's observed
-       beta to TLT with SPY held constant. Why they disagree: terminal share rises with implied growth, and the largest block of the high-implied-growth names is Information
-       Technology (30 of 77), which tends to move against long bonds once the market is taken out. Measured across 12 monthly vintages, the rank correlation of terminal share with rate beta is &minus;0.20 to +0.07 &mdash;
-       <b>orthogonal, not opposed</b>. (A single date, 2026-10-16, read &minus;0.27 and was quoted here as the headline; it is not representative.) The two are not rival
-       duration measures: the DCF split discounts every name at one rate and fades to one terminal growth, so its only cross-sectional variation is base FCF/EV, and
-       <b>spearman(floor share, implied growth) is &minus;1.000000 on all 27 vintages</b> &mdash; the Modelled L/S is a value spread wearing a duration label.
-       The Measured short leg is mostly noise: <b>80&ndash;88% of it has |t| &lt; 2</b>, no measurable rate beta at all. Each book is a fifth of the core universe,
-       equal weight; the L/S books run 100% long / 50% short.
-       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded.</b> These books were first locked 2026-10-16; earlier marks were rebuilt
-       from point-in-time sources on 2026-10-17. The panel is today&rsquo;s universe looking backwards, so every long-only book is flattered by survivorship &mdash;
-       <code>ic_price_history</code> holds no delisted name at all. An adversarial review on 2026-10-20 rated most of these books DO-NOT-USE; read
-       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code> before quoting any figure here.</div></div>`;
-  },
-  factor: () => `A <b>tilt</b> holds the top fifth of core names on the factor, equal weight and long only, and asks whether the tilt beats Universe EW.
-       An <b>L/S</b> holds that fifth long against the bottom fifth short (100% long / 50% short, drawn dashed in the tint of its tilt's colour), which takes the market out
-       and asks whether the factor premium itself is being paid. Size is oriented so that high means small: the Small-cap books are long the smallest names.
-       <div style="margin-top:6px"><b>History before 2026-10-16 is RECONSTRUCTED, not traded</b>, and the honest start differs by factor: Value, Low-vol and Growth
-       begin late June 2026 because <code>pe_forward</code> and <code>beta</code> have no point-in-time source at all. Momentum, Quality and Size were rebuilt further
-       back, but the <code>companies</code> table itself only begins 2026-06-04, so <b>2026-07-01 is the first lock struck on a universe the model actually held</b>.
-       Survivorship flatters every long-only book. An adversarial review on 2026-10-20 rated most of these DO-NOT-USE &mdash; see
-       <code>journal/decisions/2026-10-20_paper_reconstruction_verdict.md</code>.</div>`
-};
-async function paperCard(el){
-  const rows = await qAll("site_paper_nav", r => r.order("nav_date").order("strategy"));   // (nav_date, strategy) is unique: with only nav_date, ties let a page boundary drop or repeat rows
-  if(!rows.length) return;
-  const all = {}; rows.forEach(r => (all[r.strategy] ||= []).push(r));
-  const lastDate = rows.reduce((a, r) => r.nav_date > a ? r.nav_date : a, "");
-  // Anything in the data the registry does not know is shown, never silently dropped.
-  const groups = PAPER_GROUPS.slice();
-  const unlabelled = Object.keys(all).filter(k => !(k in PAPER_LABEL)).sort();
-  unlabelled.forEach((k, i) => { PAPER_LABEL[k] = k + " (unlabelled)"; PAPER_COL[k] = PAPER_FALLBACK_COL[i % PAPER_FALLBACK_COL.length]; });
-  if(unlabelled.length) groups.push({id:"other", name:"Unlabelled", refs:["spy"], keys:unlabelled});
-  const avail = groups.filter(g => g.keys.some(k => all[k]));
-  if(!avail.some(g => g.id === paperGroup)) paperGroup = (avail[0] || groups[0]).id;
-  const overlap = avail.some(g => g.id === "duration") ? await paperDurationOverlap() : null;
-  const cutoff = () => {
-    // Every boundary is derived from lastDate, the newest NAV in the data, NOT from today's clock.
-    // A paper NAV is only marked when paper_tracker runs, so on a day the chain has not run yet —
-    // or the morning after a quarter turns — a clock-derived QTD would start a window the data has
-    // no marks in and the chart would read empty rather than "not marked yet".
-    if(paperRange === "qtd"){
-      const m = +lastDate.slice(5,7);
-      return `${lastDate.slice(0,4)}-${String(3 * Math.floor((m - 1) / 3) + 1).padStart(2,"0")}-01`;
-    }
-    if(paperRange === "ytd") return lastDate.slice(0,4) + "-01-01";
-    if(paperRange === "1y"){ const d = new Date(lastDate); d.setFullYear(d.getFullYear()-1); return d.toISOString().slice(0,10); }
-    return "0000-01-01";
-  };
-  const box = document.createElement("div"); box.style.marginTop = "16px"; el.appendChild(box);
-
-  const draw = () => {
-    const grp = avail.find(g => g.id === paperGroup);
-    const view = [...grp.keys, ...grp.refs.filter(k => !grp.keys.includes(k))].filter(k => all[k]);
-    // A view of young books starts at the first of them, not at the references' first day: Universe EW and SPY run from
-    // January, and drawn from there the new books would sit as a few dots at the far right of an empty chart.
-    const firstOf = k => all[k][0].nav_date;
-    const born = ["model", "other"].includes(grp.id) ? "0000-01-01" : grp.keys.filter(k => all[k]).map(firstOf).sort()[0];
-    const from = [cutoff(), born].sort().pop();
-    const by = {};
-    view.forEach(s => { const w = all[s].filter(r => r.nav_date >= from); if(w.length) by[s] = w; });
-    const days = [...new Set(Object.values(by).flat().map(r => r.nav_date))].sort();
-    const start_ = days[0], liveDays = days.filter(d => d >= PAPER_LIVE_FROM).length;
-    const spyAt = d => { const r = (by.spy||[]).filter(x => x.nav_date <= d).slice(-1)[0]; return r ? +r.nav : null; };
-    const rf = (D.perf && D.perf.rf_mean) || 0;
-    const sharpe = ser => {
-      const r = ser.map(x => x.daily_return).filter(v => v != null).map(Number);
-      if(r.length < 20) return null;
-      const m = r.reduce((a,b)=>a+b,0) / r.length;
-      const sd = Math.sqrt(r.reduce((a,b)=>a+(b-m)**2,0) / (r.length-1));
-      return sd > 0 ? (m*252 - rf) / (sd*Math.sqrt(252)) : null;
-    };
-    const stats = view.filter(s => by[s]).map(s => {
-      const first = by[s][0], last = by[s].slice(-1)[0];
-      const ret = +last.nav / +first.nav - 1;
-      const s0 = spyAt(first.nav_date), s1 = spyAt(last.nav_date);
-      const bench = s0 && s1 ? s1 / s0 - 1 : null;
-      const sh = sharpe(by[s]);
-      return [`<span title="${esc(PAPER_TIP[s] || "")}"><span style="color:${PAPER_COL[s]}">&#9679;</span> ${esc(PAPER_LABEL[s])}</span>`,
-              `<span class="muted" style="font-size:var(--fs-sm)">${first.nav_date}</span>`,
-              pct(ret), s === "spy" || bench == null ? "—" : pct(ret - bench),
-              sh == null ? `<span class="muted" title="needs 20 daily observations">${by[s].length}d</span>` : num(sh, 2)];
-    });
-    const btn = (k, label) => `<button class="lock" data-range="${k}"${paperRange===k?' style="border-color:var(--brand);color:var(--text)"':""}>${label}</button>`;
-    const gbtn = g => `<button class="lock" data-group="${g.id}"${paperGroup===g.id?' style="border-color:var(--brand);color:var(--text)"':""}>${esc(g.name)}</button>`;
-    const span = grp.id === "model"
-      ? `since ${start_} · ${plural(days.length,"trading day")} · <b>proxy</b> grade to ${PAPER_REAL_FROM}, <b>model snapshots</b> to ${PAPER_LIVE_FROM}, <b>live</b> for the ${plural(liveDays,"day")} since`
-      : `since ${start_} · ${days.length} trading day${days.length === 1 ? "" : "s"}`
-          + (start_ < "2026-10-16" ? " · reconstructed before 2026-10-16" : " · forward-locked");
-    const noteHtml = grp.id === "other"
-      ? `<b style="color:var(--text)">${unlabelled.length} strateg${unlabelled.length === 1 ? "y has" : "ies have"} no label registered in this page</b> (${unlabelled.map(esc).join(", ")}) and
-         ${unlabelled.length === 1 ? "is" : "are"} shown by key. Add ${unlabelled.length === 1 ? "it" : "them"} to PAPER_LABEL, PAPER_COL and PAPER_GROUPS in build_live.py.`
-      : PAPER_NOTES[grp.id](overlap);
-    box.innerHTML = card("Paper trading · track record",
-      `${avail.map(gbtn).join(" ")} &nbsp; ${btn("qtd","QTD")} ${btn("ytd","YTD")} ${btn("1y","1Y")} ${btn("all","All")} &nbsp; ${span} ·
-       each series shown as cumulative % return from its first day in view`,
-      `<div class="grid g-2-1"><div class="chart tall" id="paperChart"></div>${
-        tbl(["Strategy","Since","Return","vs SPY (same window)","Sharpe"], stats.sort((a,b)=>parseFloat(b[2])-parseFloat(a[2])))}</div>
-       <div class="muted" style="margin-top:8px">${noteHtml}</div>`);
-    const series = view.filter(s => by[s]).map(s => {
-      const base = +by[s][0].nav;
-      return {name:PAPER_LABEL[s], type:"line", showSymbol:days.length < 3 || by[s].length < 3, symbolSize:7, connectNulls:false,
-        lineStyle:{width:["grid_a_buy","actual_book"].includes(s) ? 2.4 : 1.4, color:PAPER_COL[s], type:s.startsWith("ls_") ? "dashed" : "solid"},
-        itemStyle:{color:PAPER_COL[s]},
-        // cumulative % return from each series' first day in view, not an index level: the
-        // question is "how much did this strategy make", which a 100-based index makes you do
-        // arithmetic to answer.
-        data:days.map(d => { const x = by[s].find(r => r.nav_date === d); return x ? +((+x.nav / base - 1) * 100).toFixed(2) : null; })};
-    });
-    /* ⚠ "LIVE" IS PER BOOK, NOT ONE DATE (backtesting-frameworks review, 2026-11-17).
-       The marker used to sit at PAPER_LIVE_FROM, 2026-09-15, on every group. That is right for the
-       grid and quad books and WRONG for the others: the duration books went live 2026-10-08/10-16 and
-       the factor books 2026-10-16, so on those groups the chart called a month of reconstruction
-       "live" while the note printed under it said the opposite. The cut now comes from
-       PAPER_RECON_FROM (indicators.js) — the same registry the price chart's paper overlay reads,
-       itself taken from each backfill script's own LIVE_START — and the span before it is SHADED, so
-       the reconstructed stretch reads as a different kind of evidence instead of one unbroken record.
-       A group whose books cut on different dates shades to the LATEST cut: everything before it is
-       reconstructed for at least one book on screen. */
-    const shown = view.filter(s => by[s]);
-    const cuts = shown.map(s => (typeof PAPER_RECON_FROM !== "undefined" && PAPER_RECON_FROM[s]) || null).filter(Boolean).sort();
-    const liveFrom = cuts.length ? cuts[cuts.length - 1] : null;
-    const atOrAfter = d => days.find(x => x >= d);
-    const marks = [[grp.id === "model" ? PAPER_REAL_FROM : null, "model data"], [liveFrom, "live"],
-                   [grp.id === "model" ? PAPER_V13_LOCK : null, "V13 rules"]]
-      .filter(([d]) => d)
-      .map(([d,l]) => { const at = atOrAfter(d); return at && at !== days[0] ? {xAxis:at, label:{formatter:l}} : null; })
-      .filter(Boolean);
-    const liveAt = liveFrom ? atOrAfter(liveFrom) : null;
-    if(series.length && marks.length)
-      series[series.length-1].markLine = {silent:true, symbol:"none", lineStyle:{color:C.dim, type:"dashed"},
-        label:{color:C.muted, fontSize:11}, data:marks};
-    if(series.length && liveAt && liveAt !== days[0])
-      series[series.length-1].markArea = {silent:true, itemStyle:{color:"rgba(255,255,255,.035)"},
-        label:{show:true, position:"insideTopLeft", color:C.dim, fontSize:11},
-        data:[[{name:"reconstructed", xAxis:days[0]}, {xAxis:liveAt}]]};
-    mk(document.getElementById("paperChart"), {
-      legend:{type:"scroll", bottom:0, textStyle:{color:C.muted},
-        selected:Object.fromEntries(view.filter(s => by[s]).map(s => [PAPER_LABEL[s], grp.id === "model" ? PAPER_DEFAULT.includes(s) : true]))},
-      grid:{left:56,right:16,top:20,bottom:40},
-      tooltip:{trigger:"axis", valueFormatter:v => v == null ? "—" : (v > 0 ? "+" : "") + (+v).toFixed(2) + "%"},
-      xAxis:{type:"category", data:days, axisLabel:{color:C.muted}},
-      yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:C.line}},
-        axisLabel:{color:C.muted, formatter:v => (v > 0 ? "+" : "") + v + "%"}},
-      series});
-    box.querySelectorAll("button[data-range]").forEach(b => b.onclick = () => { paperRange = b.dataset.range; draw(); });
-    box.querySelectorAll("button[data-group]").forEach(b => b.onclick = () => { paperGroup = b.dataset.group; draw(); });
-  };
-  draw();
-}
 /* ═══ ALERTS — the market-technicals agent's flags, behind a bell in the header ═══════════════
  *
  * scripts/technical_alerts.py writes ic_technical_flags every night (engines/technical_alerts.py
@@ -6597,12 +6396,10 @@ function memoTechnicals(row, anchor){
       (engines/technical_alerts.py). Momentum is timing and confirmation, never thesis.</div>
   </div>`;
 }
-/* ═══ MARKET MEMO (all three daily notes, one day at a time) ══════════════ */
-// The three notes answer three different questions and were scattered across two tabs: the morning
-// note and the evening close note on Holdings, the universe note on Grid and Universe. Read in
-// sequence they are a record of how the market and the bench have been changing, which is what this
-// tab is for — one day per screen, with the longer-term observations from all three pulled together
-// at the top so trends are readable without scrolling three cards.
+/* ═══ THE DAILY NOTES: one renderer per note ══════════════════════════════
+   The Memo tab is gone (V14, 2026-11-22): the notes are sections of the daily brief on the Today
+   tab, composed by dailyBrief() in v14.js. This file keeps the per-note renderers and the state the
+   day arrows and the bell's jump use. */
 let memoIdx = 0;
 let memoJump = null;     // {date, to}: set by the bell so the Memo opens on that session and scrolls to a card
 function memoDates(){
@@ -6615,7 +6412,7 @@ function memoLongerTerm(notes){
     ((row && row.payload && row.payload.longer_term) || []).map(x => ({label, col, ...x})));
   if(!items.length) return "";
   return card("Longer-term observations",
-    "what has been building over weeks and months, from all three notes on this day",
+    "what has been building over weeks and months, from the morning, universe and close notes on this day",
     `<ul class="blist memolt">${items.map(x => `<li>
       <span class="memotag" style="color:${x.col};border-color:${x.col}44">${x.label}</span>
       <b>${esc(x.shift || "")}</b><div class="muted">${esc(x.note || "")}</div></li>`).join("")}</ul>`);
@@ -6657,12 +6454,167 @@ function memoEvening(row, anchor){
     ${briefBody(row.payload)}
   </div>`;
 }
-async function memo(el){
-  const B = (typeof LIVE !== "undefined" && LIVE.briefs) || [];
+/* ═══ SIX TABS (V14, 2026-11-22) ═════════════════════════════════════════════════════════════
+ *
+ * PROCESS_AUDIT_2026-11.md §6. The site had ten tabs, and the first screen did not say what needed
+ * a decision: open sell conditions, thesis reviews and the proposal's exits sat on Research or inside
+ * a drawer. Six tabs now, each one a question:
+ *
+ *   Today      What needs me?                 the decision queue · the book against the model · the
+ *                                             brake against exposure · the day's notes
+ *   Book       What do I own and why?         holdings · the book at a glance · performance
+ *   Buy list   What would the model own?      the top 25 by QGS · what it would change · every name
+ *   Market     What is the backdrop?          market signals · rotation · charts · trend maps
+ *   Evidence   What do we believe, on what?   the hypothesis register · the forward record · theses
+ *   Reference  How does it work?              the method · risk engine detail · factors
+ *
+ * EVERY VIEW IS RENDERED INTO ITS OWN BOX. The views this composes each set innerHTML on the element
+ * they are given and several redraw themselves on a click. Given the tab's own element they would
+ * wipe every section below them on the first filter change, which is what the old composed tabs did.
+ *
+ * ⚠ A FAILED LOAD IS A NAMED GAP, NEVER AN EMPTY PANEL. LIVE.queue / LIVE.distance / LIVE.hyp are
+ * null when the view did not answer, and the card then says the load failed. An empty queue and a
+ * queue that could not be read are different facts and must not look alike.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+const gapBox = (what, why) => `<div class="gap"><b>${esc(what)}</b> ${esc(why || "")}</div>`;
+const ptsFmt = (v, dp = 1) => v == null || isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(dp)} pts`;
+
+// The decision grid, keyed by ticker, for every table that shows the model's rank, action or veto.
+async function ensureMatrix(){
+  try{
+    if(!LIVE.matrix) LIVE.matrix = await qAll("site_decision_matrix");
+    LIVE.matrixBy = Object.fromEntries(LIVE.matrix.map(r => [r.ticker, r]));
+    LIVE.matrixOk = LIVE.matrix.length > 0;
+  }catch(e){ LIVE.matrixBy = {}; LIVE.matrixOk = false; LIVE.matrixErr = e.message || String(e); }
+}
+async function loadDecisions(){
+  try{ LIVE.queue = await qAll("site_decision_queue"); LIVE.queueErr = null; }
+  catch(e){ LIVE.queue = null; LIVE.queueErr = e.message || String(e); }
+  try{ const r = await qAll("site_book_distance"); LIVE.distance = r.length ? r[0] : false; LIVE.distanceErr = null; }
+  catch(e){ LIVE.distance = null; LIVE.distanceErr = e.message || String(e); }
+}
+
+/* ── TODAY ─────────────────────────────────────────────────────────────────────────────────── */
+// Labels for the kinds engines/decisions.py produces today, in its priority order. THE QUEUE IS
+// RENDERED GENERICALLY: a kind this table does not know (one added to the engine after this page
+// was built) is shown under its own name with the same row, never dropped.
+const Q_KIND = {exit_veto: ["Exit veto", "bad"], review_veto: ["Under a veto", "warn"], sell_condition: ["Sell condition", "bad"],
+                sector_cap: ["Sector cap", "bad"], brake_exposure: ["Above the brake's setting", "bad"], factor_limit: ["Factor limit", "warn"],
+                away_from_model: ["Away from the model", "warn"], thesis_revision: ["Thesis revision", ""], proposal_exit: ["Proposal drops it", "warn"]};
+const Q_ORDER = Object.keys(Q_KIND);
+const qKind = k => Q_KIND[k] || [String(k || "item").replaceAll("_", " ").replace(/^./, c => c.toUpperCase()), "warn"];
+const qRank = k => { const i = Q_ORDER.indexOf(k); return i < 0 ? Q_ORDER.length : i; };
+const Q_RULING = {ACT: "Acting on it", DECLINE: "Declined", DEFER: "Deferred"};
+// Two kinds are ruled with their own command, which is also what clears them from the queue.
+const Q_OWN = {sell_condition: r => `python run.py thesis confirm ${r.ticker} ${r.item_key} "why"   (or: thesis dismiss)`,
+               thesis_revision: r => `python run.py thesis accept ${r.ticker} "why"   (or: thesis reject)`};
+function queueRow(r, today){
+  const [label, tone] = qKind(r.kind);
+  const overdue = r.status === "OPEN" && r.due && r.due < today;
+  const tk = r.ticker ? `<a href="#book/${esc(r.ticker)}" class="tk" style="text-decoration:none">${esc(r.ticker)}</a> ` : "";
+  const title = r.ticker && r.title && r.title.startsWith(r.ticker) ? esc(r.title.slice(r.ticker.length).replace(/^[\s:]+/, "")) : esc(r.title || "");
+  const when = r.status === "RULED"
+    ? `<span class="chip">${Q_RULING[r.ruling] || esc(r.ruling || "ruled")}</span>${r.ruling === "DEFER" && r.due ? `<span class="muted">back on ${esc(r.due)}</span>` : ""}`
+    : overdue ? `<span class="chip bad">Overdue since ${esc(r.due)}</span>`
+    : `<span class="muted">due ${esc(r.due || "not set")}</span>`;
+  const cmd = Q_OWN[r.kind] ? Q_OWN[r.kind](r) : `python run.py decide ${r.id} act|decline|defer "why"`;
+  return `<div class="qrow">
+    <div><span class="chip ${tone}">${esc(label)}</span> ${tk}<span class="qt">${title}</span></div>
+    <div class="qmeta">${when}<span class="muted" title="Open since">since ${esc(r.opened || "?")}</span></div>
+    <div class="qd">${esc(r.detail || "")}${r.status === "RULED" && r.reason ? `<br><b>Reason given:</b> ${esc(r.reason)}` : ""}
+      ${r.status === "OPEN" ? `<div class="mono" style="font-size:var(--fs-xs);opacity:.75;margin-top:4px">${esc(cmd)}</div>` : ""}</div>
+  </div>`;
+}
+function queueCard(){
+  const Q = LIVE.queue, today = _todayISO();
+  if(Q == null) return card("Waiting for a decision", "could not be loaded",
+    gapBox("The decision queue did not load.", `This is a failed read, not an empty queue${LIVE.queueErr ? " (" + LIVE.queueErr + ")" : ""}. Run "python run.py decide" for the list.`));
+  const byDue = (a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999")) || qRank(a.kind) - qRank(b.kind)
+                          || String(a.ticker || "").localeCompare(String(b.ticker || ""));
+  const open = Q.filter(r => r.status === "OPEN").sort(byDue), ruled = Q.filter(r => r.status === "RULED").sort(byDue);
+  const cleared = Q.filter(r => r.status === "CLEARED").sort((a, b) => String(b.cleared_on).localeCompare(String(a.cleared_on)));
+  const late = open.filter(r => r.due && r.due < today).length;
+  return card("Waiting for a decision",
+    `${plural(open.length, "item")} open${late ? ` · <span class="neg">${late} overdue</span>` : ""} · ${ruled.length} ruled and still holding · oldest due first`,
+    (open.length ? `<div>${open.map(r => queueRow(r, today)).join("")}</div>`
+       : `<div class="muted">Nothing is open. If the queue did not run after tonight's grid, the health badge in the header names it.</div>`) +
+    (ruled.length ? `<h4 style="${VDUR_H4}">Ruled, and the condition still holds</h4><div>${ruled.map(r => queueRow(r, today)).join("")}</div>` : "") +
+    `<h4 style="${VDUR_H4}">Cleared in the last 30 days</h4>` +
+    (cleared.length ? `<div class="list">${cleared.map(r => `<div class="li"><span><span class="chip">${esc(qKind(r.kind)[0])}</span> ${esc(r.title || "")}</span>
+        <span class="muted" style="font-size:var(--fs-sm);white-space:nowrap">${r.ruling ? esc(Q_RULING[r.ruling] || r.ruling) + " · " : ""}cleared ${esc(r.cleared_on || "?")}</span></div>`).join("")}</div>`
+      : `<div class="muted">None yet. An item is cleared when its condition stops holding.</div>`) +
+    `<div class="note" style="margin-top:12px">A list, not an order book: nothing here trades or changes a grade. An item opens the night its condition first holds and is cleared when the condition stops holding. A ruling is made on the command line and needs a reason, which is written to the journal.</div>`);
+}
+function distanceCard(){
+  const R = LIVE.distance;
+  if(R == null) return card("The book against the model", "could not be loaded",
+    gapBox("The model-to-book distance did not load.", `A failed read, not a zero${LIVE.distanceErr ? " (" + LIVE.distanceErr + ")" : ""}.`));
+  if(R === false) return card("The book against the model", "not computed", gapBox("No distance row is stored.", "scripts/decision_queue.py has not written one."));
+  const d = R.payload || {}, lim = d.limits || {};
+  const share = [["Buy list", d.list_share, C.green], ["Hold", d.hold_share, C.muted], ["Review", d.review_share, C.amber], ["Exit", d.exit_share, C.red]];
+  const known = share.every(([, v]) => v != null);
+  const bar = known ? `<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:10px 0 6px;background:var(--line)">${
+      share.filter(([, v]) => v > 0).map(([l, v, c]) => `<i title="${l} ${(v * 100).toFixed(1)}%" style="width:${(v * 100).toFixed(2)}%;background:${c}"></i>`).join("")}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-sm)">${share.map(([l, v, c]) =>
+        `<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c};margin-right:5px"></i>${l} <b>${(v * 100).toFixed(1)}%</b></span>`).join("")}</div>`
+    : gapBox("The shares could not be computed.", "No held name carried a list action.");
+  const floor = lim.list_share_floor, under = d.list_share != null && floor != null && d.list_share < floor;
+  const over = d.sectors_over_cap || {}, overN = Object.keys(over).length;
+  const F = d.factors || [], fl = lim.factor_limit;
+  const frow = F.map(f => { const b = f.active_beta, out = b != null && fl != null && Math.abs(b) > fl;
+    return [esc(f.factor), b == null ? `<span class="muted" title="Not measured">?</span>` : `<span class="mono ${out ? "neg" : ""}">${b > 0 ? "+" : ""}${(+b).toFixed(2)}</span>`,
+            b == null ? "" : out ? `<span class="chip bad">beyond ±${num(fl, 2)}</span>` : `<span class="muted">inside</span>`]; });
+  return card("The book against the model", `grid of ${esc(R.as_of || "?")} · shares are of stock capital (cash and the index fund are not names the list can hold)`,
+    `<div style="font-size:var(--fs-lg)"><b>${d.on_list ?? "?"} of ${d.names ?? "?"}</b> holdings are on the buy list${
+       d.list_share != null ? `, <b class="${under ? "neg" : ""}">${(d.list_share * 100).toFixed(0)}%</b> of stock capital${floor != null ? ` against a floor of ${(floor * 100).toFixed(0)}%` : ""}` : ""}.</div>
+     ${bar}
+     <h4 style="${VDUR_H4}">Sector cap</h4>
+     ${overN ? Object.entries(over).map(([s, w]) => `<span class="chip bad">${esc(s)} ${num(w, 1)}% of the sleeve, cap ${num(lim.sector_cap, 0)}%</span>`).join(" ")
+             : d.sectors_over_cap ? `<span class="muted">No sector is over the ${num(lim.sector_cap, 0)}% cap.</span>` : `<span class="muted" title="Not in the stored row">?</span>`}
+     <h4 style="${VDUR_H4}">Active factor betas against SPY</h4>
+     ${frow.length ? tbl(["Factor", "Active beta", `Limit ±${fl == null ? "?" : num(fl, 2)}`], frow)
+                   : gapBox("No factor betas.", "The rotation agent's reading was not available, so the factor limit was not tested.")}
+     <div class="muted" style="font-size:var(--fs-sm);margin-top:6px">Measured on the recorded book return over 126 sessions${d.factor_as_of ? `, as of ${esc(d.factor_as_of)}` : ""}. Each factor is measured on its own, so the readings overlap and do not add up.</div>
+     ${(d.missing || []).length ? `<div style="margin-top:10px">${gapBox("Not read tonight:", d.missing.join("; ") + ". Anything that depends on it was not tested.")}</div>` : ""}
+     ${(d.stale_prices || []).length ? `<div style="margin-top:10px">${gapBox("Carried at an old price:", d.stale_prices.join(", "))}</div>` : ""}
+     <div class="note" style="margin-top:12px" data-nofold>Limits: sector cap ${num(lim.sector_cap, 0)}%, factor beta within ±${fl == null ? "?" : num(fl, 2)}, at least ${floor == null ? "?" : (floor * 100).toFixed(0)}% of stock capital in buy-list names${lim.brake_tolerance_pts == null ? "" : `, no more than ${num(lim.brake_tolerance_pts, 0)} points above the brake's setting while it is defensive`}, ${lim.ruling_sessions ?? "?"} sessions to rule on an item.
+       ${lim.set_by ? `<b>Every limit here except the sector cap is one of the ${esc(lim.set_by)}.</b>` : ""}</div>`);
+}
+function exposureCard(){
+  const R = LIVE.distance, b = R && R.payload && R.payload.brake;
+  if(R == null) return card("The brake against exposure", "could not be loaded", gapBox("Not loaded.", "The brake's state travels with the distance row, which did not load."));
+  if(!b) return card("The brake against exposure", "not stored", gapBox("No brake reading is stored with tonight's row.", "This is a missing reading, not a brake that is off."));
+  const SC = typeof REGIME_C === "function" ? REGIME_C() : {};
+  const lim = (R.payload.limits || {}), tol = lim.brake_tolerance_pts;
+  // actual and target as the queue's own engine computed them; the cash line alone if the row is older
+  const act = b.actual_invested_pct ?? (b.cash_pct == null ? null : 100 - b.cash_pct), tgt = b.target_invested_pct ?? null;
+  const gap = act != null && tgt != null ? act - tgt : null, over = gap != null && tol != null && gap > tol;
+  const M = b.mandates || {};
+  const big = (cap, v, sub, tone = "") => `<span><span class="caps">${cap}</span><br><b style="font-size:var(--fs-xl)" class="${tone}">${v}</b> <span class="muted">${sub}</span></span>`;
+  return card("The brake against exposure", `brake row of ${esc(b.as_of || "?")}`,
+    `<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline">
+       <span><span class="caps">State</span><br><b style="font-size:var(--fs-xl);color:${SC[b.state] || C.text}">${esc(codeLbl("regime", b.state))}</b></span>
+       ${big("Equity sized at", b.exposure_multiplier == null ? "?" : (b.exposure_multiplier * 100).toFixed(0) + "%", "of normal")}
+       ${big("The brake's setting", tgt == null ? "?" : num(tgt, 1) + "%", tgt == null ? "not in this row" : "invested")}
+       ${big("The book now", act == null ? "?" : num(act, 1) + "%", `invested · cash ${b.cash_pct == null ? "?" : num(b.cash_pct, 1) + "%"}`, over ? "neg" : "")}
+     </div>
+     ${gap == null ? `<div style="margin-top:10px">${gapBox("Actual against the setting could not be compared.", "One of the two figures is not in tonight's row.")}</div>`
+       : `<div style="margin-top:10px">${over ? `<span class="chip bad">${num(gap, 1)} points above the setting</span>` : `<span class="chip ${gap > 0 ? "warn" : "ok"}">${gap > 0 ? num(gap, 1) + " points above" : num(-gap, 1) + " points below"} the setting</span>`}
+          ${tol == null ? "" : `<span class="muted" style="font-size:var(--fs-sm)"> · it becomes an item above ${num(tol, 0)} points while the brake is defensive</span>`}</div>`}
+     <h4 style="${VDUR_H4}">What the brake asks of each client model</h4>
+     ${Object.keys(M).length ? tbl(["Model", "Equity when the brake is off", "Equity the brake asks for now", "Rest in the defensive core"],
+        Object.entries(M).map(([n, m]) => [esc(n), num(m.base_equity_pct, 0) + "%", `<b>${num(m.target_equity_pct, 0)}%</b>`, num(m.defensive_core_pct, 0) + "%"]))
+       : gapBox("No model targets stored.", "")}
+     <div class="note" style="margin-top:12px" data-nofold>The brake proposes; nothing is trimmed by the system, and its setting has never been binding. The setting is the book's tier weights scaled by the brake. The index fund this sleeve holds behaves like about 0.6 of an equity position and is not downside protection.
+       <a href="#risk">Regime detail</a></div>`);
+}
+/* The day's notes: Keith first, then ONE brief with a section per note, then Keith's weekly on its
+ * own. memoIdx / memoJump / the per-note renderers are memo.js's; the bell still jumps here. */
+function dailyBrief(box){
+  const B = LIVE.briefs || [];
   if(!B.length){
-    el.innerHTML = head("Memo", "Market memo", "") +
-      card("No notes yet", "", `<p class="muted">The notes are written by the scheduled jobs — pre-open,
-        mid-morning for the universe, and after the close.</p>`);
+    box.innerHTML = sectionHead("Notes") + card("No notes yet", "", `<p class="muted">The notes are written by the scheduled jobs: before the open, mid-morning for the universe, and after the close.</p>`);
     return;
   }
   const dates = memoDates();
@@ -6670,52 +6622,295 @@ async function memo(el){
     memoIdx = Math.max(0, Math.min(memoIdx, dates.length - 1));
     const d = dates[memoIdx];
     const at = k => B.find(x => x.as_of === d && (x.kind || "evening") === k);
-    // the close note for the anchored day may not exist yet; fall back to the most recent one
-    // before it, clearly labelled with its own date rather than presented as this day's
-    const ev = at("evening") || B.filter(x => (x.kind||"evening") === "evening" && x.as_of < d)[0];
-    // the technicals note is written after the close too, so it gets the same fallback: through
-    // the trading day the page showed three notes and silently no fourth
-    const mo = at("premarket"), un = at("universe"),
-          te = at("technicals") || B.filter(x => x.kind === "technicals" && x.as_of < d)[0],
-          ro = at("rotation") || B.filter(x => x.kind === "rotation" && x.as_of < d)[0],
-          ke = at("keith") || B.filter(x => x.kind === "keith" && x.as_of < d)[0], kw = at("keith_weekly");
+    const prior = k => B.filter(x => (x.kind || "evening") === k && x.as_of < d)[0];
+    // A note written after the close may not exist yet for the anchored day: the most recent earlier
+    // one is shown, and its own renderer labels it with its own date.
+    const ev = at("evening") || prior("evening"), mo = at("premarket"), un = at("universe"),
+          te = at("technicals") || prior("technicals"), ro = at("rotation") || prior("rotation"),
+          ke = at("keith") || prior("keith"), kw = at("keith_weekly") || prior("keith_weekly");
+    const parts = [["Morning", mo, memoMorning(mo)], ["Close", ev, memoEvening(ev, d)], ["Technicals", te, memoTechnicals(te, d)],
+                   ["Rotation", ro, typeof rotationNote === "function" ? rotationNote(ro, d) : ""], ["Universe", un, memoUniverse(un)]];
+    const have = parts.filter(p => p[1] && p[2]);
+    const missing = parts.filter(p => !(p[1] && p[2])).map(p => p[0].toLowerCase());
     const nav = `<span class="bnav">
-      <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
+      <button class="bbtn" data-md="1" ${memoIdx >= dates.length - 1 ? "disabled" : ""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:var(--fs-sm)">${d}</span>
-      <button class="bbtn" data-md="-1" ${memoIdx<=0?"disabled":""} title="Later">→</button></span>`;
-    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals", ro && "rotation", ke && "Keith", kw && "Keith weekly"].filter(Boolean).join(" · ");
-    el.innerHTML = head("Memo", "Market memo",
-      `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
-      memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
-      (typeof keithNote === "function" ? keithNote(ke, d) + keithNote(kw, null, true) : "") +
-      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te, d) + (typeof rotationNote === "function" ? rotationNote(ro, d) : "") +
-      `<div class="note" style="margin-top:14px">Five notes, each from a different point in the day (the rotation note, written after the close, reads sector and factor leadership against the book):
-       the morning note is what you are walking into, the universe note covers all ${(D.universe || []).length || "the"} tracked names
-       rather than the book, and the close note is how the day actually went, and the technicals note reads the
-       setups and breakdowns the alerts engine flagged on the book after the close. Every figure in them is
-       computed first and the model is told to add none of its own — commentary on what the model is
-       showing, not advice or a forecast. Use ← → to read back through earlier days.</div>`;
-    el.querySelectorAll(".bbtn[data-md]").forEach(b =>
-      b.onclick = () => { memoIdx += Number(b.dataset.md); draw(); });
+      <button class="bbtn" data-md="-1" ${memoIdx <= 0 ? "disabled" : ""} title="Later">→</button></span>`;
+    box.innerHTML = sectionHead("Notes", `<span class="muted">${nav}</span>`) +
+      (typeof keithNote === "function" && ke ? keithNote(ke, d) : gapBox("No daily markets note for this session or before it.", "")) +
+      `<div style="margin-top:16px"><div class="caps" style="margin:0 0 8px">Daily brief · ${esc(d)} · ${have.length} of ${parts.length} sections${
+          missing.length ? ` · not written: ${missing.join(", ")}` : ""}</div>
+        <div class="dbrief">${memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]])}${have.map(p => p[2]).join("") ||
+          `<div class="muted" style="padding:14px 0">No section was written for ${esc(d)}.</div>`}</div></div>` +
+      (kw && typeof keithNote === "function" ? `<div style="margin-top:16px">${keithNote(kw, null, true)}</div>` : "") +
+      `<div class="note" style="margin-top:14px">Every figure in a note is computed first and the model that writes it is told to add none of its own. The notes describe what the model is showing. They are not advice or a forecast. Use the arrows to read earlier days.</div>`;
+    box.querySelectorAll(".bbtn[data-md]").forEach(b => b.onclick = () => { memoIdx += Number(b.dataset.md); draw(); });
   };
   if(memoJump){ const i = dates.indexOf(memoJump.date); if(i >= 0) memoIdx = i; }
   draw();
   if(memoJump){
     const t = document.getElementById(memoJump.to); memoJump = null;
-    // After route() has finished (it scrolls to the top before drawing), and on a TIMER rather than
-    // an animation frame: a frame callback does not run in a tab that is not painting, and then the
-    // link opens the right day at the top of the page with the note three screens down. Focus goes
-    // to the card so a keyboard reader lands on the note too.
-    if(t) setTimeout(() => { t.scrollIntoView({block: "start"}); t.focus({preventScroll: true}); }, 0);
+    if(t) setTimeout(() => { t.scrollIntoView({block: "start"}); if(t.focus) t.focus({preventScroll: true}); }, 0);
   }
 }
+async function today(el){
+  el.innerHTML = head("Today", "What needs a decision", `<span class="muted">loading…</span>`);
+  await loadDecisions();
+  const Q = LIVE.queue, nOpen = Q ? Q.filter(r => r.status === "OPEN").length : null;
+  el.innerHTML = head("Today", "What needs a decision",
+      `<span class="muted">${nOpen == null ? "the queue did not load" : plural(nOpen, "open item")} · ${plural(D.holdings.length, "holding")} · book ${usd(D.book_value)}</span>`) +
+    (typeof regimeStrip === "function" ? regimeStrip() : "") + queueCard() +
+    `<div class="grid g2" style="margin-top:16px">${distanceCard()}${exposureCard()}</div>`;
+  const nb = document.createElement("div"); el.appendChild(nb);
+  try{ dailyBrief(nb); }catch(e){ nb.innerHTML = sectionHead("Notes") + gapBox("The notes could not be drawn.", e.message || String(e)); }
+}
 
+/* ── BOOK ──────────────────────────────────────────────────────────────────────────────────── */
+let bookHoldBox = null;
+async function bookAll(el){
+  await ensureMatrix();
+  const hb = document.createElement("div"); el.appendChild(hb); bookHoldBox = hb;
+  holdings(hb);
+  const ov = document.createElement("div"); el.appendChild(ov);
+  try{ overview(ov); }catch(e){ ov.innerHTML = sectionHead("The book at a glance") + gapBox("Could not be drawn.", e.message || String(e)); }
+  let X = null;
+  try{ X = await anLoad(); }catch(e){}
+  if(X){
+    const box = document.createElement("div"); el.appendChild(box);
+    box.innerHTML = sectionHead("Fundamentals") + anValuationCard(X);
+  }
+  await section(el, "Performance", b => performanceAll(b), "", true);
+  await section(el, "The book through time", b => historyView(b));
+}
 
-const VIEWS = {overview, holdings: holdingsAll, memo, performance: performanceAll, risk: riskAll, universe: universeAll, signals: signalsV2, research, about, grid: universeAll, analytics: riskAll, proposal: research, theses: research, markets, history: holdingsAll, factors: riskAll};
+/* ── BUY LIST ──────────────────────────────────────────────────────────────────────────────── */
+let blAll = false;
+function pullbackFlags(){
+  // {ticker: session} for the entry flag on the NEWEST flag session; null when the flags did not load.
+  if(!Array.isArray(LIVE.flags)) return null;
+  const newest = LIVE.flags.length ? LIVE.flags[0].as_of : null, out = {};
+  LIVE.flags.filter(f => f.as_of === newest && f.code === "PULLBACK_IN_LEADER").forEach(f => { out[f.ticker] = f.as_of; });
+  return {newest, by: out};
+}
+function buyListCard(M){
+  const L = M.filter(r => r.list_action === "BUY_LIST").sort((a, b) => (a.list_rank ?? 9e9) - (b.list_rank ?? 9e9));
+  const nm = Object.fromEntries((D.universe || []).map(u => [u.tk, u.name]));
+  const PF = pullbackFlags();
+  const flagCell = tk => PF == null ? `<span class="muted" title="The technical flags did not load">?</span>`
+    : PF.by[tk] ? `<span class="chip ok" title="Above its 200-day average with RSI(14) under 35, on ${esc(PF.by[tk])}. In testing such days were a modestly better entry over the next two weeks. It says when, never which.">Pullback · ${esc(PF.by[tk].slice(5))}</span>`
+    : `<span class="muted">none</span>`;
+  const status = r => r.held ? `<span class="pill">held</span>`
+    : r.list_defer ? `<span class="chip warn" title="A new position waits while the name is in a 200-day downtrend. A holding is never sold on trend.">Waiting: in a downtrend</span>`
+    : `<span class="chip ok">Open to buy</span>`;
+  const held = L.filter(r => r.held).length, wait = L.filter(r => r.list_defer).length;
+  const rows = L.map(r => `<tr data-open="${esc(r.ticker)}" tabindex="0" style="cursor:pointer">
+      <td class="mono">${r.list_rank ?? "?"}</td>
+      <td><b>${esc(r.ticker)}</b> <span class="muted" style="font-size:var(--fs-sm)">${esc(nm[r.ticker] || "")}</span></td>
+      <td>${status(r)}</td>
+      <td class="mono" title="Quality Growth Score × 10,000">${r.qgs == null ? "?" : num(r.qgs * 1e4, 1)}</td>
+      <td title="${esc(r.grade_reason || "")}">${esc(r.grade || "—")}</td>
+      <td class="mono">${num(r.composite)}</td>
+      <td>${r.veto ? `<span class="chip bad" title="${esc(r.veto_reason || "")}">${esc(r.veto)}</span>` : `<span class="muted">none</span>`}</td>
+      <td>${trendChip(r.trend)}</td>
+      <td>${flagCell(r.ticker)}</td></tr>`).join("");
+  return card("The buy list", `${L.length} names · ${held} held · ${L.length - held - wait} open to buy · ${wait} waiting in a downtrend`,
+    (L.length ? `<div class="table-wrap"><table class="tbl"><thead><tr>${["#", "Name", "Status", "QGS", "Grade", "Composite", "Veto", "200-day state · risk", "Entry flag"]
+        .map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody id="blRows">${rows}</tbody></table></div>`
+      : gapBox("No name carries the buy-list action.", "The grid may not have written the list columns. This is not an empty list.")) +
+    `<div class="note" style="margin-top:12px">The list is the highest-ranked core names on Quality Growth Score that no veto holds down. A name is on it because of its rank, not its chart: the 200-day state is shown as a risk descriptor and only delays a new entry. The entry flag is the one timing signal with a test behind it, and that test was suggestive, not conclusive.${
+      PF && PF.newest ? ` Flags are for the ${esc(PF.newest)} session.` : ""}</div>`);
+}
+function offListCard(M){
+  const H = M.filter(r => r.held && r.list_action !== "BUY_LIST").sort((a, b) => (({EXIT: 0, REVIEW: 1, HOLD: 2})[a.list_action] ?? 3) - (({EXIT: 0, REVIEW: 1, HOLD: 2})[b.list_action] ?? 3)
+                                                                    || (a.qgs_universe_rank ?? 9e9) - (b.qgs_universe_rank ?? 9e9));
+  if(!H.length) return "";
+  return `<div style="margin-top:16px">` + card("Held, and not on the list", `${H.length} names · exits and reviews first`,
+    tbl(["Name", "Action", "Why", "QGS rank", "List rank"], H.map(r => [`<b>${esc(r.ticker)}</b>`, listActChip(r.list_action, r.veto_reason),
+      `<span class="muted">${esc(r.veto_reason || (r.list_action === "HOLD" ? "no veto; outside the list's top names" : ""))}</span>`,
+      r.qgs_universe_rank ?? `<span class="muted">n/a</span>`, r.list_rank ?? `<span class="muted">—</span>`])) +
+    `<div class="note" style="margin-top:10px">Nothing in the model sells a holding for being outranked or for its trend. Review and Exit come only from a veto.</div>`) + `</div>`;
+}
+async function buyList(el, forceAll){
+  if(forceAll) blAll = true;
+  el.innerHTML = head("Buy list", "What the model would own", `<span class="muted">loading…</span>`);
+  await ensureMatrix();
+  if(!LIVE.matrixOk){
+    el.innerHTML = head("Buy list", "What the model would own", "") +
+      gapBox("The decision grid did not load.", `So there is no list to show${LIVE.matrixErr ? " (" + LIVE.matrixErr + ")" : ""}. This is a failed read, not an empty list.`);
+    return;
+  }
+  const M = LIVE.matrix;
+  el.innerHTML = head("Buy list", "What the model would own", `<span class="muted">grid of ${esc(M[0].as_of || "?")} · rules ${esc(M[0].method || "?")}</span>`) +
+    buyListCard(M) + offListCard(M);
+  el.querySelectorAll("#blRows tr[data-open]").forEach(tr => tr.onclick = () => openName(tr.dataset.open));
+  await section(el, "What the model would change", b => proposal(b), `<span class="muted">adds, exits and keeps</span>`);
+  const core = M.filter(r => r.universe_tag !== "micro").length;
+  const tg = document.createElement("div"); el.appendChild(tg);
+  const all = document.createElement("div"); el.appendChild(all);
+  const drawAll = async () => {
+    tg.innerHTML = sectionHead("Every tracked name", `<button class="lock" id="blToggle" aria-expanded="${blAll}">${blAll ? "Hide" : `Show all ${M.length} names`}</button>`) +
+      (blAll ? "" : `<div class="muted">The full table (${core} core names and the micro sleeve), with every column, and the quad map. Closed by default: the list above is what decides.</div>`);
+    const b = document.getElementById("blToggle");
+    if(b) b.onclick = () => { blAll = !blAll; disposeOnly(charts.filter(c => c.getDom && all.contains && all.contains(c.getDom()))); all.innerHTML = ""; drawAll(); };
+    if(!blAll) return;
+    await section(all, "Every name", x => grid(x), "", true);
+    await section(all, "Quad map", x => universe(x), "", true);
+  };
+  await drawAll();
+}
+
+/* ── MARKET ────────────────────────────────────────────────────────────────────────────────── */
+async function marketAll(el){
+  const mb = document.createElement("div"); el.appendChild(mb);
+  try{ await markets(mb); }catch(e){ mb.innerHTML = head("Market", "The backdrop") + gapBox("The market view could not be drawn.", e.message || String(e)); }
+  await section(el, "Trend maps: holdings and sectors", b => gbgUniverseMaps(b), "", true);
+  await section(el, "Technical readings for every name", b => signalsV2(b), "", true);
+}
+
+/* ── EVIDENCE ──────────────────────────────────────────────────────────────────────────────── */
+const HYP_AREA = {selection: "Selection: which names", vetoes: "Vetoes: what holds a name down", timing: "Timing: when", risk: "Risk and exposure",
+                  market: "The market backdrop", data: "Data"};
+const HYP_VERDICT = {PREDICTIVE: ["Predictive", "ok", "The test found it: |t| of 2.5 or more with the same sign in both halves of the history"],
+                     SUGGESTIVE: ["Suggestive", "warn", "|t| of 2.0 or more with the same sign in both halves. Not established"],
+                     NOT_SHOWN: ["Not shown", "", "Tested, and the test did not support it"],
+                     REFUTED: ["Refuted", "bad", "Tested, and the opposite held"],
+                     UNTESTED: ["Untested", "", "No test has been possible or run"]};
+const HYP_STATUS = {ADOPTED: ["In use", "A rule rests on it"], FORWARD_TEST: ["Forward test", "Running on new data, not relied on"],
+                    CONTEXT: ["Shown only", "On the page for context; it moves nothing"], REJECTED: ["Not used", "Tested and not used"]};
+// The reported paper books (scripts/paper_tracker.py REPORTED) and the date each one's FORWARD record
+// starts. Before that date actual_book is recorded history and universe_ew is a reconstruction, so
+// neither is drawn from earlier. A book not in this list is retired and is not shown.
+const PAPER_REPORTED = [
+  ["proc_qgs25",           "The buy list",                      "2026-11-20", "Top 25 by QGS among core names no veto holds down, equal weight, relocked monthly"],
+  ["proc_qgs25_brake",     "The buy list, with the brake",      "2026-11-20", "The same book's daily return scaled by the brake's exposure the night before; the rest in cash at zero"],
+  ["proc_qgs25_no_pillar", "The buy list, no pillar vetoes",    "2026-11-20", "The same list with the pillar vetoes switched off; thesis vetoes kept"],
+  ["proc_qgs25_defer",     "The buy list, entries deferred",    "2026-11-20", "The same list, a name in a 200-day downtrend not entered until it leaves it"],
+  ["actual_book",          "The actual book",                   "2026-09-15", "The real holdings, marked"],
+  ["proposal",             "The proposal",                      "2026-09-15", "What the proposal engine would hold, equal weight"],
+  ["universe_ew",          "Every tracked name, equal weight",  "2026-09-15", "The baseline any selection has to beat"],
+  ["spy",                  "SPY",                               "2026-09-15", "The index"],
+  ["val_brake_kept",       "Valuation test: kept",              "2026-11-05", "Names the model would buy, outside the richest fifth on valuation"],
+  ["val_brake_cut",        "Valuation test: cut",               "2026-11-05", "Names the model would buy, inside the richest fifth"],
+  ["ls_val_brake",         "Valuation test: kept minus cut",    "2026-11-05", "Long kept, short cut at half size. Read this spread, not either leg"],
+];
+const paperName = k => (PAPER_REPORTED.find(p => p[0] === k) || [k, k])[1];
+function hypForward(h){
+  const f = h.forward;
+  if(h.books && !f) return `<div class="hf muted">Forward record: not started (the two books share no date yet).</div>`;
+  if(!f) return "";
+  if(f.kind === "books"){
+    if(!f.sessions) return `<div class="hf muted">Forward record: started ${esc(f.from)}. No session has passed yet.</div>`;
+    return `<div class="hf">Forward: ${esc(paperName(f.a_book))} ${pct(f.a)} against ${esc(paperName(f.b_book))} ${pct(f.b)} = <b class="${cls(f.diff)}">${ptsFmt(f.diff)}</b> over ${plural(f.sessions, "session")} since ${esc(f.from)}</div>`;
+  }
+  if(f.kind === "event_study")
+    return `<div class="hf">Forward: ${plural(f.signals ?? 0, "signal day")}, ${plural(f.others ?? 0, "other day")}, ${f.maturing ?? 0} still maturing (each needs ${f.horizon_sessions} sessions)${
+      f.diff != null ? ` · difference <b class="${cls(f.diff)}">${ptsFmt(f.diff, 2)}</b>` : " · no difference can be computed yet"}</div>`;
+  return "";
+}
+function hypRow(h){
+  const [vl, vt, vtip] = HYP_VERDICT[h.verdict] || [h.verdict, "", ""], [sl, stip] = HYP_STATUS[h.status] || [h.status, ""];
+  return `<div class="hyp">
+    <div class="hc">${esc(h.claim)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="chip ${vt}" title="${esc(vtip)}">${vl}</span>
+      <span class="chip" title="${esc(stip)}">${sl}</span>${h.used_in ? `<span class="muted" style="font-size:var(--fs-sm)">${esc(h.used_in)}</span>` : ""}</div>
+    <div class="hr"><b>Result.</b> ${esc(h.result)}</div>
+    <div class="hr" title="${esc(h.source || "")}"><b>Test.</b> ${esc(h.test)}${h.design_window ? ` Design: ${esc(h.design_window)}.` : ""}${h.holdout_window ? ` Holdout: ${esc(h.holdout_window)}.` : ""}</div>
+    ${hypForward(h)}
+    ${h.ends_if ? `<div class="hr"><b>Ends if.</b> ${esc(h.ends_if)}</div>` : ""}
+  </div>`;
+}
+function hypothesisCards(){
+  const Hy = LIVE.hyp;
+  if(Hy == null) return card("What the process believes", "could not be loaded", gapBox("The hypothesis register did not load.", `A failed read${LIVE.hypErr ? " (" + LIVE.hypErr + ")" : ""}. "python run.py evidence" prints it.`));
+  if(!Hy.length) return card("What the process believes", "empty", gapBox("The register table has no rows.", "scripts/hypothesis_register.py has not run."));
+  const n = s => Hy.filter(h => h.status === s).length;
+  const judged = Hy.filter(h => h.status === "ADOPTED" && ["UNTESTED", "NOT_SHOWN"].includes(h.verdict));
+  const review = Hy.map(h => h.next_review).filter(Boolean).sort()[0];
+  return `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      ${kpi("In use", n("ADOPTED"), "a rule rests on it")}${kpi("Forward test", n("FORWARD_TEST"), "running, not relied on")}
+      ${kpi("Shown only", n("CONTEXT"), "context; moves nothing")}${kpi("Not used", n("REJECTED"), "tested and rejected")}</div>
+    <div class="note" data-nofold>${Hy.length} claims, each with its test and its verdict. A claim stays on the list when it is rejected.
+      <b>Every "ends if" is a default written on 2026-11-22 and has not been confirmed.</b>${review ? ` Next review: ${esc(review)}.` : ""}${
+      judged.length ? ` In use on judgement rather than evidence: ${judged.map(h => esc(h.id.replaceAll("_", " "))).join(", ")}.` : ""}
+      Every number is a dated sample from the script named in the claim's tooltip.</div>` +
+    Object.entries(HYP_AREA).map(([a, label]) => { const rows = Hy.filter(h => h.area === a).sort((x, y) => x.position - y.position);
+      return rows.length ? `<div style="margin-top:16px">${card(label, plural(rows.length, "claim"), rows.map(hypRow).join(""))}</div>` : ""; }).join("") +
+    (Hy.some(h => !(h.area in HYP_AREA)) ? `<div style="margin-top:16px">${card("Other", "", Hy.filter(h => !(h.area in HYP_AREA)).map(hypRow).join(""))}</div>` : "");
+}
+async function paperRecord(el){
+  let rows;
+  try{ rows = await qAll("site_paper_nav", r => r.in("strategy", PAPER_REPORTED.map(p => p[0])).order("nav_date").order("strategy")); }
+  catch(e){ el.innerHTML = card("The forward paper record", "could not be loaded", gapBox("The paper record did not load.", e.message || String(e))); return; }
+  const keys = new Set(PAPER_REPORTED.map(p => p[0])), by = {};
+  rows.filter(r => keys.has(r.strategy)).forEach(r => (by[r.strategy] ||= []).push({d: r.nav_date, v: +r.nav}));
+  Object.values(by).forEach(a => a.sort((x, y) => x.d.localeCompare(y.d)));
+  const spy = by.spy || [], spyAt = Object.fromEntries(spy.map(x => [x.d, x.v]));
+  const line = ([k, label, from, what]) => {
+    const s = (by[k] || []).filter(x => x.d >= from);
+    if(!s.length) return [`<b>${esc(label)}</b><div class="nm">${esc(what)}</div>`, esc(from), `<span class="muted" title="No NAV on or after its start date">no record yet</span>`, "", "", ""];
+    const a = s[0], z = s[s.length - 1], r = z.v / a.v - 1;
+    const sb = spyAt[a.d] && spyAt[z.d] ? spyAt[z.d] / spyAt[a.d] - 1 : null;
+    return [`<b>${esc(label)}</b><div class="nm">${esc(what)}</div>`, esc(a.d), s.length - 1,
+            s.length > 1 ? `<span class="mono ${cls(r)}">${pct(r)}</span>` : `<span class="muted">first day</span>`,
+            s.length > 1 ? (sb == null ? `<span class="muted" title="SPY has no NAV on both dates">?</span>` : `<span class="mono">${pct(sb)}</span>`) : "",
+            s.length > 1 && sb != null && k !== "spy" ? `<span class="mono ${cls(r - sb)}">${ptsFmt(r - sb)}</span>` : ""];
+  };
+  // The chart: the four process books against SPY, the equal-weight universe and the actual book,
+  // all rebased to 100 on the first date the process books have. One date is not a line.
+  const proc = PAPER_REPORTED.slice(0, 4).map(p => p[0]), show = [...proc, "actual_book", "universe_ew", "spy"];
+  const start = proc.map(k => (by[k] || [])[0]?.d).filter(Boolean).sort().slice(-1)[0];
+  const dates = start ? [...new Set(show.flatMap(k => (by[k] || []).filter(x => x.d >= start).map(x => x.d)))].sort() : [];
+  const newest = rows.reduce((a, r) => r.nav_date > a ? r.nav_date : a, "");
+  el.innerHTML = card("The forward paper record", `marked to ${esc(newest || "?")} · each book from the date its own forward record starts`,
+    tbl(["Book", "Record from", "Sessions", "Return", "SPY, same dates", "Against SPY"], PAPER_REPORTED.map(line)) +
+    (dates.length > 1 ? `<div class="chart tall" id="prChart" style="margin-top:14px"></div>`
+      : `<div class="gap" style="margin-top:14px"><b>No chart yet.</b> The process books were first locked at the ${esc(start || "2026-11-20")} close, and one date is not a line. It draws from the second session.</div>`) +
+    `<div class="note" style="margin-top:12px" data-nofold>The four process books started on 2026-11-20: each differs from the first by exactly one rule, so a gap between two of them is that rule's effect. The books that tested single ingredients were retired on that date and are not shown; their locked positions and history are kept. Nothing here is reconstructed: a book's line starts where its forward record does. Returns are before costs and taxes.</div>`);
+  if(dates.length > 1){
+    const PC = {proc_qgs25: C.green, proc_qgs25_brake: C.accent2, proc_qgs25_no_pillar: C.gold, proc_qgs25_defer: "#c9a1ff", actual_book: C.amber, universe_ew: C.accent, spy: C.muted};
+    mk(document.getElementById("prChart"), {
+      legend:{top:0,right:0,textStyle:{color:C.muted},icon:"roundRect",itemWidth:12,itemHeight:3},
+      xAxis:axX({type:"category",data:dates,boundaryGap:false}), yAxis:axY({type:"value",scale:true}),
+      series: show.filter(k => by[k]).map(k => { const m = Object.fromEntries(by[k].map(x => [x.d, x.v])), base = m[dates.find(d => m[d] != null)];
+        return {name: paperName(k), type:"line", symbol:"none", connectNulls:true, lineStyle:{width: k === "proc_qgs25" ? 2.2 : 1.4, color: PC[k], type: k === "spy" ? "dashed" : "solid"},
+                itemStyle:{color: PC[k]}, data: dates.map(d => m[d] == null ? null : +(100 * m[d] / base).toFixed(2))}; })
+    });
+  }
+}
+async function evidence(el){
+  el.innerHTML = head("Evidence", "What we believe, and on what", `<span class="muted">loading…</span>`);
+  try{ LIVE.hyp = await qAll("site_hypotheses"); LIVE.hypErr = null; }
+  catch(e){ LIVE.hyp = null; LIVE.hypErr = e.message || String(e); }
+  el.innerHTML = head("Evidence", "What we believe, and on what",
+    `<span class="muted">${LIVE.hyp ? plural(LIVE.hyp.length, "claim") : "the register did not load"} · forward record · theses</span>`) + hypothesisCards();
+  await section(el, "The forward record", b => paperRecord(b), `<span class="muted">paper books, marked nightly</span>`);
+  await ensureMatrix();
+  await section(el, "Theses", b => theses(b), "", true);
+}
+
+/* ── REFERENCE ─────────────────────────────────────────────────────────────────────────────── */
+async function reference(el, first){
+  const strip = document.createElement("div"); el.appendChild(strip);
+  strip.innerHTML = `<div class="filters" style="margin:0 0 6px"><span class="caps">Reference</span>
+    <a class="fbtn ${first === "risk" ? "" : "on"}" style="text-decoration:none" href="#about">How the model works</a>
+    <a class="fbtn ${first === "risk" ? "on" : ""}" style="text-decoration:none" href="#risk">Risk engine, factors and concentration</a></div>`;
+  const a = document.createElement("div"), r = document.createElement("div");
+  if(first === "risk"){ el.appendChild(r); el.appendChild(a); } else { el.appendChild(a); el.appendChild(r); }
+  try{ about(a); }catch(e){ a.innerHTML = gapBox("The method page could not be drawn.", e.message || String(e)); }
+  try{ await riskAll(r); }catch(e){ r.innerHTML = gapBox("The risk detail could not be drawn.", e.message || String(e)); }
+}
+
+const VIEWS = {today, book: bookAll, buylist: buyList, market: marketAll, evidence, reference, overview: today, memo: today, holdings: bookAll, performance: bookAll, history: bookAll, universe: e => buyList(e, true), grid: e => buyList(e, true), proposal: buyList, signals: marketAll, markets: marketAll, research: evidence, theses: evidence, risk: e => reference(e, "risk"), analytics: e => reference(e, "risk"), factors: e => reference(e, "risk"), about: reference};
+const TAB_OF = {overview: "today", memo: "today", holdings: "book", performance: "book", history: "book", universe: "buylist", grid: "buylist", proposal: "buylist", signals: "market", markets: "market", research: "evidence", theses: "evidence", risk: "reference", analytics: "reference", factors: "reference", about: "reference"};
+// SIX TABS (V14, 2026-11-22). Every older route name still resolves: TAB_OF (build_live.py) says
+// which of the six tabs an old name now lives on, so a bookmark or a link inside a note lands on
+// the right tab with the right tab lit instead of silently falling back to the landing page.
 function route(){
-  const v = (location.hash || "#overview").slice(1).split("/")[0];
-  const fn = VIEWS[v] || overview;
-  const active = VIEWS[v] ? v : "overview";
+  const HOME = typeof VIEWS.today === "function" ? "today" : "overview";
+  const v = (location.hash || "#" + HOME).slice(1).split("/")[0];
+  const fn = VIEWS[v] || VIEWS[HOME];
+  const tabOf = typeof TAB_OF !== "undefined" ? TAB_OF : {};
+  const active = VIEWS[v] ? (tabOf[v] || v) : HOME;
   document.querySelectorAll("#tabs a, #menupanel a").forEach(a => { const on = a.dataset.v === active;
     a.classList.toggle("on", on); if(on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   setMenu(false);
@@ -6728,8 +6923,9 @@ function route(){
   // same await the Universe table's row click uses is repeated here rather than a second path.
   const sub = location.hash.split("/")[1];
   if(sub){
-    if(v === "holdings") openHolding(sub);
-    else if(["grid", "universe", "signals"].includes(v)) (async () => {
+    // the drawer shows the model's rank and action, which come from the grid: load it first
+    if(v === "holdings" || v === "book") (async () => { if(typeof ensureMatrix === "function") await ensureMatrix(); openHolding(sub); })();
+    else if(["grid", "universe", "signals", "buylist", "market", "markets"].includes(v)) (async () => {
       if(typeof LIVE !== "undefined" && !LIVE.matrix && typeof qAll === "function"){
         try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){}
       }
@@ -6746,7 +6942,7 @@ function buildMenu(){
   panel.innerHTML = [...document.getElementById("tabs").children].map(n => n.tagName === "SPAN"
     ? `<div class="mgrp">${n.textContent}</div>`
     : `<a href="${n.getAttribute("href")}" data-v="${n.dataset.v}">${n.textContent}</a>`).join("")
-    + `<div class="mgrp">Reference</div><a href="#about" data-v="about">About the model</a>`;
+;
   panel.querySelectorAll("a").forEach(a => a.onclick = () => setMenu(false));
 }
 function setMenu(open){
@@ -6803,103 +6999,10 @@ function periodStats(key){
           max_dd: Math.min(...dd, 0), x: [dates[i], ...dates.slice(i)], cum_p: cp, cum_b: cb};
 }
 // ── TODAY ────────────────────────────────────────────────────────────────────
-// The grid has always computed one plain-English instruction per holding — pace(action, timing)
-// in decision_matrix.py, e.g. "Accumulate · low in range", "Exit Review · top of range" — and it
-// was reachable only inside the Grid table and a drawer. The answer to "what do I do today" was
-// computed nightly and buried two tabs deep. site_build now carries it onto each holdings row,
-// so this can sit above everything else.
-//
-// Ordered by what demands a decision, not by weight: exits first, then trims, then adds that are
-// actually at a good price, then names the model has something against. A name appears ONCE, in
-// the most urgent bucket it qualifies for.
-const ACT_NOW = new Set(["EXIT", "EXIT_REVIEW", "REDUCE", "TRIM_CANDIDATE"]);
-const ADD_ACT = new Set(["ACCUMULATE", "ADD_ON_WEAKNESS", "STARTER", "STARTER_ADD"]);
-function flagsFor(h){
-  const f = [];
-  if(h.comp != null && h.comp < 6.5) f.push(`composite ${num(h.comp)}`);
-  if((h.p2 != null && h.p2 < 6) || (h.p3 != null && h.p3 < 6)) f.push("pillar floor");
-  if(h.bucket === "DISTRIBUTE") f.push("distribute");
-  if(h.trend === "DOWNTREND") f.push("downtrend");
-  if(h.eq === "EPS_ENGINEERED") f.push("engineered EPS");
-  if(h.thesis_status === "BROKEN" || h.thesis_status === "REVIEW") f.push("thesis " + h.thesis_status.toLowerCase());
-  if(h.range && h.range.rev) f.push("range reversed");
-  return f;
-}
-function todayBlock(H){
-  if(!H || !H.length) return "";
-  const seen = new Set(), rows = [];
-  const take = (test, bucket, tone) => H.filter(h => !seen.has(h.tk) && test(h))
-    .sort((a, b) => (b.value || 0) - (a.value || 0))
-    .forEach(h => { seen.add(h.tk); rows.push({h, bucket, tone, flags: flagsFor(h)}); });
-
-  take(h => ACT_NOW.has(h.action), "Exit / trim review", "bad");
-  take(h => h.timing === "TRIM_ZONE", "Top of range", "warn");
-  // One chip per zone: "low in range" used to cover ACCUMULATE_OK too, beside a row saying "lower half".
-  take(h => ADD_ACT.has(h.action) && h.timing === "BUY_ZONE", "Add · low in range", "good");
-  take(h => ADD_ACT.has(h.action) && h.timing === "ACCUMULATE_OK", "Add · lower half", "good");
-
-  const n = rows.length;
-  // Everything else the model has something against is the "Needs attention" card below. Including
-  // it here put 26 of 29 holdings in a list whose whole job is to prioritise.
-  const alsoFlagged = H.filter(h => !seen.has(h.tk) && flagsFor(h).length).length;
-  const line = ({h, bucket, tone, flags}) => `<a class="li todayrow" href="#holdings/${h.tk}">
-    <span style="display:flex;gap:9px;align-items:baseline;min-width:0">
-      <span class="chip ${tone}">${bucket}</span>
-      <span class="tk">${h.tk}</span>
-      <span class="muted" style="font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.guidance || h.action || "")}</span>
-    </span>
-    <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:baseline">
-      ${flags.slice(0,3).map(x => `<span class="chip ${/floor|broken|engineered|reversed/.test(x) ? "bad" : "warn"}">${x}</span>`).join("")}
-      <span class="mono muted" style="font-size:var(--fs-sm)" title="Share of invested capital (cash excluded)">${pct(h.weight, 1, false)}</span>
-    </span></a>`;
-
-  // Dry powder. Position weights are weights of INVESTED capital (db/023), so cash is shown as its
-  // own figure rather than folded into them — it is an input to "what do I do today", and until
-  // now it left the model entirely the moment a trim settled.
-  const cashAmt = D.cash && D.cash.amount ? +D.cash.amount : 0;
-  const invested = (D.book_value || 0);
-  const cashChip = cashAmt > 0
-    ? `<span class="chip">cash ${usd(cashAmt)} · ${pct(cashAmt / (invested + cashAmt), 1, false)} of total</span>`
-    : "";
-
-  // Book-level rules that no single name owns. Sector breach is the live one.
-  //
-  // THE CAP IS CASH-INCLUSIVE (Niko, 2026-10-22) and this chip was not, which put two numbers for
-  // one hard rule in the same product: Overview read IT at 40.6% while the Risk tab, the sizing
-  // card and factor_exposure all read 33.2%. Worse, this very chip row already showed cash as a
-  // share of TOTAL next to sector weights of INVESTED — two bases, side by side, unlabelled.
-  // h.weight is a fraction of invested, so diluting by the cash fraction converts it, which is
-  // what engines/book.py::dilute_for_cash does for everything server-side.
-  // THE CAP IS READ, NOT RECOMPUTED (2026-11-18). This chip used to rebuild the 28% test here from
-  // live quotes, so the hard rule read 32.7% on Overview and 32.2% on Risk in the same minute. It now
-  // quotes D.cap — engines.book.cap_table(), the one definition, written by site_build — and says
-  // which close it is priced at. If the payload has no cap table the chip says so; it never falls
-  // back to a browser estimate that would look exactly like the real number.
-  const CAP = D.cap || {}, capLim = CAP.limit ?? 28;
-  const exempt = new Set(CAP.exempt || []);
-  const breach = CAP.table
-    ? Object.entries(CAP.table).filter(([sec, w]) => !exempt.has(sec) && w > capLim)
-        .sort((a, b) => b[1] - a[1])
-        .map(([sec, w]) => `<span class="chip bad" title="engines.book.cap_table — share of total capital including cash, priced at the ${esc(CAP.priced || "?")} close">${esc(sec)} ${num(w, 1)}% of total &gt; ${num(capLim, 0)}% cap · ${esc((CAP.priced || "").slice(5))} close</span>`).join(" ")
-    : `<span class="chip" title="${esc(CAP.error || "no cap table in the payload")}">sector cap: not measured</span>`;
-
-  // The two drawdown gates, quoted from the risk engine's row (D.gates). A FAIL is a chip on the first
-  // screen; a missing row says "not measured" and never reads as a pass.
-  const G = D.gates || {}, g1 = G.drawdown_1y;
-  const gateChip = g1
-    ? [["p50", "median path"], ["p95", "worst 1-in-20 path"]].filter(([k]) => g1[k + "_pass"] === false)
-        .map(([k, w]) => `<span class="chip bad" title="Monte Carlo, 10,000 one-year paths at today's weights · risk engine ${esc(G.as_of || "")}">1-yr drawdown, ${w} ${num(g1[k] * 100, 1)}% &gt; ${num(g1[k + "_limit"] * 100, 0)}% limit</span>`).join(" ")
-    : `<span class="chip" title="${esc(G.error || "no gate data in the payload")}">drawdown gates: not measured</span>`;
-
-  return `<div style="margin-top:16px">` + card("Today",
-    n ? `${n} of ${plural(H.length,"holding")} are at a decision point · exits first, then trims, then adds at a good price · weights are % of invested capital`
-        + (alsoFlagged ? ` · ${alsoFlagged} more flagged below` : "")
-      : "nothing in the book is at a decision point"
-        + (alsoFlagged ? ` · ${alsoFlagged} flagged below` : ""),
-    (breach || gateChip || cashChip ? `<div class="todaybreach">${breach}${gateChip ? " " + gateChip : ""}${cashChip}</div>` : "") +
-    (n ? `<div class="list">${rows.map(line).join("")}</div>`
-       : `<div class="muted">No exits, trims or buy-zone adds today.</div>`)) + `</div>`;
-}
+// Scoped chart disposal. A view that redraws itself used to call clearCharts(), which disposes
+// EVERY chart on the tab; on a tab composed of several views that blanks the other sections.
+function disposeOnly(list){ list.forEach(c => { try{ c.dispose(); }catch(e){} const i = charts.indexOf(c); if(i >= 0) charts.splice(i, 1); }); list.length = 0; }
+let ovCharts = [];
 function overview(el){
   const m = D.perf.metrics, H = D.holdings;
   const last = arr => arr.filter(v=>v!=null).slice(-1)[0];
@@ -6907,8 +7010,8 @@ function overview(el){
   const pl = PERIODS.find(([k]) => k === S.key)[1];
   const toggle = `<span class="seg" id="ovSeg">${PERIODS.map(([k,l]) =>
       `<button data-p="${k}" class="${k===S.key?"on":""}" ${periodStats(k)?"":"disabled"}>${l}</button>`).join("")}</span>`;
-  el.innerHTML = head("Portfolio", "Overview", `<span class="muted">${plural(H.length,"holding")} · book ${usd(D.book_value)}</span>${toggle}`) +
-  todayBlock(H) + regimeStrip() +
+  const _n0 = charts.length;
+  el.innerHTML = sectionHead("The book at a glance", `<span class="muted">${plural(H.length,"holding")} · book ${usd(D.book_value)}</span>${toggle}`) +
   `<div class="kpis">
     ${kpi(`${pl} return`, pct(S.port), `SPY ${pct(S.spy)}`, cls(S.port))}
     ${kpi(`${pl} vs SPY`, pct(S.excess), `${S.from} → ${S.to}`, cls(S.excess))}
@@ -6925,9 +7028,8 @@ function overview(el){
     ${card("Allocation", "weight by sector → holding · colour = P&L", `<div class="chart tall" id="ovTree"></div>`)}
     ${card("Position P&L", "unrealized vs average cost", `<div class="chart tall" id="ovPL"></div>`)}
   </div>
-  <div class="grid g2" style="margin-top:16px">
+  <div style="margin-top:16px">
     ${card("Earnings ahead", "next reports for holdings", `<div class="list" id="ovER"></div>`)}
-    ${card("Needs attention", "weak model signals or thesis flags", `<div class="list" id="ovFlags"></div>`)}
   </div>`;
 
   const x0 = S.key === "all" ? [D.inception, ...D.perf.dates] : S.x;
@@ -6942,7 +7044,7 @@ function overview(el){
   });
   const seg = document.getElementById("ovSeg");
   if(seg) seg.querySelectorAll("button").forEach(b => b.onclick = () => {
-    if(b.disabled) return; ovPeriod = b.dataset.p; clearCharts(); overview(el); });
+    if(b.disabled) return; ovPeriod = b.dataset.p; disposeOnly(ovCharts); overview(el); });
   // Two different absences used to share one "N/A" slice: an index fund, for which a quad does not
   // apply, and stocks whose quad could not be computed. They are different facts (2026-11-18).
   const QN = {Q1:"Q1 · Full compounders", Q2:"Q2 · Margin compression", Q3:"Q3 · Full deterioration", Q4:"Q4 · Reset"};
@@ -6989,26 +7091,31 @@ function overview(el){
     return `<a class="li" href="#holdings/${h.tk}" style="text-decoration:none;color:inherit"><span><span class="tk">${h.tk}</span> <span class="nm">${esc(h.name)}</span></span>
       <span class="mono muted" style="font-size:var(--fs-sm)">${h.next_er} <span class="${days<=7?'amber':''}">(${days === 0 ? "today" : days + "d"})</span></span></a>`; }).join("") +
     (erUnset ? `<p class="muted" style="margin:8px 0 0;font-size:var(--fs-sm)">${plural(erUnset, "holding")} with no published next date.</p>` : "");
-  const flags = H.map(h => { const f=[];
-      if(h.comp!=null && h.comp<6.5) f.push(`composite ${num(h.comp)}`);
-      if((h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6)) f.push("pillar floor");
-      if(h.bucket==="DISTRIBUTE") f.push("distribute");
-      if(h.trend==="DOWNTREND") f.push("downtrend");
-      if(h.eq==="EPS_ENGINEERED") f.push("engineered EPS");
-      if(h.thesis_status==="BROKEN"||h.thesis_status==="REVIEW") f.push("thesis "+h.thesis_status.toLowerCase());
-      return {h, f}; }).filter(x=>x.f.length).sort((a,b)=>b.f.length-a.f.length);
-  // This used .slice(0,9) with no count, so 9 of 18 flagged holdings were silently invisible —
-  // including STX, a hard-rule composite breach. Show them all; the list is short enough.
-  document.getElementById("ovFlags").innerHTML = flags.map(({h,f}) =>
-    `<a class="li" href="#holdings/${h.tk}" style="text-decoration:none;color:inherit"><span class="tk">${h.tk}</span>
-     <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${f.map(x=>`<span class="chip ${/floor|broken|engineered/.test(x)?'bad':'warn'}">${x}</span>`).join("")}</span></a>`).join("") || `<div class="muted">Nothing flagged.</div>`;
+  ovCharts = charts.slice(_n0);
 }
 const kpi = (label, v, note, c="") => `<div class="kpi"><div class="caps">${label}</div><div class="v ${c}">${v}</div><div class="n">${note}</div></div>`;
 
 /* ═══ HOLDINGS ═══════════════════════════════════════════════════════════ */
 let hSort = {k:"weight", d:-1}, hQuery = "";
-let hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
-const HOLD_MONITOR = ["tk","weight","value","pl","quad","comp","trend","timing","next_er","thesis_status"];
+let hFilter = {act:"", trend:"", sector:"", thesis:"", flagged:false};
+// V14 (2026-11-22): the default columns are the ones with evidence or a decision behind them, in that
+// order: what it is, how much, where the model ranks it, its grade, what the model says to do with
+// it, the thesis, the result, the next report, and the 200-day state as a RISK descriptor. Quad,
+// timing, the risk range and the factors are one toggle away.
+const HOLD_MONITOR = ["tk","weight","qgs_rank","grade","list_action","thesis_status","pl","next_er","trend"];
+// The model's row for a holding (rank, list action, veto) comes from the decision grid, which the
+// Book tab loads before it draws. null = the grid could not be read, and the cells say so.
+const mxRow = tk => (typeof LIVE !== "undefined" && LIVE.matrixBy) ? (LIVE.matrixBy[tk] || null) : null;
+const mxOk = () => typeof LIVE !== "undefined" && LIVE.matrixOk === true;
+// The four actions (V14). One vocabulary for the Book, the Buy list and the drawers.
+const LIST_ACT = {BUY_LIST: ["Buy list", "ok", "On the model's buy list: one of its highest-ranked names with no veto"],
+                  HOLD: ["Hold", "", "Held, no veto against it, not in the list's top names. Nothing asks for a sale"],
+                  REVIEW: ["Review", "warn", "A veto holds it down: a pillar score under its line, an open sell condition, or no locked thesis"],
+                  EXIT: ["Exit", "bad", "The model's vetoes say exit: a confirmed sell condition, a composite under 5.0, or both pillar floors breached"]};
+const listActChip = (a, why) => { if(!a) return `<span class="muted">—</span>`;
+  const [label, cls_, tip] = LIST_ACT[a] || [a, "", ""];
+  return `<span class="chip ${cls_}" title="${esc(tip + (why ? ". " + why : ""))}">${label}</span>`; };
+let hCharts = [];
 let hAllCols = (() => { try { return localStorage.getItem("ic.holdings.cols") === "all"; } catch(e){ return false; } })();
 function holdings(el){
   const HD = D.holdings;
@@ -7016,31 +7123,34 @@ function holdings(el){
       <option value="">All</option>${opts.map(o => `<option value="${esc(o)}"${o===value?" selected":""}>${esc(id==="hTrend" ? codeLbl("trend", o) : id==="hQuad" ? codeLbl("quad", o) : String(o).replaceAll("_"," "))}</option>`).join("")}
     </select></label>`;
   const uniq = k => [...new Set(HD.map(h => h[k]).filter(Boolean))].sort();
-  el.innerHTML = head("Portfolio", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
+  const acts = ["BUY_LIST", "HOLD", "REVIEW", "EXIT"].filter(a => HD.some(h => (mxRow(h.tk) || {}).list_action === a));
+  el.innerHTML = head("Book", "Holdings", `<input class="search" id="hq" placeholder="Search ticker or name" value="${esc(hQuery)}">`) +
     `<div class="filters" style="margin-top:16px">
-      ${sel("hQuad","Quad",hFilter.quad,uniq("quad"))}
-      ${sel("hTrend","Trend",hFilter.trend,uniq("trend"))}
+      <label class="fsel"><span>Action</span><select id="hAct"><option value="">All</option>${acts.map(a =>
+        `<option value="${a}"${a===hFilter.act?" selected":""}>${LIST_ACT[a][0]}</option>`).join("")}</select></label>
+      ${sel("hTrend","200-day state",hFilter.trend,uniq("trend"))}
       ${sel("hSector","Sector",hFilter.sector,uniq("sector"))}
       ${sel("hThesis","Thesis",hFilter.thesis,uniq("thesis_status"))}
-      <label class="check"><input type="checkbox" id="hFlag" ${hFilter.flagged?"checked":""}> Flagged only</label>
+      <label class="check" title="A list action of Review or Exit, or a thesis in review, broken or missing"><input type="checkbox" id="hFlag" ${hFilter.flagged?"checked":""}> Needs a ruling</label>
       <button class="lock" id="hClear">Clear</button>
-      <button class="lock" id="hCols" aria-pressed="${hAllCols}" title="Off: ten columns. On: all 22 — adds alignment, the risk range, implied growth, forward estimates, size and the six factors">All columns</button>
-     </div>` +
+      <button class="lock" id="hCols" aria-pressed="${hAllCols}" title="Off: nine columns. On: every column, adding market value, the 12-month line, quad, composite, alignment, timing, the risk range, implied growth, forward estimates, size and the six factors">All columns</button>
+     </div>
+     ${mxOk() ? "" : `<div class="note" style="margin-top:10px">The decision grid could not be read, so QGS rank and action show "?" for every holding. That is a failed load, not a reading.</div>`}` +
     `<div class="card" style="padding:6px 6px 2px;margin-top:16px"><div class="scroll"><table class="t" id="ht"></table></div></div>
-     <div class="note" style="margin-top:10px">Click any row for the full thesis: news, guidance, catalysts, risks, and the trend chart. Composite below 6.5 and pillar-floor breaches are shown in red.</div>`;
+     <div class="note" style="margin-top:10px">Click any row for the thesis, the model's read and the chart. QGS rank is the name's place among every core company tracked (1 is highest). Action is the model's: Buy list, Hold, Review or Exit. The 200-day state describes risk (a downtrend has gone with about twice the chance of a 20% fall); it is not a reason to sell.</div>`;
   document.getElementById("hq").oninput = e => { hQuery = e.target.value; drawHoldings(); };
-  [["hQuad","quad"],["hTrend","trend"],["hSector","sector"],["hThesis","thesis"]].forEach(([id,key]) => {
+  [["hAct","act"],["hTrend","trend"],["hSector","sector"],["hThesis","thesis"]].forEach(([id,key]) => {
     const s2 = document.getElementById(id);
-    if(s2) s2.onchange = e => { hFilter[key] = e.target.value; clearCharts(); holdings(el); };
+    if(s2) s2.onchange = e => { hFilter[key] = e.target.value; disposeOnly(hCharts); holdings(el); };
   });
   const hcol = document.getElementById("hCols");
   if(hcol) hcol.onclick = () => { hAllCols = !hAllCols; try { localStorage.setItem("ic.holdings.cols", hAllCols ? "all" : "monitor"); } catch(e){}
-    clearCharts(); holdings(el); };
+    disposeOnly(hCharts); holdings(el); };
   const fl = document.getElementById("hFlag");
-  if(fl) fl.onchange = e => { hFilter.flagged = e.target.checked; clearCharts(); holdings(el); };
+  if(fl) fl.onchange = e => { hFilter.flagged = e.target.checked; disposeOnly(hCharts); holdings(el); };
   const hc = document.getElementById("hClear");
-  if(hc) hc.onclick = () => { hFilter = {quad:"", trend:"", sector:"", thesis:"", flagged:false};
-    hQuery = ""; clearCharts(); holdings(el); };
+  if(hc) hc.onclick = () => { hFilter = {act:"", trend:"", sector:"", thesis:"", flagged:false};
+    hQuery = ""; disposeOnly(hCharts); holdings(el); };
   drawHoldings();
 }
 // CASH AS A ROW, pinned below the positions and never sorted into them (Niko, 2026-10-22).
@@ -7071,10 +7181,11 @@ function drawHoldings(){
   // The size and factor block is the same one the Grid and Universe tables use, built from FAC_KEYS
   // so all three cannot disagree about how many columns there are. LIVE.suniv is loaded at boot, not
   // per tab, so Holdings needs no extra fetch for it.
-  const cols = [["tk","Holding"],["weight","Weight · invested"],["value","Mkt value"],["pl","P&L"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
-                ["align","Alignment"],["trend","Trend"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],
-                ["mcap","Mkt cap"], ...FACTORS.map(f => ["f_" + f.k, f.label]),
-                ["next_er","Next ER"],["thesis_status","Thesis"]];
+  const cols = [["tk","Holding"],["weight","Weight · invested"],["qgs_rank","QGS rank"],["grade","Grade"],["list_action","Action"],
+                ["thesis_status","Thesis"],["pl","P&L"],["next_er","Next ER"],["trend","200-day state · risk"],
+                ["value","Mkt value"],["_spark","12 mo"],["quad","Quad"],["comp","Composite"],
+                ["align","Alignment"],["timing","Timing"],["range_pos","Risk range"],["implied_cagr","Implied growth"],["fwd_rev","Fwd rev / EPS"],
+                ["mcap","Mkt cap"], ...FACTORS.map(f => ["f_" + f.k, f.label])];
   // MONITOR VIEW BY DEFAULT (critique, 2026-11-18): 22 columns ran 2,355px in a 1,258px card, so
   // Thesis was off-screen on a laptop and only the ticker showed on a phone. The ten that answer
   // "how is each position doing and does it need me" lead; the rest are one toggle away. The factor
@@ -7085,17 +7196,19 @@ function drawHoldings(){
   // "Flagged" means the model has something to say against the name: composite under the 6.5
   // eligibility line, a pillar through its 6.0 floor, a DISTRIBUTE bucket, a downtrend, engineered
   // earnings, or a thesis in review or broken. Same test the Overview's "Needs attention" list uses.
-  const flagged = h => (h.comp != null && h.comp < 6.5) || (h.p2 != null && h.p2 < 6) ||
-    (h.p3 != null && h.p3 < 6) || h.bucket === "DISTRIBUTE" || h.trend === "DOWNTREND" ||
-    h.eq === "EPS_ENGINEERED" || h.thesis_status === "BROKEN" || h.thesis_status === "REVIEW";
+  const flagged = h => ["REVIEW", "EXIT"].includes((mxRow(h.tk) || {}).list_action) ||
+    ["BROKEN", "REVIEW", "NO_THESIS"].includes(h.thesis_status);
   let rows = D.holdings.filter(h =>
     (!q || h.tk.toLowerCase().includes(q) || (h.name||"").toLowerCase().includes(q)) &&
-    (!f.quad   || h.quad === f.quad) &&
+    (!f.act    || (mxRow(h.tk) || {}).list_action === f.act) &&
     (!f.trend  || h.trend === f.trend) &&
     (!f.sector || h.sector === f.sector) &&
     (!f.thesis || h.thesis_status === f.thesis) &&
     (!f.flagged || flagged(h)));
-  const hval = (r,k) => k === "implied_cagr"
+  const ACT_RANK = {EXIT: 0, REVIEW: 1, BUY_LIST: 2, HOLD: 3};
+  const hval = (r,k) => k === "qgs_rank" ? ((mxRow(r.tk) || {}).qgs_universe_rank ?? null)
+    : k === "list_action" ? (ACT_RANK[(mxRow(r.tk) || {}).list_action] ?? null)
+    : k === "implied_cagr"
     ? (((typeof LIVE !== "undefined" && LIVE.vdur ? LIVE.vdur[r.tk] : null)||{}).implied_fcf_cagr ?? null)
     // ordinal, not alphabetical: sorting BUY_ZONE next to AVOID_EXTENDED by first letter
     // misrepresents a field whose whole point is its order.
@@ -7108,14 +7221,22 @@ function drawHoldings(){
   rows.sort((a,b) => { const k=hSort.k, x=hval(a,k), y=hval(b,k); if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string" ? x.localeCompare(y) : x-y) * hSort.d; });
   const t = document.getElementById("ht");
-  t.innerHTML = `<thead><tr>${shownHead.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp'].includes(k)?'r':''}${k==='tk'?' stick':''}"${k==="_spark"||k==="_timing"?"":` tabindex="0" aria-sort="${hSort.k===k?(hSort.d>0?"ascending":"descending"):"none"}"`}>${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
+  const _n0 = charts.length;
+  t.innerHTML = `<thead><tr>${shownHead.map(([k,l])=>`<th data-k="${k}" class="${['weight','value','pl','comp','qgs_rank'].includes(k)?'r':''}${k==='tk'?' stick':''}"${k==="_spark"||k==="_timing"?"":` tabindex="0" aria-sort="${hSort.k===k?(hSort.d>0?"ascending":"descending"):"none"}"`}>${l}${hSort.k===k?(hSort.d>0?" ↑":" ↓"):""}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(h => {
-      const floor = (h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6);
+      const floor = (h.p2!=null&&h.p2<6)||(h.p3!=null&&h.p3<6), mx = mxRow(h.tk);
       // Keyed by column, so the monitor view and the full view render from one definition and a
       // header can never sit over another column's cell (the 2026-10-16 off-by-one, below).
       const cell = {
         tk: `<td class="stick"><div class="tk">${h.tk}</div><div class="nm">${esc(h.name)}</div></td>`,
         weight: `<td class="r mono">${pct(h.weight,1,false)}</td>`,
+        // "?" = the grid was not read; "n/a" = read, and this line has no rank (an index fund has none)
+        qgs_rank: `<td class="r mono">${!mxOk() ? `<span class="muted" title="The decision grid could not be read">?</span>`
+          : mx && mx.qgs_universe_rank != null ? mx.qgs_universe_rank
+          : `<span class="muted" title="${esc(mx ? "No QGS rank: an input is missing" : "Not a ranked company")}">n/a</span>`}</td>`,
+        grade: `<td title="${esc((mx || {}).grade_reason || "")}">${esc((mx || {}).grade || h.grade || "—")}</td>`,
+        list_action: `<td>${!mxOk() ? `<span class="muted" title="The decision grid could not be read">?</span>`
+          : listActChip((mx || {}).list_action, (mx || {}).veto_reason)}</td>`,
         value: `<td class="r mono muted">${usd(h.value)}</td>`,
         pl: `<td class="r mono ${cls(h.pl)}">${pct(h.pl)}</td>`,
         _spark: `<td><div class="spark" data-spark="${h.tk}"></div></td>`,
@@ -7133,10 +7254,11 @@ function drawHoldings(){
       };
       return `<tr class="row" data-tk="${h.tk}">${shown.map(([k]) => cell[k] ?? "").join("")}</tr>`; }).join("") + cashRow(shownHead.length) + "</tbody>";
   t.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; if(k==="_spark"||k==="_timing") return;
-    hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status"].includes(k)?1:-1)}; clearCharts(); drawHoldings(); });
+    hSort = {k, d: hSort.k===k ? -hSort.d : (["tk","quad","trend","next_er","thesis_status","qgs_rank","list_action","grade"].includes(k)?1:-1)}; disposeOnly(hCharts); drawHoldings(); });
   t.querySelectorAll("tr.row").forEach(tr => { tr.tabIndex = 0; tr.onclick = () => { location.hash = "#holdings/" + tr.dataset.tk; }; });
   t.querySelectorAll("[data-spark]").forEach(el => { const h = D.holdings.find(x=>x.tk===el.dataset.spark);
     const pts = (h.px||[]).map(p=>p[1]); if(pts.length>2) sparkline(el, pts, pts[pts.length-1]>=pts[0]?C.green:C.red); });
+  hCharts = charts.slice(_n0);
 }
 
 
@@ -7265,7 +7387,7 @@ document.addEventListener("keydown", e => {
 // finding ("These are targets, not instructions. 17 positions…") — and folds the rest under "How
 // this is measured". Nothing is deleted. An observer applies it to sections that render after the
 // tab's first paint (the risk engine and factor cards arrive async). data-nofold opts a note out.
-const FOLD_TABS = new Set(["risk", "holdings"]), FOLD_MIN_WORDS = 50;
+const FOLD_TABS = new Set(["risk", "holdings", "book", "reference", "analytics", "factors", "about"]), FOLD_MIN_WORDS = 50;
 function foldNotes(root){
   root.querySelectorAll(".note").forEach(n => {
     if(n.closest("details.howto") || n.hasAttribute("data-nofold")) return;
@@ -7310,7 +7432,7 @@ function openHolding(tk){
   const cellv = (label, v, bad) => `<div><small>${label}</small><b class="${bad?'neg':''}">${v}</b></div>`;
   document.getElementById("drIn").innerHTML = `
     <div class="dr-top"><div><div class="caps">${esc(h.sector||"")} · ${esc(h.sleeve||"")}</div><h2>${h.tk} <span class="muted" style="font-weight:500;font-size:var(--fs-lg)">${esc(h.name)}</span></h2>
-      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${qchip(h.quad, true)} ${trendChip(h.trend)} ${trendChip((LIVE.v2[h.tk]||{}).trend)} ${thesisChip(h.thesis_status)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${esc(codeLbl("earnings_quality", h.eq))}</span>`:""}</div></div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${mxOk() && mxRow(h.tk) ? listActChip(mxRow(h.tk).list_action, mxRow(h.tk).veto_reason) + (mxRow(h.tk).qgs_universe_rank != null ? ` <span class="chip" title="Place among every core company tracked, on Quality Growth Score">QGS rank ${mxRow(h.tk).qgs_universe_rank}</span>` : "") : ""} ${thesisChip(h.thesis_status)} ${trendChip(h.trend)} ${qchip(h.quad, true)} ${h.eq?`<span class="chip ${h.eq==='EPS_ENGINEERED'?'bad':''}">${esc(codeLbl("earnings_quality", h.eq))}</span>`:""}</div></div>
       <button class="x" onclick="closeDrawer()" aria-label="Close">✕</button></div>
     <div class="mini">
       <div><span class="caps">Price</span><b>${usd(h.price,2)}</b></div>
@@ -7482,93 +7604,6 @@ let uFilter = "all";
 const uKeep = u => uFilter==="all" || (uFilter==="held"&&u.held) || (uFilter==="watch"&&u.watch) || (uFilter==="accum"&&u.bucket==="ACCUMULATE");
 const uPlotted = u => u.x!=null && u.y!=null && !!u.quad;      // what the scatter can draw
 
-/* ── Universe table: every tracked name, sortable by size and by the six factors ──────────────
-   Sits below the scatter. Size and factors come from site_universe (LIVE.suniv); the rest of each row is
-   the nightly payload the scatter already uses. Blanks sink on every key, in either direction. */
-let uSort = {k:"mcap", d:1}, uQuery = "";                      // smallest first: the question that prompted it
-const U_COLS = [
-  {k:"tk",     label:"Ticker",         str:true},
-  {k:"sector", label:"Sector",         str:true},
-  {k:"mcap",   label:"Mkt cap",        tip:"Market capitalisation. Click once for largest first, again for smallest first", cls:"fac fb0"},
-  ...FACTORS.map(f => ({k:"f_" + f.k, label:f.label, tip:f.label + " percentile, 0-100 · " + f.tip, cls:"fac"})),
-  {k:"profile",label:"Factor profile", str:true, tip:"The one or two factors the name loads at +1 sigma or more"},
-  {k:"quad",   label:"Quad",           str:true},
-  {k:"comp",   label:"Composite"},
-  {k:"align",  label:"Alignment"},
-];
-// The size/factor row for a name: the live table, else (if it failed to load) a market-cap-only row built
-// from the payload, so the table degrades to dashes with a stated reason instead of failing.
-function uSu(u){
-  const L = typeof LIVE !== "undefined" ? LIVE : null;
-  return (L && L.suniv && L.suniv[u.tk]) || (u.mcap != null ? sunivNorm({market_cap: u.mcap}) : null);
-}
-function uVal(u, k){
-  if(k === "tk") return u.tk;
-  if(k === "sector") return u.sector || null;
-  if(k === "quad") return u.quad || null;
-  if(k === "comp") return u.comp;
-  if(k === "align") return u.align;
-  const su = uSu(u);
-  if(!su) return null;
-  if(k === "mcap") return su.market_cap;
-  if(k === "profile") return su.factor_profile || null;
-  return su[k.slice(2) + "_pct"];                                // f_<factor>
-}
-function drawUniverseTable(){
-  const t = document.getElementById("uTbl"); if(!t) return;
-  try{
-    const U = D.universe, q = uQuery.trim().toLowerCase();
-    const kept = U.filter(uKeep);
-    const rows = kept.filter(u => !q || u.tk.toLowerCase().includes(q) || (u.name||"").toLowerCase().includes(q));
-    rows.sort((a, b) => {
-      const x = uVal(a, uSort.k), y = uVal(b, uSort.k);
-      if(x == null && y == null) return a.tk.localeCompare(b.tk);
-      if(x == null) return 1;                                    // blanks sink whichever way it is sorted
-      if(y == null) return -1;
-      const c = typeof x === "string" ? x.localeCompare(y) : x - y;
-      return c ? c * uSort.d : a.tk.localeCompare(b.tk);
-    });
-    t.innerHTML = `<thead><tr>${U_COLS.map(c => {
-      const on = uSort.k === c.k;
-      return `<th data-k="${c.k}" class="${(c.cls||"")}${on?" sorted":""}" style="cursor:pointer;white-space:nowrap"
-        title="${esc(c.tip || "Sort by " + c.label)}">${c.label}${on ? (uSort.d > 0 ? " ↑" : " ↓") : ""}</th>`; }).join("")}</tr></thead><tbody>` +
-      rows.map(u => { const su = uSu(u); return `<tr data-open="${esc(u.tk)}" style="cursor:pointer">
-        <td style="white-space:nowrap"><div class="tk">${esc(u.tk)}${u.held ? ' <span class="pill">held</span>' : ""}</div><div class="nm">${esc(u.name)}</div></td>
-        <td class="muted">${esc(u.sector || "—")}</td>
-        <td class="fac fb0">${capCell(su, null)}</td>
-        ${FACTORS.map(f => `<td class="fac">${facCell(su, f, null)}</td>`).join("")}
-        <td class="muted" style="font-size:var(--fs-sm)"${su && su.mcap_bad != null ? ` title="${esc("Profile withheld: it was scored using a market cap that is a units defect")}"` : ""}>${esc(profileLabel(su && su.factor_profile))}</td>
-        <td>${qchip(u.quad)}</td>
-        <td class="mono ${u.comp!=null&&u.comp<6.5?'neg':''}">${num(u.comp)}</td>
-        <td style="white-space:nowrap">${alignBar(u.align)}</td></tr>`; }).join("") +
-      (rows.length ? "" : `<tr><td colspan="${U_COLS.length}" class="muted">No names match.</td></tr>`) + "</tbody>";
-    // The scatter can only draw a name with both axes and a quad. Say how many of the table's names that leaves
-    // off, so "N names here, M dots there" is explained on the page rather than discovered.
-    const off = kept.filter(u => !uPlotted(u)).length;
-    const sub = document.getElementById("uTblSub");
-    if(sub) sub.textContent = rows.length + (q ? " of " + kept.length : "") + " names"
-      + (off ? ` · ${off} ${off === 1 ? "has" : "have"} no quad, so ${off === 1 ? "is" : "are"} not on the map` : "")
-      + " · click a header to sort, a row for the chart";
-    t.querySelectorAll("th[data-k]").forEach(th => th.onclick = () => {
-      const k = th.dataset.k, c = U_COLS.find(x => x.k === k);
-      // a new numeric column opens highest-first; text opens A-Z; a repeat click flips
-      uSort = {k, d: uSort.k === k ? -uSort.d : (c.str ? 1 : -1)};
-      drawUniverseTable();
-    });
-    t.querySelectorAll("tr[data-open]").forEach(tr => tr.onclick = async () => {
-      const tk = tr.dataset.open;
-      // the drawer reads LIVE.matrix for grade / quad / guidance, and only the Grid tab loads it
-      if(typeof LIVE !== "undefined" && !LIVE.matrix && typeof qAll === "function"){
-        try{ LIVE.matrix = await qAll("site_decision_matrix"); }catch(e){}
-      }
-      if(typeof openName === "function") openName(tk);
-      else if(D.holdings.some(h => h.tk === tk)) location.hash = "#holdings/" + tk;
-    });
-  }catch(e){
-    console.error("universe table", e);
-    t.innerHTML = `<tbody><tr><td class="muted">The table could not be drawn: ${esc(e.message || e)}</td></tr></tbody>`;
-  }
-}
 function universe(el){
   const U = D.universe, qc = D.quad_counts, n = U.length;
   // THE AXES ARE THE PAYLOAD'S (V13). D.method says what x and y are, in which units, and where to
@@ -7576,7 +7611,7 @@ function universe(el){
   const QM = D.method || {}, QQ = QM.quad === "quarterly";
   const XC = QM.x_clip || 30, YC = QM.y_clip || 30;
   const xU = QM.x_unit || "%", yU = QM.y_unit || "%";
-  el.innerHTML = head("Strategy universe", "Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
+  el.innerHTML = sectionHead("Quad map", `<span class="muted">${n} core names · the micro sleeve and index ETFs are not plotted</span>`) +
   `<div class="kpis" style="grid-template-columns:repeat(5,minmax(0,1fr))">
     ${["Q1","Q2","Q3","Q4"].map(q=>kpi({Q1:"Q1 · Full compounders",Q2:"Q2 · Margin compression",Q3:"Q3 · Full deterioration",Q4:"Q4 · Reset"}[q],
       `<span style="color:${C.q[q]}" title="${esc(QUAD_MEANS()[q])}">${qc[q]||0}</span>`, `${((qc[q]||0)/n*100).toFixed(0)}% of universe`)).join("")}
@@ -7603,10 +7638,11 @@ function universe(el){
       <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="uIndQ1"> sort by Q1 share</label>`,
       `<div class="chart" id="uInd" style="height:520px"></div>`)}
   </div>
-  <div class="note" style="margin-top:16px">Every name, with its grade, timing, risk range, factors and
-    size, is in the <b>decision grid</b> below — one table instead of the two these tabs used to carry
-    between them, filterable on every column and sortable on several at once.</div>`;
-  document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f; clearCharts(); universe(el); });
+  <div class="note" style="margin-top:16px">The quad is shown for context. It is not an input to the grade or to
+    which names are bought: in testing only the first box separated, and not reliably.</div>`;
+  document.querySelectorAll("#uf .fbtn").forEach(b => b.onclick = () => { uFilter = b.dataset.f;
+    // only this view's own charts: the tab it sits on has others
+    disposeOnly(charts.filter(c => c.getDom && ["uMap", "uSec", "uInd"].includes((c.getDom() || {}).id))); universe(el); });
   const keep = uKeep;
   const clipX = v => Math.max(-XC, Math.min(XC, v)), clipY = v => Math.max(-YC, Math.min(YC, v));
   const pts = U.filter(u=>u.x!=null&&u.y!=null&&u.quad);
@@ -7665,41 +7701,6 @@ function universe(el){
   if(q1c) q1c.onchange = drawInd;
 }
 
-/* ═══ SIGNALS ════════════════════════════════════════════════════════════ */
-function signals(el){
-  const S = D.signals, H = D.holdings;
-  const label = f => ({trend_status:"Trend",extension_flag:"Extension",reversal_setup:"Reversal setup",quadrant:"Quad"}[f]||f);
-  el.innerHTML = head("Daily signal engine", "Signals & earnings", `<span class="muted">last 14 days · ${S.length} changes</span>`) +
-  `<div class="grid g-2-1">
-    ${card("Holdings — signal changes", "trend, extension, reversal and quad changes on names we own", `<div class="scroll"><table class="t" id="sH"></table></div>`)}
-    ${card("Earnings calendar", "holdings", `<div class="chart" id="sCal" style="height:420px"></div>`)}
-  </div>
-  <div style="margin-top:16px">${card("Universe — signal changes", "", `<div class="filters" id="sf" style="margin-bottom:10px"></div><div class="scroll" style="max-height:520px;overflow-y:auto"><table class="t" id="sU"></table></div>`)}</div>`;
-  const rowHtml = x => `<tr><td class="mono muted" style="font-size:var(--fs-sm)">${x.d}</td><td class="tk">${x.tk}</td><td class="muted">${label(x.field)}</td>
-    <td class="mono" style="font-size:var(--fs-sm)"><span class="muted">${esc(x.old)}</span> → <b style="color:${/UPTREND|OVERSOLD|True|Q1/.test(x.new)?C.green:/DOWNTREND|OVEREXTENDED|Q3|Q4/.test(x.new)?C.red:C.text}">${esc(x.new)}</b></td></tr>`;
-  const hdr = `<thead><tr><th>Date</th><th>Ticker</th><th>Signal</th><th>Change</th></tr></thead>`;
-  const held = S.filter(x=>x.held);
-  document.getElementById("sH").innerHTML = hdr + "<tbody>" + (held.map(rowHtml).join("") || `<tr><td colspan="4" class="muted">No holding signal changes.</td></tr>`) + "</tbody>";
-  let sfv = "all";
-  const drawU = () => { const rows = S.filter(x=>!x.held && (sfv==="all"||x.field===sfv));
-    document.getElementById("sU").innerHTML = hdr + "<tbody>" + rows.slice(0,300).map(rowHtml).join("") + "</tbody>";
-    document.getElementById("sf").innerHTML = [["all","All"],["trend_status","Trend"],["extension_flag","Extension"],["reversal_setup","Reversal"],["quadrant","Quad"]]
-      .map(([k,l])=>`<button class="fbtn ${sfv===k?'on':''}" data-f="${k}">${l}</button>`).join("");
-    document.querySelectorAll("#sf .fbtn").forEach(b=>b.onclick=()=>{sfv=b.dataset.f;drawU();}); };
-  drawU();
-  const er = H.filter(h=>erNext(h.next_er)).sort((a,b)=>a.next_er.localeCompare(b.next_er));
-  const today = new Date(); today.setHours(0,0,0,0);
-  mk(document.getElementById("sCal"), {
-    grid:{left:52,right:60,top:10,bottom:26},
-    xAxis:axY({type:"value",axisLabel:{color:C.dim,fontSize:11,formatter:v=>v+"d"},name:"days away",nameLocation:"middle",nameGap:22,nameTextStyle:{color:C.dim}}),
-    yAxis:axX({type:"category",data:er.map(h=>h.tk),inverse:true,axisLabel:{color:C.muted,fontSize:11}}),
-    tooltip:{trigger:"item",formatter:p=>`<b>${er[p.dataIndex].tk}</b> reports ${er[p.dataIndex].next_er}`},
-    series:[{type:"bar",barWidth:"55%",data:er.map(h=>{const dd=Math.round((Date.parse(h.next_er)-Date.parse(_todayISO()))/864e5);
-      return {value:dd,itemStyle:{color:dd<=7?C.amber:dd<=21?C.accent:"rgba(106,166,248,.45)",borderRadius:[0,3,3,0]}};}),
-      label:{show:true,position:"right",color:C.dim,fontSize:11,formatter:p=>er[p.dataIndex].next_er.slice(5)}}]
-  }).on("click", p => location.hash = "#holdings/" + er[p.dataIndex].tk);
-}
-
 /* ═══ FACTORS ════════════════════════════════════════════════════════════ */
 function factors(el, title="Factors & concentration"){
   const F = D.factor_snapshot || {}, FS = D.factor_scores, H = D.holdings;
@@ -7729,7 +7730,12 @@ function factors(el, title="Factors & concentration"){
     ${card("Factor fingerprint by holding", "universe percentile per factor (0 = lowest, 100 = highest)", `<div class="chart" id="fHeat" style="height:${Math.max(420, FS.length*22+60)}px"></div>`)}
     <div class="grid" style="gap:16px">
       ${card("Portfolio factor tilt", "average percentile across holdings", `<div class="chart" id="fRadar" style="height:300px"></div>`)}
-      ${card("Sector weights", "dotted line = 28% cap", `<div class="chart" id="fSec" style="height:${Math.max(260,new Set(H.map(h=>h.sector)).size*26+40)}px"></div>`)}
+      ${(() => { const CAP = D.cap || {};
+        return card("Sector weights", CAP.table
+            ? `share of total capital, cash included: the basis the ${num(CAP.limit ?? 28, 0)}% cap is measured on · ${esc(CAP.priced || "?")} close · grey lines are not governed by the cap`
+            : "the cap table is not in the payload",
+          CAP.table ? `<div class="chart" id="fSec" style="height:${Math.max(260, Object.keys(CAP.table).length * 26 + 40)}px"></div>`
+                    : `<div class="note">${esc(CAP.error || "No sector table was written by the nightly build, so nothing is drawn. An estimate from the holdings would be on a different basis from the cap.")}</div>`); })()}
     </div>
   </div>
   <div style="margin-top:16px">${card("Portfolio averages", "weighted", `<div class="mtab" style="grid-template-columns:repeat(6,1fr)">${[
@@ -7759,17 +7765,24 @@ function factors(el, title="Factors & concentration"){
     series:[{type:"radar",data:[{value:avg.map(v=>Math.round(v)),name:"Portfolio",areaStyle:{color:"rgba(106,166,248,.25)"},lineStyle:{color:C.accent,width:2},itemStyle:{color:C.accent}},
                                {value:facs.map(()=>50),name:"Universe median",lineStyle:{color:C.dim,type:"dashed"},itemStyle:{color:C.dim},symbol:"none"}]}]
   });
-  const sw = {}; H.forEach(h=>{const s=h.sector||"Other"; sw[s]=(sw[s]||0)+(h.weight||0);});
-  const se = Object.entries(sw).sort((a,b)=>a[1]-b[1]);
-  mk(document.getElementById("fSec"), {
-    grid:{left:150,right:44,top:8,bottom:22},
-    xAxis:axY({type:"value",max:Math.max(.35,Math.max(...se.map(s=>s[1]))+.03),axisLabel:{color:C.dim,fontSize:11,formatter:v=>(v*100).toFixed(0)+"%"}}),
-    yAxis:axX({type:"category",data:se.map(s=>s[0]),axisLabel:{color:C.muted,fontSize:11}}),
-    tooltip:{trigger:"axis",valueFormatter:v=>pct(v,1,false)},
-    series:[{type:"bar",barWidth:"60%",data:se.map(s=>({value:s[1],itemStyle:{color:s[1]>.28?C.red:C.accent,borderRadius:[0,3,3,0]}})),
-      label:{show:true,position:"right",color:C.dim,fontSize:11,formatter:p=>pct(p.value,1,false)},
-      markLine:{silent:true,symbol:"none",lineStyle:{color:C.gold,type:"dotted"},label:{show:false},data:[{xAxis:.28}]}}]
-  });
+  // THE CAP'S OWN TABLE (V14, 2026-11-22). This chart summed holdings weights, which are shares of
+  // INVESTED capital, and drew the 28% line across them: Information Technology read about 37% here
+  // and 31.4% everywhere the cap is tested. It now draws D.cap.table (engines.book.cap_table, share of
+  // total capital including cash) and nothing else; with no table it draws nothing and says so above.
+  const CAPT = D.cap || {};
+  if(CAPT.table){
+    const lim = (CAPT.limit ?? 28) / 100, ex = new Set(CAPT.exempt || []);
+    const se = Object.entries(CAPT.table).map(([k, v]) => [k, v / 100]).sort((a, b) => a[1] - b[1]);
+    mk(document.getElementById("fSec"), {
+      grid:{left:150,right:44,top:8,bottom:22},
+      xAxis:axY({type:"value",max:Math.max(.35,Math.max(...se.map(s=>s[1]))+.03),axisLabel:{color:C.dim,fontSize:11,formatter:v=>(v*100).toFixed(0)+"%"}}),
+      yAxis:axX({type:"category",data:se.map(s=>s[0]),axisLabel:{color:C.muted,fontSize:11}}),
+      tooltip:{trigger:"axis",valueFormatter:v=>pct(v,1,false)},
+      series:[{type:"bar",barWidth:"60%",data:se.map(s=>({value:s[1],itemStyle:{color:ex.has(s[0])?C.dim:s[1]>lim?C.red:C.accent,borderRadius:[0,3,3,0]}})),
+        label:{show:true,position:"right",color:C.dim,fontSize:11,formatter:p=>pct(p.value,1,false)},
+        markLine:{silent:true,symbol:"none",lineStyle:{color:C.gold,type:"dotted"},label:{show:false},data:[{xAxis:lim}]}}]
+    });
+  }
 }
 
 /* ═══ HISTORY ════════════════════════════════════════════════════════════ */
