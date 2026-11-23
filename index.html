@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-22 22:00 · c0fb6c3</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 01:36 · 42dba48</div>
   </div>
 </section>
 
@@ -528,7 +528,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-22 22:00 · c0fb6c3</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 01:36 · 42dba48</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -654,6 +654,13 @@ async function enter(){
     // Thesis watch (db/083) for the name drawer; the Theses tab reloads it. Flagged on failure.
     try{ LIVE.tsell = {}; for(const s of await qAll("site_thesis_sell_conditions")) (LIVE.tsell[s.ticker] ||= []).push(s); }
     catch(e){ LIVE.tsell = {}; }
+    /* Insider filings (db/086): 180 days of open-market lines for the names the nightly sync covers.
+     * insiderNames is every name with at least one row, which is how the drawer tells "covered, nothing
+     * recent" from "not a covered name". */
+    try{ LIVE.insiders = {}; for(const r of await qAll("site_insider_filings", x => x.order("filed_at", {ascending: false})))
+           (LIVE.insiders[r.ticker] ||= []).push(r);
+         LIVE.insiderNames = new Set(Object.keys(LIVE.insiders)); LIVE.insidersOk = true; }
+    catch(e){ LIVE.insiders = {}; LIVE.insiderNames = new Set(); LIVE.insidersOk = false; }
     try{ LIVE.twatch = Object.fromEntries((await qAll("site_thesis_watch")).map(w => [w.ticker, w])); LIVE.twatchOk = true; }
     catch(e){ LIVE.twatch = {}; LIVE.twatchOk = false; }
     // GasBrakesGas status for the Universe and Signals columns (db/082): the stored rows without
@@ -4037,6 +4044,35 @@ function rangeMove(tk){
     Width is judged against the universe median for the same run, because every name's range drifts
     together; "widening" means widening relative to everything else.</div></div>`;
 }
+/* INSIDER FILINGS (db/086, scripts/insider_sync.py). Open-market purchases and sales from SEC
+ * Form 4, as filed, for the last 90 days. Three states that must not look alike: the rows did not
+ * load ("?"), this name is not one the nightly sync covers (said in words), and the name is
+ * covered with nothing filed. A sale is "under a trading plan" only when the filing's footnotes
+ * say so; the plan checkbox on the form is not in this data, so "names no plan" is not "unplanned". */
+function insiderBlock(tk){
+  if(LIVE.insidersOk === false)
+    return `<div class="sec"><h4>Insider filings</h4><p class="amber">The filings did not load, so this is unknown.</p></div>`;
+  if(!LIVE.insiderNames || !LIVE.insiderNames.has(tk)) return "";
+  const cut = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+  const rows = (LIVE.insiders[tk] || []).filter(r => r.filed_at >= cut);
+  const usd = v => v == null ? "—" : "$" + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "m" : Math.round(v / 1e3) + "k");
+  const who = r => String(r.owner_cik || r.owner_name || "?");
+  const buys = rows.filter(r => r.code === "P"), sells = rows.filter(r => r.code === "S" && !r.planned),
+        plan = rows.filter(r => r.code === "S" && r.planned);
+  const sum = a => a.reduce((s, r) => s + (+r.value || 0), 0), n = a => new Set(a.map(who)).size;
+  const head = !rows.length ? `<p class="muted">No open-market purchase or sale filed in the last 90 days.</p>`
+    : `<p>${n(buys) ? `<b style="color:${C.green}">${n(buys)} bought</b> (${usd(sum(buys))})` : "No purchases"} ·
+        ${n(sells) ? `<b>${n(sells)} sold</b> with no trading plan named (${usd(sum(sells))})` : "no sales outside a named plan"} ·
+        ${plan.length ? `${usd(sum(plan))} sold under a trading plan` : "none under a plan"}</p>`;
+  const body = !rows.length ? "" : tbl(["Filed", "Who", "", "Value", "Price"], rows.slice(0, 8).map(r => [
+      esc(r.filed_at), esc(r.owner_name || "—") + (r.officer_title ? ` <span class="muted">${esc(r.officer_title)}</span>` : r.is_director ? ` <span class="muted">director</span>` : ""),
+      r.code === "P" ? `<span style="color:${C.green}">bought</span>` : r.planned ? `<span class="muted">sold · plan</span>` : "sold",
+      usd(r.value == null ? null : +r.value), r.price == null ? "—" : "$" + (+r.price).toFixed(2)]));
+  return `<div class="sec"><h4>Insider filings · last 90 days</h4>${head}${body}
+    <div class="note">SEC Form 4, as filed. Awards, tax withholding, gifts and option exercises are left out.
+    A sale is shown as under a plan only when the filing's footnotes name a Rule 10b5-1 plan; the form's own
+    plan checkbox is not in this data. Not tested against returns: something to be aware of, not a signal on its own.</div></div>`;
+}
 function rangeBar(v2){
   if(!v2 || v2.trade_low == null) return "";
   const lo=+v2.trade_low, hi=+v2.trade_high, px=+v2.close, p=Math.max(0,Math.min(1,(px-lo)/(hi-lo)));
@@ -4052,7 +4088,7 @@ function rangeBar(v2){
       ${v2.above_earnings_avwap == null ? "no earnings anchor" :
         (v2.above_earnings_avwap ? "above" : "below") + " the VWAP since earnings " + esc(v2.earnings_anchor) +
         " (" + v2.days_since_earnings + "d)"} · TD buy ${v2.td_buy_count}/sell ${v2.td_sell_count}</div></div>
-    ${rangeMove(v2.ticker)}`;
+    ${rangeMove(v2.ticker)}${insiderBlock(v2.ticker)}`;
 }
 
 /* ═══ GRID (decision matrix, live) ═════════════════════════════════════════ */
