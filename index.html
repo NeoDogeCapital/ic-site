@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 01:36 · 42dba48</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 01:46 · 2f7124a</div>
   </div>
 </section>
 
@@ -528,7 +528,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 01:36 · 42dba48</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 01:46 · 2f7124a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3889,6 +3889,70 @@ function _ytd(bars){
   return first && first.c ? last.c / first.c - 1 : null;
 }
 
+/* ═══ ROTATION (db/087, scripts/rotation_agent.py) ═══════════════════════════════════════════════
+ * Sector and factor funds against SPY: where each has been (63 sessions), where it is now (21),
+ * the state those two give, and what that has meant for the book. The numbers are computed nightly
+ * by engines/rotation.py; nothing here is recomputed in the browser. A fund with no state is shown
+ * as "no reading", never as neutral. Rotation is what HAS been rewarded, not a forecast. */
+const ROT_STATE = {LEADING: ["Leading", "ok"], IMPROVING: ["Improving", "ok"], WEAKENING: ["Weakening", "warn"],
+                   LAGGING: ["Lagging", "bad"], NEUTRAL: ["Neutral", ""]};
+const rotChip = (s, turned, prev) => !s ? `<span class="muted" title="Under 63 sessions of history">no reading</span>`
+  : `<span class="chip ${ROT_STATE[s][1]}" title="${turned ? "Crossed from " + esc((ROT_STATE[prev] || [prev])[0]) + " in the last five sessions" : "Five sessions ago: " + esc((ROT_STATE[prev] || [prev || "no reading"])[0])}">${ROT_STATE[s][0]}${turned ? " · turned" : ""}</span>`;
+const rotPts = (v, dp = 1) => v == null ? `<span class="muted">—</span>`
+  : `<span style="color:${v > 0 ? C.green : v < 0 ? C.red : C.muted}">${v > 0 ? "+" : ""}${(v * 100).toFixed(dp)}</span>`;
+function rotationNote(row, anchor){
+  if(!row || !row.payload) return "";
+  const b = row.payload, earlier = anchor && row.as_of !== anchor;
+  const para = (h, t) => t ? `<div><h4>${h}</h4><p>${esc(t)}</p></div>` : "";
+  return `<div class="card brief" id="memoRot" style="scroll-margin-top:96px">
+    <div class="bhead"><div><div class="caps">Rotation note · sectors and factors against the book · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
+      <h3>${esc(b.headline || "")}</h3></div></div>
+    ${earlier ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} session's note. The one for ${esc(anchor)} is written after the close.</div>` : ""}
+    <div class="bgrid">${para("The market", b.market)}${para("This book", b.book)}${para("Factors", b.factors)}</div>
+    ${b.watch_next ? `<p class="blede" style="margin-top:10px"><b>Watching.</b> ${esc(b.watch_next)}</p>` : ""}</div>`;
+}
+async function rotationCard(el){
+  let rows, book;
+  try{ [rows, book] = await Promise.all([q("site_rotation"), q("site_rotation_book")]); }
+  catch(e){ el.innerHTML = `<div class="card"><div class="caps">Rotation</div><p class="amber">Rotation did not load (${esc(e.message || e)}), so this is unknown.</p></div>`; return; }
+  if(!rows || !rows.length){ el.innerHTML = `<div class="card"><div class="caps">Rotation</div><p class="muted">Not measured yet.</p></div>`; return; }
+  const asOf = rows[0].as_of, bk = ((book || [])[0] || {}).payload || {}, B = bk.book || {};
+  const note = (LIVE.briefs || []).filter(x => x.kind === "rotation")[0];
+  const bySec = Object.fromEntries((B.sectors || []).map(s => [s.sector, s])), byFac = Object.fromEntries((B.factors || []).map(f => [f.factor, f]));
+  const grp = g => rows.filter(r => r.grp === g).sort((a, b) => (a.rank21 ?? 99) - (b.rank21 ?? 99));
+  const w = v => v == null ? `<span class="muted">—</span>` : (v * 100).toFixed(1) + "%";
+  const sect = tbl(["Sector", "State", "5d", "21d", "63d", "Book", "vs SPY", "Effect"], grp("sector").map(r => { const s = bySec[r.name] || {}; return [
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev),
+    rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63), s.book_weight ? w(s.book_weight) : `<span class="muted">not held</span>`,
+    s.active_weight == null ? `<span class="muted">—</span>` : rotPts(s.active_weight), s.tailwind_21 == null ? `<span class="muted">—</span>` : rotPts(s.tailwind_21, 2)]; }));
+  const fact = tbl(["Factor", "State", "5d", "21d", "63d", "Book's active beta", "Effect"], grp("factor").map(r => { const f = byFac[r.name] || {}; return [
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev),
+    rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63), f.active_beta == null ? `<span class="muted">—</span>` : (+f.active_beta).toFixed(2),
+    f.tailwind_21 == null ? `<span class="muted">—</span>` : rotPts(f.tailwind_21, 1)]; }));
+  const theme = tbl(["Theme", "State", "5d", "21d", "63d"], grp("theme").map(r => [
+    `<b>${esc(r.name)}</b> <span class="muted">${esc(r.symbol)}</span>`, rotChip(r.state, r.turned, r.state_prev), rotPts(+r.x5), rotPts(+r.x21), rotPts(+r.x63)]));
+  const spr = (bk.spreads || []).length ? tbl(["Spread", "5d", "21d", "63d"], bk.spreads.map(s => [esc(s.spread), rotPts(s.d5), rotPts(s.d21), rotPts(s.d63)])) : "";
+  const rec = B.recorded_21, st = B.capital_by_sector_state || {};
+  const kpi = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0">
+      <div class="kpi"><div class="caps">Book vs SPY, 21 sessions (recorded)</div><div style="font-size:var(--fs-xl,22px);font-weight:600;margin:4px 0 2px">${rec ? rotPts(rec.excess, 2) : "—"}</div>
+        <div class="muted" style="font-size:var(--fs-xs)">${rec ? `book ${(rec.book * 100).toFixed(1)}% · SPY ${(rec.spy * 100).toFixed(1)}%` : "not enough recorded sessions"}</div></div>
+      <div class="kpi"><div class="caps">Sector weights, 21 sessions (approx.)</div><div style="font-size:var(--fs-xl,22px);font-weight:600;margin:4px 0 2px">${B.sector_tailwind_21 == null ? "—" : rotPts(B.sector_tailwind_21, 2)}</div>
+        <div class="muted" style="font-size:var(--fs-xs)">${B.sector_tailwind_21 == null ? "index weights missing, not computed" : "today's weights against SPY's × each sector's excess"}</div></div>
+      <div class="kpi"><div class="caps">Capital in leading or improving sectors</div><div style="font-size:var(--fs-xl,22px);font-weight:600;margin:4px 0 2px">${w((st.LEADING || 0) + (st.IMPROVING || 0))}</div>
+        <div class="muted" style="font-size:var(--fs-xs)">weakening or lagging ${w((st.WEAKENING || 0) + (st.LAGGING || 0))} · cash and index fund ${w(B.capital_outside_sectors)}</div></div></div>`;
+  const turned = rows.filter(r => r.turned).map(r => `${esc(r.name)} (${(ROT_STATE[r.state_prev] || [r.state_prev])[0]} → ${(ROT_STATE[r.state] || [r.state])[0]})`);
+  el.innerHTML = (note ? rotationNote(note) : "") + `<div class="card" style="margin-top:14px">
+    <div class="caps">Rotation against SPY · session ${esc(asOf)}</div>${kpi}
+    <p class="muted" style="margin:0 0 8px">${turned.length ? "<b>Turned in the last five sessions:</b> " + turned.join(", ") : "Nothing crossed between the constructive and adverse half in the last five sessions."}</p>
+    ${sect}<div style="height:12px"></div>${fact}<div style="height:12px"></div><div class="bgrid"><div>${theme}</div><div>${spr}</div></div>
+    <div class="note" style="margin-top:10px">Columns 5d / 21d / 63d are returns in excess of SPY, in points. State: Leading = ahead over 63 and 21 sessions;
+      Weakening = ahead over 63, behind over 21; Improving = behind over 63, ahead over 21; Lagging = behind on both. A move inside a small band
+      (sectors 2.0 and 1.0 points, factors 1.1 and 0.6) counts as flat. "Effect" for a sector is the book's weight minus SPY's, times the sector's
+      21-session excess, using today's weights: an approximation, and the exact attribution is on the Performance tab. For a factor it is the book's
+      active beta times the factor's excess; the factors overlap, so those do not add up. This describes what has been rewarded. It is not a forecast
+      and it feeds no grade, proposal or sizing.</div></div>`;
+}
+
 async function markets(el){
   el.innerHTML = head("Markets", "Major equity indices", `<span class="muted">loading…</span>`);
 
@@ -3945,6 +4009,7 @@ async function markets(el){
           title="Chart any tracked ticker: a holding, a universe name, a sector or factor fund"><button class="tfb" type="submit">Go</button></form></div>`
     + (mktMiss ? `<p class="amber" style="margin:8px 0 0">No price history is stored for ${esc(mktMiss)}, so ${esc(mktSym)} is shown instead.</p>` : "")
     + `<div class="card" style="padding:12px;margin-top:10px"><div id="mktChart"></div></div>`
+    + `<div id="mktRot" style="margin-top:14px"></div>`
     + `<div id="mktMaps" style="margin-top:14px"></div>`
     + `<div style="margin-top:14px">` + breadthCard + `</div>`
     + `<div style="margin-top:14px">` + card("Index returns", "trailing, on the bars currently loaded",
@@ -3965,6 +4030,8 @@ async function markets(el){
   if(form) form.onsubmit = (e) => { e.preventDefault(); pick(document.getElementById("mktQ").value); };
   // GBG Sector Map and the index / factor / theme map; selecting a row charts that fund above
   const maps = document.getElementById("mktMaps");
+  const rot = document.getElementById("mktRot");
+  if(rot) rotationCard(rot).catch(e => { rot.innerHTML = `<div class="note">Rotation unavailable: ${esc(e.message || e)}</div>`; });
   if(maps) gbgMarketsMaps(maps, pick).catch(e => { maps.innerHTML = `<div class="note">GBG maps unavailable: ${esc(e.message || e)}</div>`; });
 
   const host = document.getElementById("mktChart");
@@ -6453,17 +6520,18 @@ async function memo(el){
     // the technicals note is written after the close too, so it gets the same fallback: through
     // the trading day the page showed three notes and silently no fourth
     const mo = at("premarket"), un = at("universe"),
-          te = at("technicals") || B.filter(x => x.kind === "technicals" && x.as_of < d)[0];
+          te = at("technicals") || B.filter(x => x.kind === "technicals" && x.as_of < d)[0],
+          ro = at("rotation") || B.filter(x => x.kind === "rotation" && x.as_of < d)[0];
     const nav = `<span class="bnav">
       <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:var(--fs-sm)">${d}</span>
       <button class="bbtn" data-md="-1" ${memoIdx<=0?"disabled":""} title="Later">→</button></span>`;
-    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals"].filter(Boolean).join(" · ");
+    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals", ro && "rotation"].filter(Boolean).join(" · ");
     el.innerHTML = head("Memo", "Market memo",
       `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
       memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
-      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te, d) +
-      `<div class="note" style="margin-top:14px">Four notes, each from a different point in the day:
+      memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te, d) + (typeof rotationNote === "function" ? rotationNote(ro, d) : "") +
+      `<div class="note" style="margin-top:14px">Five notes, each from a different point in the day (the rotation note, written after the close, reads sector and factor leadership against the book):
        the morning note is what you are walking into, the universe note covers all ${(D.universe || []).length || "the"} tracked names
        rather than the book, and the close note is how the day actually went, and the technicals note reads the
        setups and breakdowns the alerts engine flagged on the book after the close. Every figure in them is
