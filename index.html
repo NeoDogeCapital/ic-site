@@ -493,7 +493,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 02:02 · 0e8ce1a</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 02:26 · da624b5</div>
   </div>
 </section>
 
@@ -528,7 +528,7 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 02:02 · 0e8ce1a</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 02:26 · da624b5</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -3829,6 +3829,126 @@ async function openName(tk){
   const bars = await loadBars(tk);
   if(bars.length) setTimeout(() => techChart(document.getElementById("nmChart"), tk, bars), 60);
 }
+/* ═══ MARKET SIGNALS (db/089, scripts/market_dashboard.py) and KEITH (scripts/keith.py) ══════════
+ * Broad-market indicators, rebuilt nightly, each carrying the VERDICT of a 25-year test of whether
+ * it has predicted what the index and this process's book did next. The page orders and colours
+ * by that verdict, not by how interesting the chart looks: an indicator the test found nothing in
+ * is drawn, labelled "context only", and given no say. Nothing is computed in the browser except
+ * the drawing. A reading that is not for the newest session shows its own date. */
+const MS_VERDICT = {PREDICTIVE: ["Predictive", "ok", "The 25-year test found this state predictive: |t| of 2.5 or more, the same sign in both halves of the history."],
+                    SUGGESTIVE: ["Suggestive", "warn", "|t| of 2.0 or more with the same sign in both halves: weaker evidence."],
+                    NOT_SHOWN: ["Context only", "", "The test found no state of this indicator that predicted. It is shown for context and carries no weight."],
+                    UNTESTED: ["Untested", "", "No history to test on."]};
+const MS_TARGET = {spy_r21: "SPY, next 21 sessions", spy_r63: "SPY, next 63 sessions", spy_dd63: "SPY's worst close, next 63",
+                   book_r63: "the process book, next 63 sessions", book_x63: "the process book minus SPY, next 63", book_dd63: "the process book's worst close, next 63"};
+const MS_FAMILY = {breadth: "Breadth: S&P 500 members", volatility: "Volatility", credit: "Credit", rates: "Rates and inflation",
+                   fundamentals: "Margins and pricing power", model: "This model"};
+let msRange = "3y";
+function msFmt(v, unit){
+  if(v == null) return "—";
+  v = +v;
+  if(unit === "share") return (v * 100).toFixed(1) + "%";
+  if(unit === "return") return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + " pts";
+  if(unit === "points" || unit === "rank gap") return (v > 0 ? "+" : "") + v.toFixed(unit === "rank gap" ? 2 : Math.abs(v) >= 20 ? 0 : 2);
+  if(unit === "sessions") return Math.round(v) + " sessions";
+  return v.toFixed(Math.abs(v) >= 20 ? 1 : 3);
+}
+/* One SVG line chart. The main series is on the left scale; each overlay gets its OWN scale (the
+ * legend says so), because a margin in percent and a breakeven in percent do not share an axis any
+ * more than a line and an index do. Gaps are gaps: a null breaks the line. */
+function msChart(chart, unit){
+  if(!chart || !(chart.d || []).length) return `<div class="muted" style="font-size:var(--fs-xs)">No history to draw.</div>`;
+  const cut = msRange === "all" ? "" : new Date(Date.now() - (msRange === "3y" ? 3 : 10) * 365.25 * 864e5).toISOString().slice(0, 10);
+  const i0 = Math.max(0, chart.d.findIndex(x => x >= cut));
+  const d = chart.d.slice(i0), W = 560, H = 132, P = 4, x = i => P + (W - 2 * P) * i / Math.max(1, d.length - 1);
+  const path = (arr, col, wd, dash) => { const v = arr.slice(i0), ok = v.filter(z => z != null); if(!ok.length) return "";
+    const lo = Math.min(...ok), hi = Math.max(...ok), y = z => H - P - (H - 2 * P) * (hi > lo ? (z - lo) / (hi - lo) : 0.5);
+    let s = "", pen = false; v.forEach((z, i) => { if(z == null){ pen = false; return; } s += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(z).toFixed(1); pen = true; });
+    return `<path d="${s}" fill="none" stroke="${col}" stroke-width="${wd}"${dash ? ` stroke-dasharray="${dash}"` : ""} vector-effect="non-scaling-stroke"/>`; };
+  const cols = [C.amber, C.muted], ov = Object.entries(chart.overlay || {});
+  const zero = (() => { const v = chart.v.slice(i0).filter(z => z != null); if(!v.length) return ""; const lo = Math.min(...v), hi = Math.max(...v);
+    if(!(lo < 0 && hi > 0)) return ""; const y = H - P - (H - 2 * P) * (0 - lo) / (hi - lo);
+    return `<line x1="${P}" x2="${W - P}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.muted}" stroke-width="0.6" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>`; })();
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block">${zero}
+      ${ov.map(([_k, a], j) => path(a, cols[j % 2], 1, "3 2")).join("")}${path(chart.v, C.accent, 1.5)}</svg>
+    <div class="muted" style="font-size:var(--fs-xs);display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between">
+      <span>${esc(d[0])} → ${esc(d[d.length - 1])}</span>
+      <span>${ov.length ? `<span style="color:${C.accent}">━</span> this indicator ` + ov.map(([k], j) => `<span style="color:${cols[j % 2]}">┅</span> ${esc(k)}`).join(" ") + " · each line on its own scale" : ""}</span></div>`;
+}
+function msCard(r, newest){
+  const on = Object.entries(r.forms || {}).filter(([_f, s]) => s.on && (s.passing || []).length);
+  /* The chip is the verdict of what is TRUE TONIGHT, not of the indicator's best form: an indicator
+   * whose predictive form is off and whose merely suggestive form is on is "Suggestive · active". */
+  const live = on.flatMap(([_f, s]) => s.passing.map(e => e.verdict));
+  const shown = r.verdict === "NOT_SHOWN" || !on.length ? r.verdict : (live.includes("PREDICTIVE") ? "PREDICTIVE" : "SUGGESTIVE");
+  const [vl, vc, vt] = MS_VERDICT[shown] || MS_VERDICT.UNTESTED;
+  const waits = Object.entries(r.forms || {}).filter(([_f, s]) => !s.on && (s.passing || []).length);
+  const ev = e => `${esc(MS_TARGET[e.target] || e.target)} <b style="color:${e.diff > 0 ? C.green : C.red}">${e.diff > 0 ? "+" : ""}${(e.diff * 100).toFixed(1)} pts</b>
+      <span class="muted">(t ${(+e.t).toFixed(1)}${e.verdict === "SUGGESTIVE" ? ", suggestive" : ""})</span>`;
+  const state = r.value == null ? `<p class="amber" style="font-size:var(--fs-sm)">No reading.</p>`
+    : r.verdict === "NOT_SHOWN" ? `<p class="muted" style="font-size:var(--fs-sm)">No state of this indicator predicted in the test. It carries no weight in the read.</p>`
+    : on.length ? on.map(([_f, s]) => `<p style="font-size:var(--fs-sm);margin:4px 0"><b>True tonight:</b> ${esc(s.text)}
+          <span class="muted">(${Math.round(((s.passing[0] || {}).share_of_days || 0) * 100)}% of days)</span>. Followed by: ${s.passing.map(ev).join(" · ")}</p>`).join("")
+    : `<p class="muted" style="font-size:var(--fs-sm)">Not in a state that has predicted. It would matter when ${waits.map(([_f, s]) => esc(s.text)).join(", or ")}.</p>`;
+  return `<div class="card" style="padding:12px">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap">
+      <b>${esc(r.name)}</b><span class="chip ${on.length && r.verdict !== "NOT_SHOWN" ? vc : ""}" title="${esc(vt)}">${vl}${on.length && r.verdict !== "NOT_SHOWN" ? " · active" : ""}</span></div>
+    <div style="display:flex;gap:14px;align-items:baseline;margin:4px 0 6px;flex-wrap:wrap">
+      <span style="font-size:var(--fs-xl,20px);font-weight:700">${msFmt(r.value, r.unit)}</span>
+      <span class="muted" style="font-size:var(--fs-sm)">${r.pct == null ? "no percentile yet" : "higher than " + Math.round(r.pct * 100) + "% of its own history"}
+        ${r.change_21 == null ? "" : " · 21 sessions " + msFmt(r.change_21, r.unit === "share" ? "return" : r.unit === "sessions" ? "sessions" : "points")}</span>
+      ${r.as_of && newest && r.as_of < newest ? `<span class="chip warn" title="This input was not refreshed for the newest session">as of ${esc(r.as_of)}</span>` : ""}</div>
+    ${msChart(r.chart, r.unit)}${state}
+    <div class="muted" style="font-size:var(--fs-xs)">${esc(r.description || "")}</div></div>`;
+}
+function keithNote(row, anchor, weekly){
+  if(!row || !row.payload) return "";
+  const b = row.payload, earlier = anchor && row.as_of !== anchor;
+  const para = (h, t) => t ? `<div><h4>${h}</h4><p>${esc(t)}</p></div>` : "";
+  const body = weekly ? para("The week", b.week) + para("Weight of evidence", b.regime) + para("What it has meant for allocation", b.allocation)
+    : para("The tape", b.tape) + para("What it has meant for allocation", b.allocation) + para("What changed", b.changed) + para("Context only", b.context_only);
+  const tail = weekly ? b.next_week : b.watch;
+  return `<div class="card brief" id="${weekly ? "memoKeithW" : "memoKeith"}" style="scroll-margin-top:96px">
+    <div class="bhead"><div><div class="caps">Keith · markets agent · ${weekly ? "weekly" : "daily"} · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
+      <h3>${esc(b.headline || "")}</h3></div></div>
+    ${earlier ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} session's note. The one for ${esc(anchor)} is written after the close.</div>` : ""}
+    <div class="bgrid">${body}</div>
+    ${tail ? `<p class="blede" style="margin-top:10px"><b>${weekly ? "Next week" : "Watching"}.</b> ${esc(tail)}</p>` : ""}
+    <div class="note" style="margin-top:8px">An AI agent's reading of indicators that were each tested on 25 years of history. It states what the evidence has meant, not what to do; it is not a forecast or advice.</div></div>`;
+}
+async function marketSignals(el){
+  let rows;
+  try{ rows = await q("site_market_signals"); }
+  catch(e){ el.innerHTML = `<div class="card"><div class="caps">Market signals</div><p class="amber">The indicators did not load (${esc(e.message || e)}), so this is unknown.</p></div>`; return; }
+  if(!rows || !rows.length){ el.innerHTML = `<div class="card"><div class="caps">Market signals</div><p class="muted">Not built yet.</p></div>`; return; }
+  const newest = rows.map(r => r.as_of).filter(Boolean).sort().pop();
+  const rank = {PREDICTIVE: 0, SUGGESTIVE: 1, NOT_SHOWN: 2, UNTESTED: 3};
+  const active = r => r.verdict !== "NOT_SHOWN" && Object.values(r.forms || {}).some(s => s.on && (s.passing || []).length);
+  const eff = {"higher forward returns": [], "lower forward returns": [], "shallower drawdowns": [], "deeper drawdowns": []};
+  for(const r of rows) for(const s of Object.values(r.forms || {})) if(s.on) for(const e of (s.passing || [])){
+    const k = e.target.includes("dd") ? (e.diff > 0 ? "shallower drawdowns" : "deeper drawdowns") : (e.diff > 0 ? "higher forward returns" : "lower forward returns");
+    const tag = r.name + (e.target.startsWith("book") ? " (book)" : " (index)");
+    if(!eff[k].includes(tag)) eff[k].push(tag); }
+  const briefs = LIVE.briefs || [], kd = briefs.filter(x => x.kind === "keith")[0], kw = briefs.filter(x => x.kind === "keith_weekly")[0];
+  const tested = rows.filter(r => r.verdict === "PREDICTIVE" || r.verdict === "SUGGESTIVE");
+  const draw = () => {
+    const fams = Object.keys(MS_FAMILY).map(f => { const g = rows.filter(r => r.family === f).sort((a, b) => (active(b) - active(a)) || (rank[a.verdict] - rank[b.verdict]) || a.name.localeCompare(b.name));
+      return !g.length ? "" : `<h4 style="margin:16px 0 8px">${esc(MS_FAMILY[f])}</h4><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px">${g.map(r => msCard(r, newest)).join("")}</div>`; }).join("");
+    el.innerHTML = (kd ? keithNote(kd) : "") + (kw ? `<details style="margin-top:10px"><summary>Keith's weekly note · ${esc(kw.as_of)}</summary>${keithNote(kw, null, true)}</details>` : "") +
+      `<div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+        <div class="caps">Market signals · session ${esc(newest || "—")}</div>
+        <span>${["3y", "10y", "all"].map(k => `<button class="bbtn" data-msr="${k}" ${msRange === k ? 'style="font-weight:700"' : ""}>${k === "all" ? "All" : k}</button>`).join(" ")}</span></div>
+        <p style="margin:8px 0 4px"><b>${tested.filter(active).length} of ${tested.length}</b> tested indicators are in a state that has predicted.
+          ${Object.entries(eff).filter(([_k, v]) => v.length).map(([k, v]) => `<span title="${esc(v.join(", "))}"><b>${v.length}</b> point to ${k}</span>`).join(" · ") || "None is active tonight."}</p>
+        <p class="muted" style="font-size:var(--fs-sm);margin:0">Every indicator was tested against what SPY and this process's book did over the next 21 and 63 sessions.
+          "Predictive" needs a t-statistic of 2.5 and the same sign in both halves of the history; "context only" means the test found nothing and the indicator carries no weight.
+          The same stress often points both ways (better average returns, deeper drawdowns on the way). The indicators overlap, so the count is fewer independent facts than it looks.
+          Breadth uses each day's actual index members; delisted members are partly missing from the early years.</p>
+        ${fams}</div>`;
+    el.querySelectorAll("[data-msr]").forEach(b => b.onclick = () => { msRange = b.dataset.msr; draw(); });
+  };
+  draw();
+}
 /* ═══ MARKETS — the major equity indices, on the same chart as everything else ═══════════════
  *
  * Six ETFs, chosen to span the thing rather than to be six large funds: US large (SPY), US
@@ -4011,6 +4131,7 @@ async function markets(el){
           title="Chart any tracked ticker: a holding, a universe name, a sector or factor fund"><button class="tfb" type="submit">Go</button></form></div>`
     + (mktMiss ? `<p class="amber" style="margin:8px 0 0">No price history is stored for ${esc(mktMiss)}, so ${esc(mktSym)} is shown instead.</p>` : "")
     + `<div class="card" style="padding:12px;margin-top:10px"><div id="mktChart"></div></div>`
+    + `<div id="mktSig" style="margin-top:14px"></div>`
     + `<div id="mktRot" style="margin-top:14px"></div>`
     + `<div id="mktMaps" style="margin-top:14px"></div>`
     + `<div style="margin-top:14px">` + breadthCard + `</div>`
@@ -4032,6 +4153,8 @@ async function markets(el){
   if(form) form.onsubmit = (e) => { e.preventDefault(); pick(document.getElementById("mktQ").value); };
   // GBG Sector Map and the index / factor / theme map; selecting a row charts that fund above
   const maps = document.getElementById("mktMaps");
+  const sig = document.getElementById("mktSig");
+  if(sig) marketSignals(sig).catch(e => { sig.innerHTML = `<div class="note">Market signals unavailable: ${esc(e.message || e)}</div>`; });
   const rot = document.getElementById("mktRot");
   if(rot) rotationCard(rot).catch(e => { rot.innerHTML = `<div class="note">Rotation unavailable: ${esc(e.message || e)}</div>`; });
   if(maps) gbgMarketsMaps(maps, pick).catch(e => { maps.innerHTML = `<div class="note">GBG maps unavailable: ${esc(e.message || e)}</div>`; });
@@ -6554,15 +6677,17 @@ async function memo(el){
     // the trading day the page showed three notes and silently no fourth
     const mo = at("premarket"), un = at("universe"),
           te = at("technicals") || B.filter(x => x.kind === "technicals" && x.as_of < d)[0],
-          ro = at("rotation") || B.filter(x => x.kind === "rotation" && x.as_of < d)[0];
+          ro = at("rotation") || B.filter(x => x.kind === "rotation" && x.as_of < d)[0],
+          ke = at("keith") || B.filter(x => x.kind === "keith" && x.as_of < d)[0], kw = at("keith_weekly");
     const nav = `<span class="bnav">
       <button class="bbtn" data-md="1" ${memoIdx>=dates.length-1?"disabled":""} title="Earlier">←</button>
       <span class="mono muted" style="font-size:var(--fs-sm)">${d}</span>
       <button class="bbtn" data-md="-1" ${memoIdx<=0?"disabled":""} title="Later">→</button></span>`;
-    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals", ro && "rotation"].filter(Boolean).join(" · ");
+    const have = [mo && "morning", un && "universe", ev && "close", te && "technicals", ro && "rotation", ke && "Keith", kw && "Keith weekly"].filter(Boolean).join(" · ");
     el.innerHTML = head("Memo", "Market memo",
       `<span class="muted">${d} · ${have || "nothing written"} ${nav}</span>`) +
       memoLongerTerm([["Morning", C.accent, mo], ["Universe", C.green, un], ["Close", C.amber, ev]]) +
+      (typeof keithNote === "function" ? keithNote(ke, d) + keithNote(kw, null, true) : "") +
       memoMorning(mo) + memoUniverse(un) + memoEvening(ev, d) + memoTechnicals(te, d) + (typeof rotationNote === "function" ? rotationNote(ro, d) : "") +
       `<div class="note" style="margin-top:14px">Five notes, each from a different point in the day (the rotation note, written after the close, reads sector and factor leadership against the book):
        the morning note is what you are walking into, the universe note covers all ${(D.universe || []).length || "the"} tracked names
