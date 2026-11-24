@@ -472,6 +472,18 @@ sup.srank{font:600 var(--fs-xs) var(--mono);color:var(--brand);margin-left:1px}
 .kv{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(255,255,255,.02)}
 .kv span{font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase}
 .kv b{font-size:var(--fs-base)}
+/* the front page of a thesis (format 2): a headline, a strip of numbers, then short sections two abreast */
+.thesis-front .tf-lead{font-size:var(--fs-lg);line-height:1.5;margin:6px 0 0}
+.tf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 28px;margin-top:16px}
+.tf-sec h4{margin:0 0 4px}
+.tf-sec p{margin:0;line-height:1.55}
+.tf-sec .list{margin:0}
+@media (max-width:760px){ .tf-grid{grid-template-columns:minmax(0,1fr)} }
+/* the financial record: plain-word labels (not the mono caps of the key numbers), figures right-aligned */
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kvs.fin{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.kvs.fin .kv span{font-family:inherit;letter-spacing:0;text-transform:none}
+.tbl.fin th.num,.tbl.fin td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .thesis-full{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .thesis-full>summary{cursor:pointer;font:500 var(--fs-sm) var(--mono);color:var(--muted);list-style:none}
 .thesis-full>summary::marker,.thesis-full>summary::-webkit-details-marker{display:none}
@@ -556,7 +568,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
       <div id="err" class="err" role="status" aria-live="polite"></div>
     </form>
     <div id="gateStatus" class="gate-status" role="status" aria-live="polite">Checking your session…</div>
-    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-23 22:00 · 9ffb7c4</div>
+    <div class="gate-foot">Integrity Wealth Partners · internal use only · build 2026-11-24 01:09 · 1d25908</div>
   </div>
 </section>
 
@@ -592,7 +604,7 @@ details.drfold>.drfb>.sec:first-child{margin-top:8px}
               title="All tabs">☰ <span class="mlabel">Menu</span></button>
       <div class="menupanel" id="menupanel" role="menu" hidden></div>
     </div>
-    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-23 22:00 · 9ffb7c4</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
+    <span class="caps buildstamp" style="font-size:var(--fs-xs);opacity:.5;margin-right:10px" title="page build">2026-11-24 01:09 · 1d25908</span><span id="pipestate" style="margin-right:10px"></span><button class="lock" id="lock" title="Sign out">Sign out</button>
   </div></header>
   <main id="view"></main>
 </div>
@@ -4213,12 +4225,12 @@ function keithNote(row, anchor, weekly){
     : para("The tape", b.tape) + para("What it has meant for allocation", b.allocation) + para("What changed", b.changed) + para("Context only", b.context_only);
   const tail = weekly ? b.next_week : b.watch;
   return `<div class="card brief" id="${weekly ? "memoKeithW" : "memoKeith"}" style="scroll-margin-top:96px">
-    <div class="bhead"><div><div class="caps">Keith · markets agent · ${weekly ? "weekly" : "daily"} · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
+    <div class="bhead"><div><div class="caps">Keith · AI markets agent · ${weekly ? "weekly" : "daily"} · ${esc(row.as_of)} ${typeof writtenAt === "function" ? writtenAt(row) : ""}</div>
       <h3>${esc(b.headline || "")}</h3></div></div>
     ${earlier ? `<div class="note" style="margin-bottom:10px">This is the ${esc(row.as_of)} session's note. The one for ${esc(anchor)} is written after the close.</div>` : ""}
     <div class="bgrid">${body}</div>
     ${tail ? `<p class="blede" style="margin-top:10px"><b>${weekly ? "Next week" : "Watching"}.</b> ${esc(tail)}</p>` : ""}
-    <div class="note" style="margin-top:8px">An AI agent's reading of indicators that were each tested on 25 years of history. It states what the evidence has meant, not what to do; it is not a forecast or advice.</div></div>`;
+    <div class="note" style="margin-top:8px">Written by an AI agent, in a voice modelled on a public market commentator's style: it is not that person's work, words or view. A reading of indicators that were each tested on 25 years of history. It states what the evidence has meant, not what to do; it is not a forecast or advice.</div></div>`;
 }
 async function marketSignals(el){
   let rows;
@@ -6359,24 +6371,124 @@ async function riskAll(el){
 }
 // The Book, Buy list, Market, Evidence and Reference tabs are composed in v14.js.
 /* ═══ THESES (Catalyst · Edge · Risk) ═════════════════════════════════════ */
-function plainBlock(t, docState, compact = false){
-  const P = t.plain; if(!P) return "";
+/* ── THE FRONT PAGE OF A THESIS (format 2, 2026-11-23) ─────────────────────────────────────────
+ * Niko: "I want the thesis to be summarized. I want that part the be the focus and quickly be able
+ * to understand the business, risk, fundamental story, growth story, edge, model read … in more
+ * laymen terms with less jargon and numbers." scripts/thesis_plain.py writes it; what it must be is
+ * engines.thesis_draft.check_plain. The figures live in ONE strip; the prose is words.
+ * A summary in the old format (before 2026-11-23) is still drawn, in its own layout, never dropped. */
+const _thGrade = {A: "A, the top of its four groups", B: "B, the second of its four groups", C: "C, the third of its four groups", D: "D, the bottom of its four groups"};
+function modelReadLive(tk){
+  // The model's reading TONIGHT, in plain words, from the grid row. null when the grid is not loaded:
+  // the stored sentence is then shown with its date, so an old reading is never passed off as tonight's.
+  const m = (LIVE.matrixBy || {})[tk] || (LIVE.matrix || []).find(r => r.ticker === tk);
+  if(!m || !m.grade) return null;
+  const s = [`Our model grades it ${_thGrade[m.grade] || m.grade}.`];
+  s.push(m.list_action === "BUY_LIST" ? `It is on the model's buy list, ranked ${m.list_rank}.`
+       : m.list_rank ? `It is not on the model's buy list: it ranks ${m.list_rank}, and the list is the top 25.`
+       : `It is not on the model's buy list.`);
+  if(m.composite != null){
+    const c = +m.composite;
+    s.push(c >= 7 ? `Its quality scores clear the bar comfortably (${c.toFixed(1)} against 6.5).`
+         : c >= 6.5 ? `Its quality scores clear the bar only narrowly (${c.toFixed(1)} against 6.5).`
+         : `Its quality scores are below the bar (${c.toFixed(1)} against 6.5).`);
+  }
+  if(m.veto_reason) s.push(`Something holds it back: ${m.veto_reason}.`);
+  const tr = String(m.trend || "").toUpperCase();
+  if(tr) s.push((tr === "UPTREND" ? "The share price is in a rising trend" : tr === "DOWNTREND" ? "The share price is in a falling trend" : "The share price has no clear trend")
+    + ", which is about timing and not about the business.");
+  return s.join(" ");
+}
+function frontPage(P, opt = {}){
+  const li = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
   const num = (P.numbers||[]).map(n => `<div class="kv"><span class="muted">${esc(n.label)}</span><b>${esc(n.value)}</b></div>`).join("");
-  const li  = a => (a||[]).map(x => `<li>${esc(x)}</li>`).join("");
-  const why = `<h4 style="margin-top:12px">Why we own it</h4><p>${esc(P.why_we_own)}</p>
-    <h4 style="margin-top:12px">Why this one</h4><p>${esc(P.edge)}</p>`;
-  const watch = `<h4 style="margin-top:12px">What we're watching</h4><ul class="list">${li(P.watch)}</ul>`;
-  const sell = `<h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>`;
-  // In the drawer the snapshot, the numbers and the sell conditions stay in view (they are what a
-  // decision is checked against); the argument and the watch list are one click away.
-  if(compact) return `<div class="sec"><h4>Thesis ${docState}</h4>
-    <p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>
-    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${sell}
-    ${drFold("Why we own it, why this one, and what we're watching", why + watch)}</div>`;
-  return `<div class="sec"><h4>Thesis ${docState}</h4>
-    <p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>${why}
-    ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${watch}${sell}
-  </div>`;
+  const head = `<h4>${opt.title || "Thesis"} ${opt.state || ""}</h4>`;
+  if(P.format !== 2){                         // the format before 2026-11-23
+    const why = `<h4 style="margin-top:12px">Why we own it</h4><p>${esc(P.why_we_own)}</p><h4 style="margin-top:12px">Why this one</h4><p>${esc(P.edge)}</p>`;
+    const watch = `<h4 style="margin-top:12px">What we're watching</h4><ul class="list">${li(P.watch)}</ul>`;
+    const sell = `<h4 style="margin-top:12px">What would make us sell</h4><ul class="list">${li(P.sell_if)}</ul>`;
+    if(opt.compact) return `<div class="sec">${head}<p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>
+      ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${sell}${drFold("Why we own it, why this one, and what we're watching", why + watch)}</div>`;
+    return `<div class="sec">${head}<p style="font-size:var(--fs-lg);line-height:1.5">${esc(P.snapshot)}</p>${why}
+      ${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}${watch}${sell}</div>`;
+  }
+  const live = opt.tk ? modelReadLive(opt.tk) : null;
+  const sec = (h, body) => body ? `<div class="tf-sec"><h4>${h}</h4>${body}</div>` : "";
+  const para = x => x ? `<p>${esc(x)}</p>` : "";
+  const story = sec("The business", para(P.business)) + sec("The fundamental story", para(P.fundamentals))
+    + sec("The growth story", para(P.growth)) + sec("The edge", para(P.edge));
+  const risks = sec("The risks", `<ul class="list">${li(P.risks)}</ul>`);
+  const sell = sec("What would make us sell", `<ul class="list">${li(P.sell_if)}</ul>`);
+  const model = sec("What the model says", live ? para(live)
+    : para(P.model_read) + (P.model_as_of ? `<p class="muted" style="font-size:var(--fs-xs)">As the model stood on ${esc(P.model_as_of)}.</p>` : ""));
+  const unk = (P.unknowns||[]).length ? sec("What we don't know yet", `<ul class="list">${li(P.unknowns)}</ul>`) : "";
+  const lead = `<p class="tf-lead">${esc(P.headline)}</p>${num ? `<div class="kvs" style="margin-top:12px">${num}</div>` : ""}`;
+  // In the drawer the headline, the numbers and the sell conditions stay in view (they are what a
+  // decision is checked against); the stories are one click away.
+  if(opt.compact) return `<div class="sec thesis-front">${head}${lead}${sell}
+    ${drFold("The business, the fundamental and growth stories, the edge, the risks and the model's read", `<div class="tf-grid">${story}${risks}${model}${unk}</div>`)}</div>`;
+  return `<div class="sec thesis-front">${head}${lead}<div class="tf-grid">${story}${risks}${sell}${model}${unk}</div></div>`;
+}
+function plainBlock(t, docState, compact = false){
+  return t.plain ? frontPage(t.plain, {state: docState, compact, tk: t.ticker}) : "";
+}
+/* ── THE FINANCIAL RECORD (db/097, engines/thesis_financials.py) ───────────────────────────────
+ * Five fiscal years, the recent quarters, the last four quarters added up, the balance sheet, what
+ * the price implies, consensus, and the same ratios for named peers. One stored object, dated
+ * inside. A figure the record does not hold is a dash, never a zero. */
+function _fM(v, ccy){
+  if(v == null) return "—";
+  const a = Math.abs(v), s = a >= 1e9 ? (a/1e9).toFixed(2) + "bn" : (a/1e6).toFixed(0) + "m";
+  return (v < 0 ? "−" : "") + (ccy === "?" ? "" : !ccy || ccy === "USD" ? "$" : ccy + " ") + s;   // "?" = the label is suspect: no currency is printed
+}
+const _fP = (v, signed) => v == null ? "—" : (signed && v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v*100).toFixed(1) + "%";
+const _fX = (v, d = 1) => v == null ? "—" : (+v).toFixed(d) + "×";
+function financialsBlock(F){
+  if(!F) return "";
+  // A currency label the record itself calls suspect is not printed on every figure: the note above the tables says why.
+  const c = F.currency_suspect ? "?" : F.currency, per = k => esc(String(k || "").slice(0, 7));
+  const grid = (cols, rows) => `<div class="table-wrap"><table class="tbl fin"><thead><tr><th></th>${cols.map(x => `<th class="num">${x}</th>`).join("")}</tr></thead><tbody>${
+    rows.map(r => `<tr><td class="muted">${r[0]}</td>${r.slice(1).map(x => `<td class="num">${x}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const kv = rows => `<div class="kvs fin">${rows.filter(r => r[1] !== "—").map(r => `<div class="kv"><span class="muted">${r[0]}</span><b>${r[1]}</b></div>`).join("")}</div>`;
+  const A = [...(F.annual || [])].reverse(), Q = [...(F.quarters || [])].reverse(), t = F.ttm || {}, b = F.balance || {}, m = F.market || {};
+  const years = A.length ? `<h4 style="margin-top:6px">Fiscal years</h4>` + grid(A.map(a => per(a.period)), [
+      ["Revenue", ...A.map(a => _fM(a.revenue, c))], ["Growth on the year before", ...A.map(a => _fP(a.revenue_growth, true))],
+      ["Gross profit, share of revenue", ...A.map(a => _fP(a.gross_margin))], ["Operating profit, share of revenue", ...A.map(a => _fP(a.operating_margin))],
+      ["Net income", ...A.map(a => _fM(a.net_income, c))], ["Free cash flow", ...A.map(a => _fM(a.fcf, c))],
+      ["Free cash flow, share of revenue", ...A.map(a => _fP(a.fcf_margin))]]) : "";
+  const quarters = Q.length ? `<h4 style="margin-top:14px">Recent quarters</h4>` + grid(Q.map(a => per(a.period)), [
+      ["Revenue", ...Q.map(a => _fM(a.revenue, c))], ["Growth on a year earlier", ...Q.map(a => _fP(a.revenue_growth_yoy, true))],
+      ["Operating profit, share of revenue", ...Q.map(a => _fP(a.operating_margin))], ["Net income", ...Q.map(a => _fM(a.net_income, c))]]) : "";
+  const last4 = t.revenue != null ? `<h4 style="margin-top:14px">The last four quarters, to ${per(t.to)}</h4>` + kv([
+      ["Revenue", _fM(t.revenue, c)], ["Operating profit, share of revenue", _fP(t.operating_margin)], ["Net income", _fM(t.net_income, c)],
+      ["Cash from operations", _fM(t.operating_cash_flow, c)], ["Free cash flow", _fM(t.fcf, c)], ["Free cash flow per $1 of net income", t.fcf_to_net_income == null ? "—" : "$" + t.fcf_to_net_income.toFixed(2)],
+      ["Shares bought back", _fM(t.buybacks, c)], ["Dividends paid", _fM(t.dividends, c)], ["Pay given in shares, share of revenue", _fP(t.sbc_share_of_revenue)]]) : "";
+  const bal = b.period ? `<h4 style="margin-top:14px">Balance sheet at ${per(b.period)}</h4>` + kv([
+      ["Cash and short-term investments", _fM(b.cash, c)], ["Debt", _fM(b.debt, c)], ["Net debt (debt less cash)", _fM(b.net_debt, c)],
+      ["Shareholders' equity", _fM(b.equity, c)], ["Net debt against a year's operating profit before depreciation", b.net_debt_to_ebitda == null ? "—" : b.net_debt_to_ebitda <= 0 ? "more cash than debt" : _fX(b.net_debt_to_ebitda)]]) : "";
+  const val = Object.keys(m).length ? `<h4 style="margin-top:14px">Valuation and returns${m.price_date ? `, ${esc(m.price_date)}` : ""}</h4>` + kv([
+      ["Market value", _fM(m.market_cap)], ["Enterprise value (market value plus net debt)", _fM(m.enterprise_value)],
+      ["Free cash flow as a share of enterprise value", _fP(m.fcf_ev_yield)], ["Price against next year's expected earnings", _fX(m.pe_forward)],
+      ["Free cash flow growth the price implies, a year for five years", _fP(m.implied_fcf_cagr)],
+      ["Return on invested capital" + (m.roic_basis === "CAPITAL_LIGHT" ? " (overstated: little capital is tied up)" : ""), _fP(m.roic)],
+      ["Return on equity", (b.equity != null && b.equity <= 0) ? "—" : _fP(m.roe)], ["Return on assets", _fP(m.roa)], ["Shares bought back, share of market value", _fP(m.buyback_yield)]]) : "";
+  const E = F.estimates || [];
+  const est = E.length ? `<h4 style="margin-top:14px">What analysts expect</h4>` + grid(E.map(e => "year to " + per(e.fiscal_year_end)), [
+      ["Earnings per share", ...E.map(e => e.eps == null ? "—" : "$" + e.eps.toFixed(2))], ["Change in 30 days", ...E.map(e => _fP(e.eps_change_30d, true))],
+      ["Change in 90 days", ...E.map(e => _fP(e.eps_change_90d, true))], ["Revenue", ...E.map(e => _fM(e.revenue))],
+      ["Analysts", ...E.map(e => e.analysts == null ? "—" : String(Math.round(e.analysts)))],
+      ["Raised / lowered in 30 days", ...E.map(e => e.raised_30d == null && e.lowered_30d == null ? "—" : `${Math.round(e.raised_30d || 0)} / ${Math.round(e.lowered_30d || 0)}`)]]) : "";
+  const own = (F.annual || [])[0], P = F.peers || [];
+  const prow = (name, p, cc) => [name, per(p.period), _fM(p.revenue, cc), _fP(p.revenue_growth, true), _fP(p.gross_margin), _fP(p.operating_margin), _fP(p.net_margin), _fP(p.fcf_margin)];
+  const peers = P.length && own ? `<h4 style="margin-top:14px">Against the peers its profile names</h4>` + tbl(
+      ["", "Fiscal year to", "Revenue", "Growth", "Gross profit", "Operating profit", "Net income", "Free cash flow"],
+      [prow("<b>This company</b>", own, c), ...P.map(p => prow(`${esc(p.ticker)} <span class="muted">${esc(p.name || "")}</span>`, p, p.currency))])
+      + `<p class="muted" style="font-size:var(--fs-xs)">Margins are shares of revenue. Each row is that company's own latest fiscal year, which may end in a different month and follow different accounting: read it for faster or slower and wider or narrower, not for a like-for-like level.</p>` : "";
+  const notes = [...(F.notes || [])].map(n => `<p class="amber" style="font-size:var(--fs-sm)">${esc(n)}</p>`).join("")
+    + (F.currency_suspect ? `<p class="amber" style="font-size:var(--fs-sm)">Statement amounts below are shown with no currency for that reason; the valuation figures are in US dollars.</p>` : "");
+  return `<details class="thesis-full"><summary>Financials — fiscal years, recent quarters, balance sheet, valuation, what analysts expect${P.length ? ", peers" : ""}</summary>
+    <div class="sec">${notes}${years}${quarters}${last4}${bal}${val}${est}${peers}
+    <p class="muted" style="font-size:var(--fs-xs);margin-top:10px">As of ${esc(F.as_of || "")}. ${esc((F.source || "").replace(/^./, x => x.toUpperCase()))}. A vendor's copy of the statements, not the filing itself; a dash means the record does not hold the figure.</p></div></details>`;
 }
 /* ── THESIS WATCH: is anything this thesis said to watch actually happening? (db/083) ──────────
  * scripts/thesis_watch.py reads every holding's locked thesis each night and gives one verdict
@@ -6467,8 +6579,9 @@ function thesisBlock(tk, full=false, compact=false){
     ${(t.open_questions||[]).length ? `<h4 style="margin-top:10px">Open questions</h4><ul class="list">${li(t.open_questions)}</ul>` : ""}
   </div>`;
   const watch = thesisProposalBlock(tk) + thesisWatchBlock(tk, compact);
-  if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${docState}</h4>`);
-  return watch + plain + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
+  const fin = financialsBlock(t.financials);
+  if(!plain) return watch + detail.replace('<div class="sec">', `<div class="sec"><h4>Thesis ${docState}</h4>`) + fin;
+  return watch + plain + fin + `<details class="thesis-full"${full?"":""}><summary>Full research record — sources, risk triggers, model view</summary>${detail}</details>`;
 }
 /* A PROPOSED THESIS REVISION (db/088, scripts/thesis_analyst.py). A model drafted it; it is NOT the
  * thesis. It is shown above the thesis it would replace, as a list of what it changes, and it
@@ -6498,6 +6611,7 @@ function thesisProposalBlock(tk){
         ...p.draft.invalidation.map((x, i) => [`I${i + 1}`, esc(x), `<span class="muted">sell condition</span>`,
            kinds(`I${i + 1}`).join() === "none" ? `<span class="amber">nothing collected nightly</span>` : esc(kinds(`I${i + 1}`).join(", ").replaceAll("_", " "))])])}</details>
     ${blind.length ? `<p class="muted" style="font-size:var(--fs-sm)">${blind.length} sell condition(s) (${blind.join(", ")}) could not be checked from anything collected nightly; "no sell condition met" would not cover them.</p>` : ""}
+    ${p.plain ? `<details><summary>The front page it would carry</summary>${frontPage(p.plain, {title: "The revision in brief", state: word("· proposed", "warn"), tk})}</details>` : ""}
     ${ruled}</div>`;
 }
 /* A FIRST THESIS (2026-11-23): a name with no thesis, drafted by the analyst against version 0. There
@@ -6507,13 +6621,7 @@ function firstThesisBlock(tk, p){
   const d = p.draft || {}, li = a => (a || []).map(x => `<li>${esc(x)}</li>`).join("");
   const kinds = k => (p.checks || {})[k] || ["none"];
   const chk = k => kinds(k).join() === "none" ? `<span class="amber">nothing collected nightly</span>` : esc(kinds(k).join(", ").replaceAll("_", " "));
-  return `<div class="sec" style="border-left:3px solid ${C.amber};padding-left:12px">
-    <h4>A first thesis is proposed ${word("· not a thesis yet", "warn")}</h4>
-    <p class="muted" style="font-size:var(--fs-sm)">Drafted ${esc(String(p.created_at).slice(0, 10))} by the thesis analyst from filed figures, the latest earnings call, the company's profile, estimates and three weeks of news.
-      ${esc(tk)} has no thesis until a person accepts this, on Today or with <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>). Accepting locks version 1 and buys nothing.</p>
-    ${p.rationale ? `<p><b>The analyst's note:</b> ${esc(p.rationale)}</p>` : ""}
-    ${(p.notes || []).length ? `<p class="amber" style="font-size:var(--fs-sm)">${(p.notes || []).map(esc).join(" · ")}</p>` : ""}
-    ${d.theme ? `<div class="caps" style="margin:10px 0 8px">${esc(d.theme)}</div>` : ""}
+  const record = `    ${d.theme ? `<div class="caps" style="margin:10px 0 8px">${esc(d.theme)}</div>` : ""}
     ${d.business ? `<p class="muted">${esc(d.business)}</p>` : ""}
     <h4 style="margin-top:10px">The case for owning it</h4><p>${esc(d.catalyst?.summary)}</p><ul class="list">${li(d.catalyst?.drivers)}</ul>
     <h4 style="margin-top:10px">Edge — why this company</h4><p>${esc(d.edge?.summary)}</p>
@@ -6526,8 +6634,17 @@ function firstThesisBlock(tk, p){
     <h4 style="margin-top:10px">Model view</h4><p class="muted">${esc(d.model_view)}</p>
     ${d.confidence ? `<p class="muted"><b>Confidence:</b> ${esc(d.confidence)}</p>` : ""}
     <details><summary>The ${(d.evidence || []).length} dated facts it rests on</summary><ul class="list">${(d.evidence || []).map(e => `<li><span class="muted">${esc(e.date)} · ${esc(e.ref)}</span> — ${esc(e.fact)}</li>`).join("")}</ul></details>
-    ${(d.open_questions || []).length ? `<h4 style="margin-top:10px">What the evidence could not answer</h4><ul class="list">${li(d.open_questions)}</ul>` : ""}
-  </div>`;
+    ${(d.open_questions || []).length ? `<h4 style="margin-top:10px">What the evidence could not answer</h4><ul class="list">${li(d.open_questions)}</ul>` : ""}`;
+  return `<div class="sec" style="border-left:3px solid ${C.amber};padding-left:12px">
+    <h4>A first thesis is proposed ${word("· not a thesis yet", "warn")}</h4>
+    <p class="muted" style="font-size:var(--fs-sm)">Drafted ${esc(String(p.created_at).slice(0, 10))} by the thesis analyst from filed figures, the latest earnings call, the company's profile, estimates and three weeks of news.
+      ${esc(tk)} has no thesis until a person accepts this, on Today or with <span class="mono">python run.py thesis accept ${esc(tk)} "why"</span> (or <span class="mono">reject</span>). Accepting locks version 1 and buys nothing.</p>
+    ${p.rationale ? `<p><b>The analyst's note:</b> ${esc(p.rationale)}</p>` : ""}
+    ${(p.notes || []).length ? `<p class="amber" style="font-size:var(--fs-sm)">${(p.notes || []).map(esc).join(" · ")}</p>` : ""}
+    ${p.plain ? "" : `<p class="amber" style="font-size:var(--fs-sm)">No plain-English summary was written for this draft, so the full draft is shown.</p>`}
+  </div>` + (p.plain ? frontPage(p.plain, {title: "The draft in brief", state: word("· proposed", "warn"), tk}) : "") + financialsBlock(p.financials)
+  + (p.plain ? `<details class="thesis-full"><summary>Full research record — the draft itself: dated facts, risk triggers, what could check each</summary><div class="sec">${record}</div></details>`
+             : `<div class="sec">${record}</div>`);
 }
 let thesisSel = null;
 async function loadThesisWatch(){
@@ -6569,10 +6686,10 @@ async function theses(el){
     `<div class="grid g-1-2">` +
     card("Names", "held ★ · click to open", `<div class="table-wrap"><table class="tbl"><tbody>${
       firsts.map(tk => `<tr data-tk="${esc(tk)}" style="cursor:pointer${tk===thesisSel?';background:rgba(106,166,248,.08)':''}">
-        <td><b>${esc(tk)}</b></td><td class="muted">${esc(((LIVE.tprop[tk].find(p => p.status === "PROPOSED") || {}).draft || {}).theme || "")}</td>
+        <td><b>${esc(tk)}</b></td><td class="muted"><div class="clamp2">${esc(((LIVE.tprop[tk].find(p => p.status === "PROPOSED") || {}).draft || {}).theme || "")}</div></td>
         <td>${word("first thesis proposed", "warn")}</td><td></td></tr>`).join("") +
       T.sort((a,b) => (held.has(b.ticker)-held.has(a.ticker)) || a.ticker.localeCompare(b.ticker)).map(t => `<tr data-tk="${t.ticker}" style="cursor:pointer${t.ticker===thesisSel?';background:rgba(106,166,248,.08)':''}">
-        <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted">${esc(t.theme||"")}</td>
+        <td><b>${held.has(t.ticker)?"★ ":""}${esc(t.ticker)}</b></td><td class="muted"><div class="clamp2" title="${esc(t.theme||"")}">${esc(t.theme||"")}</div></td>
         <td>${t.status === "LOCKED" ? word("locked", "dim") : word("draft", "bad")}</td>
         <td>${held.has(t.ticker) ? watchBadge(t.ticker) : ""}</td></tr>`).join("")
     }</tbody></table></div>`) +
